@@ -1,0 +1,9 @@
+Manifest-Version: 1.0
+Implementation-Title: ox.softeng.metadatacatalogue.plugins.mc-plugin-d
+ atabase
+Implementation-Version: 1.12.1-SNAPSHOT.dev
+Specification-Title: metadata-catalogue mc-plugin-database Classes
+Created-By: 1.8 JVM, 3.5.1 Gradle
+Specification-Version: 1.12.1-SNAPSHOT
+Implementation-Vendor: Oxford University
+

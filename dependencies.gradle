@@ -1,5 +1,36 @@
 dependencies {
 
+    /**
+     * MC Dependencies
+     */
+    if (rootProject == parent) {
+        implementation group: 'ox.softeng.metadatacatalogue', name: 'mc-core', version: mcCoreVersion
+        testImplementation project(':test-utils')
+    }
+    else {
+        implementation project(':mc-core')
+        testImplementation project(':mc-plugins:test-utils')
+    }
+
+    // Postgres database
+    runtimeOnly group: 'org.postgresql', name: 'postgresql', version: postgresJdbcVersion
+
+    // Logging
+    implementation group: 'org.slf4j', name: 'slf4j-api', version: slf4jVersion
+    implementation group: 'org.codehaus.groovy', name: 'groovy', version: groovyVersion
+    compile group: 'org.codehaus.groovy', name: 'groovy-all', version: groovyVersion
+    runtimeOnly group: 'ch.qos.logback', name: 'logback-classic', version: logbackVersion
+
+    implementation group: 'com.google.guava', name: 'guava', version: guavaVersion
+    implementation group: 'org.apache.commons', name:'commons-lang3', version: '3.6'
+
+    /**
+     * Testing
+     */
+    testImplementation group: 'junit', name: 'junit', version: junitVersion
+    integrationTestImplementation group: 'org.flywaydb.flyway-test-extensions', name: 'flyway-spring-test', version: flywayVersion
+
+
     implementation group: 'com.fasterxml.jackson.core', name: 'jackson-annotations', version: jacksonVersion
     implementation group: 'com.fasterxml.jackson.datatype', name: 'jackson-datatype-jsr310', version: jacksonVersion
 

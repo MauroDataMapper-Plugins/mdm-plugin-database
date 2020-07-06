@@ -1,3 +1,31 @@
+import java.util.concurrent.TimeUnit
+
+buildscript {
+    repositories {
+        mavenLocal()
+        maven {url 'https://jenkins.cs.ox.ac.uk/artifactory/plugins-snapshot'}
+        maven {url 'https://jenkins.cs.ox.ac.uk/artifactory/plugins-release'}
+        jcenter()
+
+    }
+    dependencies {
+        classpath 'com.github.jengelman.gradle.plugins:shadow:2.0.1'
+        classpath 'ox.softeng.gradle:oxbrcinformatics-gradle-plugins:1.1'
+        classpath "gradle.plugin.nl.javadude.gradle.plugins:license-gradle-plugin:0.13.1"
+    }
+    configurations.classpath {
+        // check for updates every build
+        resolutionStrategy.cacheChangingModulesFor(0, TimeUnit.SECONDS)
+    }
+}
+
+apply plugin: 'ox.softeng.ox-brc-root-project'
+
+apply from: "${projectDir}/gradle/allprojects.gradle"
+apply from: "${projectDir}/gradle/subprojects.gradle"
+
+apply plugin: "com.github.hierynomus.license"
+
 jar{
     exclude('logback.groovy')
 }

@@ -37,12 +37,12 @@ apply from: 'subprojects.gradle'
 apply from: 'dependencies.gradle'
 apply plugin: 'com.github.hierynomus.license'
 
-license {
-    header = file "$rootDir/NOTICE"
-}
-
 jar {
     exclude 'logback.groovy'
+}
+
+license {
+    header = file "$rootDir/NOTICE"
 }
 
 task unitTest {
@@ -83,14 +83,14 @@ check {
     dependsOn unitTest, integrationTest, jacocoRootReport, staticCodeAnalysis
 }
 
-task('sysProps') {
+task sysProps {
     group 'help'
     doLast {
         logger.quiet('{}', System.properties.collect {"${it.key}:${it.value}"}.sort().join('\n'))
     }
 }
 
-task('jvmArgs') {
+task jvmArgs {
     group 'help'
     doLast {
         RuntimeMXBean runtimeMxBean2 = ManagementFactory.getRuntimeMXBean()

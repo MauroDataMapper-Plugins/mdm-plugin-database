@@ -1,17 +1,17 @@
 package uk.ac.ox.softeng.maurodatamapper.plugin.database
 
-import ox.softeng.metadatacatalogue.core.Application
-import ox.softeng.metadatacatalogue.core.api.exception.ApiException
-import ox.softeng.metadatacatalogue.core.catalogue.linkable.datamodel.DataModel
-import ox.softeng.metadatacatalogue.core.feature.Folder
-import ox.softeng.metadatacatalogue.core.gorm.UuidDomain
-import ox.softeng.metadatacatalogue.core.spi.importer.ImporterService
-import ox.softeng.metadatacatalogue.core.spi.importer.parameter.DataModelFileImporterPluginParameters
-import ox.softeng.metadatacatalogue.core.spi.importer.parameter.FileParameter
-import ox.softeng.metadatacatalogue.core.spi.importer.parameter.ImporterPluginParameters
-import ox.softeng.metadatacatalogue.core.spi.json.JsonExporterService
-import ox.softeng.metadatacatalogue.core.type.user.UserRole
-import ox.softeng.metadatacatalogue.core.user.CatalogueUser
+import uk.ac.ox.softeng.maurodatamapper.core.Application
+import uk.ac.ox.softeng.maurodatamapper.core.api.exception.ApiException
+import uk.ac.ox.softeng.maurodatamapper.core.catalogue.linkable.datamodel.DataModel
+import uk.ac.ox.softeng.maurodatamapper.core.feature.Folder
+import uk.ac.ox.softeng.maurodatamapper.core.gorm.UuidDomain
+import uk.ac.ox.softeng.maurodatamapper.core.spi.importer.ImporterService
+import uk.ac.ox.softeng.maurodatamapper.core.spi.importer.parameter.DataModelFileImporterPluginParameters
+import uk.ac.ox.softeng.maurodatamapper.core.spi.importer.parameter.FileParameter
+import uk.ac.ox.softeng.maurodatamapper.core.spi.importer.parameter.ImporterPluginParameters
+import uk.ac.ox.softeng.maurodatamapper.core.spi.json.JsonExporterService
+import uk.ac.ox.softeng.maurodatamapper.core.type.user.UserRole
+import uk.ac.ox.softeng.maurodatamapper.core.user.CatalogueUser
 
 import grails.boot.GrailsApp
 import grails.plugin.json.view.JsonViewTemplateEngine

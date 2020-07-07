@@ -1,19 +1,19 @@
 package uk.ac.ox.softeng.maurodatamapper.plugin.database
 
-import ox.softeng.metadatacatalogue.core.api.exception.ApiBadRequestException
-import ox.softeng.metadatacatalogue.core.api.exception.ApiException
-import ox.softeng.metadatacatalogue.core.catalogue.linkable.component.DataClass
-import ox.softeng.metadatacatalogue.core.catalogue.linkable.component.DataClassService
-import ox.softeng.metadatacatalogue.core.catalogue.linkable.component.DataElement
-import ox.softeng.metadatacatalogue.core.catalogue.linkable.component.DataElementService
-import ox.softeng.metadatacatalogue.core.catalogue.linkable.component.datatype.DataType
-import ox.softeng.metadatacatalogue.core.catalogue.linkable.component.datatype.PrimitiveTypeService
-import ox.softeng.metadatacatalogue.core.catalogue.linkable.component.datatype.ReferenceTypeService
-import ox.softeng.metadatacatalogue.core.catalogue.linkable.datamodel.DataModel
-import ox.softeng.metadatacatalogue.core.catalogue.linkable.datamodel.DataModelService
-import ox.softeng.metadatacatalogue.core.feature.Folder
-import ox.softeng.metadatacatalogue.core.spi.importer.DataModelImporterPlugin
-import ox.softeng.metadatacatalogue.core.user.CatalogueUser
+import uk.ac.ox.softeng.maurodatamapper.core.api.exception.ApiBadRequestException
+import uk.ac.ox.softeng.maurodatamapper.core.api.exception.ApiException
+import uk.ac.ox.softeng.maurodatamapper.core.catalogue.linkable.component.DataClass
+import uk.ac.ox.softeng.maurodatamapper.core.catalogue.linkable.component.DataClassService
+import uk.ac.ox.softeng.maurodatamapper.core.catalogue.linkable.component.DataElement
+import uk.ac.ox.softeng.maurodatamapper.core.catalogue.linkable.component.DataElementService
+import uk.ac.ox.softeng.maurodatamapper.core.catalogue.linkable.component.datatype.DataType
+import uk.ac.ox.softeng.maurodatamapper.core.catalogue.linkable.component.datatype.PrimitiveTypeService
+import uk.ac.ox.softeng.maurodatamapper.core.catalogue.linkable.component.datatype.ReferenceTypeService
+import uk.ac.ox.softeng.maurodatamapper.core.catalogue.linkable.datamodel.DataModel
+import uk.ac.ox.softeng.maurodatamapper.core.catalogue.linkable.datamodel.DataModelService
+import uk.ac.ox.softeng.maurodatamapper.core.feature.Folder
+import uk.ac.ox.softeng.maurodatamapper.core.spi.importer.DataModelImporterPlugin
+import uk.ac.ox.softeng.maurodatamapper.core.user.CatalogueUser
 
 import org.springframework.beans.factory.annotation.Autowired
 

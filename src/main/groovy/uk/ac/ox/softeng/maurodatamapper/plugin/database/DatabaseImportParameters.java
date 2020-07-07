@@ -1,8 +1,8 @@
 package uk.ac.ox.softeng.maurodatamapper.plugin.database;
 
-import ox.softeng.metadatacatalogue.core.spi.importer.parameter.DataModelImporterPluginParameters;
-import ox.softeng.metadatacatalogue.core.spi.importer.parameter.config.ImportGroupConfig;
-import ox.softeng.metadatacatalogue.core.spi.importer.parameter.config.ImportParameterConfig;
+import uk.ac.ox.softeng.maurodatamapper.core.spi.importer.parameter.DataModelImporterPluginParameters;
+import uk.ac.ox.softeng.maurodatamapper.core.spi.importer.parameter.config.ImportGroupConfig;
+import uk.ac.ox.softeng.maurodatamapper.core.spi.importer.parameter.config.ImportParameterConfig;
 
 import java.sql.SQLException;
 import java.util.Properties;

@@ -29,7 +29,6 @@ subprojects {
     group = parent.group
     version = !version || version == 'unspecified' ? parent.version : version
 
-    apply from: "${parent.projectDir}/dependencies.gradle"
     apply from: 'dependencies.gradle'
 
     tasks.cleanLogs {

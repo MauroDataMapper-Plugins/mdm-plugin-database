@@ -1,0 +1,112 @@
+buildscript {
+    repositories {
+        mavenLocal()
+        maven {url 'https://jenkins.cs.ox.ac.uk/artifactory/plugins-snapshot'}
+        maven {url 'https://jenkins.cs.ox.ac.uk/artifactory/plugins-release'}
+        jcenter()
+    }
+    dependencies {
+        classpath 'com.github.jengelman.gradle.plugins:shadow:2.0.1'
+        classpath 'ox.softeng.gradle:oxbrcinformatics-gradle-plugins:1.1'
+    }
+    configurations.classpath {
+        // check for updates every build
+        resolutionStrategy.cacheChangingModulesFor 0, TimeUnit.SECONDS
+    }
+}
+
+import java.nio.file.Files
+import java.nio.file.Paths
+import java.util.concurrent.TimeUnit
+
+subprojects {
+
+    ext['commons-beanutils.version'] = commonsBeanutilsVersion
+    ext['commons-codec.version'] = commonsCodecVersion
+    ext['flyway.version'] = flywayVersion
+    ext['groovy.version'] = groovyVersion
+    ext['hibernate.version'] = hibernateVersion
+    ext['htmlunit.version'] = htmlunitVersion
+    ext['jackson.version'] = jacksonVersion
+    ext['junit.version'] = junitVersion
+    ext['logback.version'] = logbackVersion
+    ext['postgresql.version'] = postgresJdbcVersion
+    ext['selenium.version'] = seleniumVersion
+    ext['slf4j.version'] = slf4jVersion
+    ext['spock.version'] = spockVersion
+    ext['spring.version'] = springFrameworkVersion
+    ext['tomcat.version'] = tomcatJdbcVersion
+    ext['snakeyaml.version'] = snakeYamlVersion
+
+    apply plugin: 'ox.softeng.ox-brc-grails-reliant'
+    apply plugin: 'ox.softeng.integration-test'
+
+    group = parent.group
+    version = !version || version == 'unspecified' ? parent.version : version
+
+    apply from: "${parent.projectDir}/dependencies.gradle"
+    apply from: 'dependencies.gradle'
+
+    tasks.cleanLogs {
+        delete 'build/logs'
+        tasks.integrationTest.dependsOn it
+    }
+
+    tasks.integrationTest {
+        maxHeapSize = '4g'
+        jvmArgs '-XX:+TieredCompilation', '-XX:TieredStopAtLevel=1', '-XX:CICompilerCount=3'
+
+        def envMap = System.getenv()
+        String opts = envMap.GRAILS_FORK_OPTS ?: envMap.GRAILS_OPTS
+        if (opts) {
+            jvmArgs opts.split(' ')
+        }
+    }
+
+    afterEvaluate {
+
+        configurations.all {
+            // check for updates every build
+            resolutionStrategy.cacheChangingModulesFor 0, TimeUnit.SECONDS
+            resolutionStrategy.cacheDynamicVersionsFor 0, TimeUnit.SECONDS
+        }
+        tasks.withType(JavaExec) {
+            systemProperty 'env.logFileName', project.name
+        }
+
+        if (project.hasProperty('mainClass')) {
+            applicationDefaultJvmArgs += "-Dmc.logFileName=${applicationName}"
+            applicationDefaultJvmArgs += '-Dgrails.env=CUSTOM'
+            project.installDist {
+                into project.file("/opt/mc-plugins/${project.distributions.main.getBaseName()}")
+            }
+        }
+
+        /*
+         * Configure all the properties for testing,
+         * these are also required by the gretty startbasetasks,
+         * anything which runs up the app needs alot of these properties to make sure it all works
+         * If system property for the index base isnt set then create a value
+         */
+        if (!System.getProperty('hibernate.search.default.indexBase')) {
+            System.setProperty('hibernate.search.default.indexBase', "/tmp/${UUID.randomUUID().toString()}")
+        }
+
+        Closure runConfig = {
+            System.properties.each {prop ->
+                systemProperty prop.key, prop.value
+            }
+            systemProperty 'user.dir', projectDir
+            String indexBase = systemProperties['hibernate.search.default.indexBase']
+            doFirst {
+                logger.warn("==> Using ${indexBase} for hibernate.search.default.indexBase <==")
+                Files.createDirectories(Paths.get(indexBase))
+            }
+            doLast {
+                Paths.get(indexBase).deleteDir()
+            }
+        }
+
+        tasks.withType(Test, runConfig)
+    }
+}

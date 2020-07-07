@@ -34,6 +34,8 @@ plugins {
 }
 
 apply plugin: 'ox.softeng.ox-brc-base'
+apply from: 'allprojects.gradle'
+apply from: 'subprojects.gradle'
 apply plugin: 'com.github.hierynomus.license'
 
 license {

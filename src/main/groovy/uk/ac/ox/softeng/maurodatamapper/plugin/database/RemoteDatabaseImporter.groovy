@@ -1,4 +1,4 @@
-package ox.softeng.metadatacatalogue.plugins.database
+package uk.ac.ox.softeng.maurodatamapper.plugin.database
 
 import ch.qos.logback.classic.LoggerContext
 import ch.qos.logback.core.util.StatusPrinter

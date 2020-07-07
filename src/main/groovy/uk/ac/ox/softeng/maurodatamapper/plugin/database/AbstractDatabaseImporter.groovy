@@ -1,4 +1,4 @@
-package ox.softeng.metadatacatalogue.plugins.database
+package uk.ac.ox.softeng.maurodatamapper.plugin.database
 
 import ox.softeng.metadatacatalogue.core.api.exception.ApiBadRequestException
 import ox.softeng.metadatacatalogue.core.api.exception.ApiException

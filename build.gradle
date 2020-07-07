@@ -31,7 +31,7 @@ plugins {
     id 'groovy'
 }
 
-apply plugin: 'ox.softeng.ox-brc-base'
+apply plugin: 'ox.softeng.ox-brc-standard'
 apply from: 'subprojects.gradle'
 apply from: 'dependencies.gradle'
 apply plugin: 'com.github.hierynomus.license'

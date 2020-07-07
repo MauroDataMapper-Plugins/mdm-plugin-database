@@ -30,17 +30,14 @@ dependencies {
     runtimeOnly "org.grails:grails-datastore-rest-client"
     runtimeOnly "com.h2database:h2:1.4.196"
 
-    /**
-     * MDM Dependencies
-     */
-    if (rootProject == parent) {
-        implementation group: 'uk.ac.ox.softeng.maurodatamapper', name: 'mdm-core', version: mdmCoreVersion
-        testImplementation project(':test-utils')
-    }
-    else {
-        implementation project(':mdm-core')
-        testImplementation project(':mdm-plugins:test-utils')
-    }
+    // if (rootProject == parent) { // MDM dependencies
+    //     implementation group: 'uk.ac.ox.softeng.maurodatamapper', name: 'mdm-core', version: mdmCoreVersion
+    //     testImplementation project(':test-utils')
+    // }
+    // else {
+    //     implementation project(':mdm-core')
+    //     testImplementation project(':mdm-plugins:test-utils')
+    // }
 
     // Postgres database
     runtimeOnly group: 'org.postgresql', name: 'postgresql', version: postgresJdbcVersion
@@ -58,5 +55,5 @@ dependencies {
      * Testing
      */
     testImplementation group: 'junit', name: 'junit', version: junitVersion
-    integrationTestImplementation group: 'org.flywaydb.flyway-test-extensions', name: 'flyway-spring-test', version: flywayVersion
+    // integrationTestImplementation group: 'org.flywaydb.flyway-test-extensions', name: 'flyway-spring-test', version: flywayVersion
 }

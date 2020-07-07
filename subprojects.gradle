@@ -38,6 +38,8 @@ subprojects {
     ext['tomcat.version'] = tomcatJdbcVersion
     ext['snakeyaml.version'] = snakeYamlVersion
 
+    apply plugin: 'ox.softeng.static-code-analysis'
+    apply plugin: 'ox.softeng.ox-brc-idea'
     apply plugin: 'ox.softeng.ox-brc-grails-reliant'
     apply plugin: 'ox.softeng.integration-test'
 

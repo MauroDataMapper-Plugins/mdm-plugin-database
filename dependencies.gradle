@@ -1,15 +1,14 @@
 dependencies {
-
     /**
-     * MC Dependencies
+     * MDM Dependencies
      */
     if (rootProject == parent) {
-        implementation group: 'ox.softeng.metadatacatalogue', name: 'mc-core', version: mcCoreVersion
+        implementation group: 'uk.ac.ox.softeng.maurodatamapper', name: 'mdm-core', version: mdmCoreVersion
         testImplementation project(':test-utils')
     }
     else {
-        implementation project(':mc-core')
-        testImplementation project(':mc-plugins:test-utils')
+        implementation project(':mdm-core')
+        testImplementation project(':mdm-plugins:test-utils')
     }
 
     // Postgres database

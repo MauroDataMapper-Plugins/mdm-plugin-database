@@ -1,5 +1,7 @@
 import java.lang.management.ManagementFactory
 import java.lang.management.RuntimeMXBean
+import java.nio.file.Files
+import java.nio.file.Paths
 import java.util.concurrent.TimeUnit
 
 buildscript {
@@ -24,9 +26,6 @@ buildscript {
 
         classpath "com.github.jengelman.gradle.plugins:shadow:$shadowGradlePluginVersion"
     }
-    configurations.all {
-        resolutionStrategy.cacheChangingModulesFor 0, TimeUnit.SECONDS // Check for updates every build
-    }
 }
 
 plugins {
@@ -35,6 +34,7 @@ plugins {
 
 apply plugin: 'ox.softeng.ox-brc-base'
 apply from: 'subprojects.gradle'
+apply from: 'dependencies.gradle'
 apply plugin: 'com.github.hierynomus.license'
 
 license {
@@ -55,6 +55,17 @@ task integrationTest {
     description = 'Catch task for integration test'
     mustRunAfter unitTest
 }
+
+// task integrationTest { // from: mc-plugins/subprojects.gradle
+//     maxHeapSize = '4g'
+//     jvmArgs '-XX:+TieredCompilation', '-XX:TieredStopAtLevel=1', '-XX:CICompilerCount=3'
+//
+//     def envMap = System.getenv()
+//     String opts = envMap.GRAILS_FORK_OPTS ?: envMap.GRAILS_OPTS
+//     if (opts) {
+//         jvmArgs opts.split ' '
+//     }
+// }
 
 task jacocoRootReport {
     group 'reporting'
@@ -87,6 +98,56 @@ task('jvmArgs') {
     }
 }
 
+tasks.cleanLogs {
+    delete 'build/logs'
+    tasks.integrationTest.dependsOn it
+}
+
 logger.quiet(
     "Available processors: ${Runtime.runtime.availableProcessors()} | " +
     "Max unit test parallel forks: ${Runtime.runtime.availableProcessors().intdiv(2) ?: 1}")
+
+afterEvaluate {
+    configurations.all { // Check for updates every build
+        resolutionStrategy.cacheChangingModulesFor 0, TimeUnit.SECONDS
+        resolutionStrategy.cacheDynamicVersionsFor 0, TimeUnit.SECONDS
+    }
+
+    tasks.withType(JavaExec) {
+        systemProperty 'env.logFileName', project.name
+    }
+
+    if (project.hasProperty('mainClass')) {
+        applicationDefaultJvmArgs += "-Dmc.logFileName=$applicationName"
+        applicationDefaultJvmArgs += '-Dgrails.env=CUSTOM'
+        project.installDist {
+            into project.file("/opt/mc-plugins/${project.distributions.main.getBaseName()}")
+        }
+    }
+
+    /*
+     * Configure all the properties for testing
+     * These are also required by the gretty `startbasetasks`
+     * Anything which runs up the app needs a lot of these properties to make sure it all works
+     * If the system property for the index base is not set, then create a value
+     */
+
+    if (!System.getProperty('hibernate.search.default.indexBase')) {
+        System.setProperty 'hibernate.search.default.indexBase', "/tmp/${UUID.randomUUID().toString()}"
+    }
+
+    Closure runConfig = {
+        System.properties.each { prop -> systemProperty prop.key, prop.value }
+        systemProperty 'user.dir', projectDir
+        String indexBase = systemProperties['hibernate.search.default.indexBase']
+        doFirst {
+            logger.warn("==> Using $indexBase for hibernate.search.default.indexBase <==")
+            Files.createDirectories Paths.get(indexBase)
+        }
+        doLast {
+            Paths.get(indexBase).deleteDir()
+        }
+    }
+
+    tasks.withType(Test, runConfig)
+}

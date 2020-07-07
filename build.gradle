@@ -1,26 +1,91 @@
+import java.lang.management.ManagementFactory
+import java.lang.management.RuntimeMXBean
 import java.util.concurrent.TimeUnit
 
 buildscript {
     repositories {
         mavenLocal()
-        maven {url 'https://jenkins.cs.ox.ac.uk/artifactory/plugins-snapshot'}
-        maven {url 'https://jenkins.cs.ox.ac.uk/artifactory/plugins-release'}
+        maven { url 'https://jenkins.cs.ox.ac.uk/artifactory/plugins-snapshot' }
+        maven { url 'https://jenkins.cs.ox.ac.uk/artifactory/plugins-release' }
         jcenter()
-
     }
     dependencies {
-        classpath 'com.github.jengelman.gradle.plugins:shadow:2.0.1'
-        classpath 'ox.softeng.gradle:oxbrcinformatics-gradle-plugins:1.1'
-        classpath "gradle.plugin.nl.javadude.gradle.plugins:license-gradle-plugin:0.13.1"
+        classpath "ox.softeng.gradle:oxbrcinformatics-gradle-plugins:$oxbrcinformaticsGradlePluginsVersion"
+
+        // The version of spring-core included is 3.1.3.RELEASE which is incompatible with the grails-gradle-plugin used by all the
+        // the Grails modules and causes issues when trying to run-app therefore we exclude it
+        classpath("gradle.plugin.com.hierynomus.gradle.plugins:license-gradle-plugin:$licenseGradlePluginVersion") {
+            exclude group: 'org.springframework', module: 'spring-core'
+        }
+
+        // However without spring-core the license plugin won't work so we need to include it at the top level
+        // this version will need to be kept inline with Grails' spring-core
+        classpath "org.springframework:spring-core:$licenseGradlePluginSpringCoreOverrideVersion"
+
+        classpath "com.github.jengelman.gradle.plugins:shadow:$shadowGradlePluginVersion"
     }
-    configurations.classpath {
-        // check for updates every build
-        resolutionStrategy.cacheChangingModulesFor(0, TimeUnit.SECONDS)
+    configurations.all {
+        resolutionStrategy.cacheChangingModulesFor 0, TimeUnit.SECONDS // Check for updates every build
     }
 }
 
-apply plugin: "com.github.hierynomus.license"
+plugins {
+    id 'groovy'
+}
 
-// jar{
-//     exclude('logback.groovy')
-// }
+apply plugin: 'ox.softeng.ox-brc-base'
+apply plugin: 'com.github.hierynomus.license'
+
+license {
+    header = file "$rootDir/NOTICE"
+}
+
+jar {
+    exclude 'logback.groovy'
+}
+
+task unitTest {
+    group 'testing'
+    description = 'Catch task for unit test'
+}
+
+task integrationTest {
+    group 'testing'
+    description = 'Catch task for integration test'
+    mustRunAfter unitTest
+}
+
+task jacocoRootReport {
+    group 'reporting'
+    description = 'Catch task for all jacoco root report'
+    mustRunAfter unitTest, integrationTest
+}
+
+task staticCodeAnalysis {
+    group 'reporting'
+    description = 'Catch task for all SCA tasks'
+    mustRunAfter unitTest, integrationTest, jacocoRootReport
+}
+
+check {
+    dependsOn unitTest, integrationTest, jacocoRootReport, staticCodeAnalysis
+}
+
+task('sysProps') {
+    group 'help'
+    doLast {
+        logger.quiet('{}', System.properties.collect {"${it.key}:${it.value}"}.sort().join('\n'))
+    }
+}
+
+task('jvmArgs') {
+    group 'help'
+    doLast {
+        RuntimeMXBean runtimeMxBean2 = ManagementFactory.getRuntimeMXBean()
+        logger.quiet('{}', runtimeMxBean2.getInputArguments().join('\n'))
+    }
+}
+
+logger.quiet(
+    "Available processors: ${Runtime.runtime.availableProcessors()} | " +
+    "Max unit test parallel forks: ${Runtime.runtime.availableProcessors().intdiv(2) ?: 1}")

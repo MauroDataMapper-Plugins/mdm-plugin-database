@@ -7,8 +7,8 @@ import java.util.concurrent.TimeUnit
 buildscript {
     repositories {
         mavenLocal()
-        maven { url 'https://jenkins.cs.ox.ac.uk/artifactory/plugins-snapshot' }
-        maven { url 'https://jenkins.cs.ox.ac.uk/artifactory/plugins-release' }
+        maven {url 'https://jenkins.cs.ox.ac.uk/artifactory/plugins-snapshot'}
+        maven {url 'https://jenkins.cs.ox.ac.uk/artifactory/plugins-release'}
         jcenter()
     }
     dependencies {
@@ -24,17 +24,23 @@ buildscript {
         // However without spring-core the license plugin won't work so we need to include it at the top level
         // this version will need to be kept inline with Grails' spring-core
         classpath "org.springframework:spring-core:$licenseGradlePluginSpringCoreOverrideVersion"
+
+        configurations.classpath {
+            // check for updates every build
+            resolutionStrategy.cacheChangingModulesFor(0, TimeUnit.SECONDS)
+        }
     }
 }
 
-plugins {
-    id 'groovy'
-}
-
+apply plugin: "com.github.hierynomus.license"
 apply plugin: 'ox.softeng.ox-brc-standard'
-apply from: 'subprojects.gradle'
+apply plugin: 'ox.softeng.ox-brc-artifactory'
+apply plugin: 'ox.softeng.ox-brc-grails-reliant'
+apply plugin: 'ox.softeng.integration-test'
+
 apply from: 'dependencies.gradle'
-apply plugin: 'com.github.hierynomus.license'
+
+sca.ciEnabled ciRun.toBoolean()
 
 jar {
     exclude 'logback.groovy'
@@ -44,80 +50,34 @@ license {
     header = file "$rootDir/NOTICE"
 }
 
-task unitTest {
-    group 'testing'
-    description = 'Catch task for unit test'
-}
+ integrationTest {
+     maxHeapSize = '4g'
+     jvmArgs '-XX:+TieredCompilation', '-XX:TieredStopAtLevel=1', '-XX:CICompilerCount=3'
 
-task integrationTest {
-    group 'testing'
-    description = 'Catch task for integration test'
-    mustRunAfter unitTest
-}
-
-// task integrationTest { // from: mc-plugins/subprojects.gradle
-//     maxHeapSize = '4g'
-//     jvmArgs '-XX:+TieredCompilation', '-XX:TieredStopAtLevel=1', '-XX:CICompilerCount=3'
-//
-//     def envMap = System.getenv()
-//     String opts = envMap.GRAILS_FORK_OPTS ?: envMap.GRAILS_OPTS
-//     if (opts) {
-//         jvmArgs opts.split ' '
-//     }
-// }
-
-task jacocoRootReport {
-    group 'reporting'
-    description = 'Catch task for all jacoco root report'
-    mustRunAfter unitTest, integrationTest
-}
-
-task staticCodeAnalysis {
-    group 'reporting'
-    description = 'Catch task for all SCA tasks'
-    mustRunAfter unitTest, integrationTest, jacocoRootReport
-}
-
-check {
-    dependsOn unitTest, integrationTest, jacocoRootReport, staticCodeAnalysis
-}
-
-task sysProps {
-    group 'help'
-    doLast {
-        logger.quiet('{}', System.properties.collect {"${it.key}:${it.value}"}.sort().join('\n'))
-    }
-}
-
-task jvmArgs {
-    group 'help'
-    doLast {
-        RuntimeMXBean runtimeMxBean2 = ManagementFactory.getRuntimeMXBean()
-        logger.quiet('{}', runtimeMxBean2.getInputArguments().join('\n'))
-    }
-}
-
-tasks.cleanLogs {
-    delete 'build/logs'
-    tasks.integrationTest.dependsOn it
-}
+     def envMap = System.getenv()
+     String opts = envMap.GRAILS_FORK_OPTS ?: envMap.GRAILS_OPTS
+     if (opts) {
+         jvmArgs opts.split(' ')
+     }
+ }
 
 logger.quiet(
     "Available processors: ${Runtime.runtime.availableProcessors()} | " +
     "Max unit test parallel forks: ${Runtime.runtime.availableProcessors().intdiv(2) ?: 1}")
 
 afterEvaluate {
-    configurations.all { // Check for updates every build
+
+    configurations.all {
+        // check for updates every build
         resolutionStrategy.cacheChangingModulesFor 0, TimeUnit.SECONDS
         resolutionStrategy.cacheDynamicVersionsFor 0, TimeUnit.SECONDS
     }
-
     tasks.withType(JavaExec) {
         systemProperty 'env.logFileName', project.name
     }
 
     if (project.hasProperty('mainClass')) {
-        applicationDefaultJvmArgs += "-Dmc.logFileName=$applicationName"
+        applicationDefaultJvmArgs += "-Dmc.logFileName=${applicationName}"
         applicationDefaultJvmArgs += '-Dgrails.env=CUSTOM'
         project.installDist {
             into project.file("/opt/mc-plugins/${project.distributions.main.getBaseName()}")
@@ -125,23 +85,24 @@ afterEvaluate {
     }
 
     /*
-     * Configure all the properties for testing
-     * These are also required by the gretty `startbasetasks`
-     * Anything which runs up the app needs a lot of these properties to make sure it all works
-     * If the system property for the index base is not set, then create a value
+     * Configure all the properties for testing,
+     * these are also required by the gretty startbasetasks,
+     * anything which runs up the app needs alot of these properties to make sure it all works
+     * If system property for the index base isnt set then create a value
      */
-
     if (!System.getProperty('hibernate.search.default.indexBase')) {
-        System.setProperty 'hibernate.search.default.indexBase', "/tmp/${UUID.randomUUID().toString()}"
+        System.setProperty('hibernate.search.default.indexBase', "/tmp/${UUID.randomUUID().toString()}")
     }
 
     Closure runConfig = {
-        System.properties.each { prop -> systemProperty prop.key, prop.value }
+        System.properties.each {prop ->
+            systemProperty prop.key, prop.value
+        }
         systemProperty 'user.dir', projectDir
         String indexBase = systemProperties['hibernate.search.default.indexBase']
         doFirst {
-            logger.warn("==> Using $indexBase for hibernate.search.default.indexBase <==")
-            Files.createDirectories Paths.get(indexBase)
+            logger.warn("==> Using ${indexBase} for hibernate.search.default.indexBase <==")
+            Files.createDirectories(Paths.get(indexBase))
         }
         doLast {
             Paths.get(indexBase).deleteDir()

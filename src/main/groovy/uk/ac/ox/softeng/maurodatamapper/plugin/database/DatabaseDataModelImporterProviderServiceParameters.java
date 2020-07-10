@@ -12,7 +12,7 @@ import javax.sql.DataSource;
 /**
  * @since 23/08/2017
  */
-public abstract class DatabaseImportParameters<K extends DataSource> extends DataModelImporterProviderServiceParameters {
+public abstract class DatabaseDataModelImporterProviderServiceParameters<K extends DataSource> extends DataModelImporterProviderServiceParameters {
 
     @ImportParameterConfig(
         displayName = "DataModel name suffix",

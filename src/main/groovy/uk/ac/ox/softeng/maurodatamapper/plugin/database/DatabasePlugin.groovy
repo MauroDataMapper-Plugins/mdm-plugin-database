@@ -34,9 +34,9 @@ import javax.net.ssl.X509TrustManager
 /**
  * @since 16/03/2018
  */
-class RemoteDatabaseImportAndExporter {
+class DatabasePlugin {
 
-    private static final Logger logger = LoggerFactory.getLogger(RemoteDatabaseImportAndExporter)
+    private static final Logger logger = LoggerFactory.getLogger(DatabasePlugin)
 
     private static ApplicationContext applicationContext
     private static PlatformTransactionManager transactionManager
@@ -85,12 +85,12 @@ class RemoteDatabaseImportAndExporter {
     }
 
     List<DataModel> importDatabases(Properties loadedProperties, CatalogueUser catalogueUser) {
-        AbstractDatabaseImporter databaseImporter = applicationContext.getBean(AbstractDatabaseImporter)
+        AbstractDatabaseDataModelImporterProviderService databaseImporter = applicationContext.getBean(AbstractDatabaseDataModelImporterProviderService)
         logger.info('Importing Databases using {} (v{})', databaseImporter.class.simpleName, databaseImporter.version)
 
         ImporterService importerService = applicationContext.getBean(ImporterService)
 
-        DatabaseImportParameters databaseImportParameters = importerService.createNewImporterPluginParameters(databaseImporter)
+        DatabaseDataModelImporterProviderServiceParameters databaseImportParameters = importerService.createNewImporterPluginParameters(databaseImporter)
         databaseImportParameters.populateFromProperties(loadedProperties)
 
         Folder randomFolder = new Folder(label: 'random', createdBy: catalogueUser)

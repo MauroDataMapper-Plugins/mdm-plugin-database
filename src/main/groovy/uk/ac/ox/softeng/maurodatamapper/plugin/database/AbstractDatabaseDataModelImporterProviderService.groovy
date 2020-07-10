@@ -28,7 +28,7 @@ import javax.sql.DataSource
  * @since 23/08/2017
  */
 //@CompileStatic
-abstract class AbstractDatabaseImporter<P extends DatabaseImportParameters> extends DataModelImporterProviderService<P> {
+abstract class AbstractDatabaseDataModelImporterProviderService<P extends DatabaseDataModelImporterProviderServiceParameters> extends DataModelImporterProviderService<P> {
 
     public static final String IS_NOT_NULL_CONSTRAINT = 'IS NOT NULL'
 

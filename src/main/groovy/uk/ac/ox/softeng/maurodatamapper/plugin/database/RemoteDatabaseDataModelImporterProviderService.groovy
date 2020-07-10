@@ -19,7 +19,7 @@ import java.nio.file.Paths
  * @since 15/03/2018
  */
 // @CompileStatic
-trait RemoteDatabaseImporter {
+trait RemoteDatabaseDataModelImporterProviderService {
 
     private static final CommandLineParser parser = new DefaultParser()
 
@@ -69,7 +69,7 @@ trait RemoteDatabaseImporter {
     }
 
     private static String version() {
-        "  Version: \"${RemoteDatabaseImporter.getPackage().getSpecificationVersion()}\"\n" +
+        "  Version: \"${RemoteDatabaseDataModelImporterProviderService.getPackage().getSpecificationVersion()}\"\n" +
         "  Java Version: \"${System.getProperty('java.version')}\""
     }
 
@@ -93,7 +93,7 @@ trait RemoteDatabaseImporter {
                     "${version()}\n" +
                     "  Config File: ${path.toAbsolutePath().toString()}\n")
 
-            RemoteDatabaseImportAndExporter remoteDatabaseImportAndExporter = new RemoteDatabaseImportAndExporter()
+            DatabasePlugin remoteDatabaseImportAndExporter = new DatabasePlugin()
 
             remoteDatabaseImportAndExporter.outputRuntimeArgs()
 

@@ -1,6 +1,6 @@
 package uk.ac.ox.softeng.maurodatamapper.plugin.database
 
-import org.slf4j.LoggerFactory
+import uk.ac.ox.softeng.maurodatamapper.util.Utils
 
 import ch.qos.logback.classic.LoggerContext
 import ch.qos.logback.core.util.StatusPrinter
@@ -11,6 +11,9 @@ import groovyjarjarcommonscli.HelpFormatter
 import groovyjarjarcommonscli.Option
 import groovyjarjarcommonscli.OptionGroup
 import groovyjarjarcommonscli.Options
+import org.slf4j.LoggerFactory
+
+// TODO adei please use the proper commons-cli dependency
 
 import java.nio.file.Path
 import java.nio.file.Paths
@@ -93,11 +96,12 @@ trait RemoteDatabaseDataModelImporterProviderService {
                     "${version()}\n" +
                     "  Config File: ${path.toAbsolutePath().toString()}\n")
 
-            DatabasePlugin remoteDatabaseImportAndExporter = new DatabasePlugin()
+            RemoteDatabaseImportAndExporter remoteDatabaseImportAndExporter = new RemoteDatabaseImportAndExporter()
 
-            remoteDatabaseImportAndExporter.outputRuntimeArgs()
+            Utils.outputRuntimeArgs(getClass())
 
             remoteDatabaseImportAndExporter.performImportAndExport(new Properties().with {
+                // TODO adei please find the correct replacement for this call
                 load(path.newInputStream())
                 setProperty('server.username', line.getOptionValue('u'))
                 setProperty('server.password', line.getOptionValue('p'))

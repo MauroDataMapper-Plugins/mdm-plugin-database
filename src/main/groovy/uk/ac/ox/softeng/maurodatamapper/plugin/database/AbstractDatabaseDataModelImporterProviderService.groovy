@@ -15,6 +15,8 @@ import uk.ac.ox.softeng.maurodatamapper.datamodel.item.datatype.ReferenceTypeSer
 import uk.ac.ox.softeng.maurodatamapper.datamodel.provider.importer.DataModelImporterProviderService
 import uk.ac.ox.softeng.maurodatamapper.security.CatalogueUser
 
+import groovy.transform.CompileStatic
+import groovy.util.logging.Slf4j
 import org.springframework.beans.factory.annotation.Autowired
 
 import java.sql.Connection
@@ -26,9 +28,17 @@ import javax.sql.DataSource
 
 /**
  * @since 23/08/2017
+ * TODO adei please work through this file inside intellij
+ * all "red" line needs to be fixed
+ * this will/must compile with @CompileStatic in place
+ * as a start the @Slf4j will allow you to replace getLogger(). with log.
+ * Also make sure the correct methods are overriden for the importing
+ * check the extended class for whats not yet implemented
  */
-//@CompileStatic
-abstract class AbstractDatabaseDataModelImporterProviderService<P extends DatabaseDataModelImporterProviderServiceParameters> extends DataModelImporterProviderService<P> {
+@CompileStatic
+@Slf4j
+abstract class AbstractDatabaseDataModelImporterProviderService<P extends DatabaseDataModelImporterProviderServiceParameters>
+    extends DataModelImporterProviderService<P> {
 
     public static final String IS_NOT_NULL_CONSTRAINT = 'IS NOT NULL'
 
@@ -155,12 +165,12 @@ WHERE
          getTableCatalogColumnName(),]
     }
 
-    // @Override
+    @Override
     DataModel importDataModel(CatalogueUser currentUser, P params) {
         importDataModels(currentUser, params.databaseNames, params).first()
     }
 
-    // @Override
+    @Override
     List<DataModel> importDataModels(CatalogueUser currentUser, P params) {
 
         List<String> databases = params.databaseNames.split(',').toList()

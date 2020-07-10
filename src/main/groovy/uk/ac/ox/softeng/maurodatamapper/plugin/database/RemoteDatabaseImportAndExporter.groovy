@@ -10,6 +10,10 @@ import uk.ac.ox.softeng.maurodatamapper.datamodel.provider.exporter.JsonExporter
 import uk.ac.ox.softeng.maurodatamapper.datamodel.provider.importer.parameter.DataModelFileImporterProviderServiceParameters
 import uk.ac.ox.softeng.maurodatamapper.security.CatalogueUser
 
+import grails.plugin.json.view.JsonViewTemplateEngine
+import groovy.json.JsonBuilder
+import groovy.json.JsonException
+import groovy.json.JsonSlurper
 import org.grails.orm.hibernate.HibernateDatastore
 import org.slf4j.Logger
 import org.slf4j.LoggerFactory
@@ -21,12 +25,6 @@ import org.springframework.transaction.PlatformTransactionManager
 import org.springframework.validation.Errors
 import org.springframework.validation.FieldError
 
-import grails.plugin.json.view.JsonViewTemplateEngine
-import groovy.json.JsonBuilder
-import groovy.json.JsonException
-import groovy.json.JsonSlurper
-
-import java.lang.management.RuntimeMXBean
 import java.security.SecureRandom
 import javax.net.ssl.TrustManager
 import javax.net.ssl.X509TrustManager
@@ -34,9 +32,9 @@ import javax.net.ssl.X509TrustManager
 /**
  * @since 16/03/2018
  */
-class DatabasePlugin {
+class RemoteDatabaseImportAndExporter {
 
-    private static final Logger logger = LoggerFactory.getLogger(DatabasePlugin)
+    private static final Logger logger = LoggerFactory.getLogger(RemoteDatabaseImportAndExporter)
 
     private static ApplicationContext applicationContext
     private static PlatformTransactionManager transactionManager
@@ -54,12 +52,6 @@ class DatabasePlugin {
         'dataSource.dbCreate'       : 'create-drop',
         'dataSource.url'            : 'jdbc:h2:mem:remoteDb;MVCC=TRUE;LOCK_TIMEOUT=10000;DB_CLOSE_ON_EXIT=TRUE',
     ]
-
-    void outputRuntimeArgs() {
-        RuntimeMXBean runtimeMxBean = ManagementFactory.getRuntimeMXBean();
-        List<String> arguments = runtimeMxBean.getInputArguments();
-        logger.warn("Running with JVM args:\n  " + arguments.join('\n  '))
-    }
 
     void performImportAndExport(Properties loadedProperties) {
         logger.info('Performing remote import and export of DataModel')

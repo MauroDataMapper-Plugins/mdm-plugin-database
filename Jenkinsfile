@@ -81,25 +81,25 @@ pipeline {
             }
         }
 
-        // stage('Jacoco Report') {
-        //     steps {
-        //         sh "./gradlew jacocoRootReport"
-        //     }
-        //     post {
-        //         always {
-        //             jacoco execPattern: '**/build/jacoco/*.exec'
-        //             publishHTML([
-        //                     allowMissing         : true,
-        //                     alwaysLinkToLastBuild: true,
-        //                     keepAll              : true,
-        //                     reportDir            : 'reports/jacoco/jacocoRootReport/html',
-        //                     reportFiles          : 'index.html',
-        //                     reportName           : 'Coverage Report (Gradle)',
-        //                     reportTitles         : 'Jacoco Coverage'
-        //             ])
-        //         }
-        //     }
-        // }
+        stage('Jacoco Report') {
+            steps {
+                sh "./gradlew jacocoRootReport"
+            }
+            post {
+                always {
+                    jacoco execPattern: '**/build/jacoco/*.exec'
+                    publishHTML([
+                            allowMissing         : true,
+                            alwaysLinkToLastBuild: true,
+                            keepAll              : true,
+                            reportDir            : 'reports/jacoco/jacocoRootReport/html',
+                            reportFiles          : 'index.html',
+                            reportName           : 'Coverage Report (Gradle)',
+                            reportTitles         : 'Jacoco Coverage'
+                    ])
+                }
+            }
+        }
 
         stage('Static Code Analysis') {
             steps {

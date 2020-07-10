@@ -18,7 +18,7 @@ import java.nio.file.Paths
 /**
  * @since 15/03/2018
  */
-@CompileStatic
+// @CompileStatic
 trait RemoteDatabaseImporter {
 
     private static final CommandLineParser parser = new DefaultParser()

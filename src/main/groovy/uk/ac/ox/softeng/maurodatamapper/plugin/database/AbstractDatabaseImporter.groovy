@@ -1,19 +1,19 @@
 package uk.ac.ox.softeng.maurodatamapper.plugin.database
 
-import uk.ac.ox.softeng.maurodatamapper.core.api.exception.ApiBadRequestException
-import uk.ac.ox.softeng.maurodatamapper.core.api.exception.ApiException
-import uk.ac.ox.softeng.maurodatamapper.core.catalogue.linkable.component.DataClass
-import uk.ac.ox.softeng.maurodatamapper.core.catalogue.linkable.component.DataClassService
-import uk.ac.ox.softeng.maurodatamapper.core.catalogue.linkable.component.DataElement
-import uk.ac.ox.softeng.maurodatamapper.core.catalogue.linkable.component.DataElementService
-import uk.ac.ox.softeng.maurodatamapper.core.catalogue.linkable.component.datatype.DataType
-import uk.ac.ox.softeng.maurodatamapper.core.catalogue.linkable.component.datatype.PrimitiveTypeService
-import uk.ac.ox.softeng.maurodatamapper.core.catalogue.linkable.component.datatype.ReferenceTypeService
-import uk.ac.ox.softeng.maurodatamapper.core.catalogue.linkable.datamodel.DataModel
-import uk.ac.ox.softeng.maurodatamapper.core.catalogue.linkable.datamodel.DataModelService
-import uk.ac.ox.softeng.maurodatamapper.core.feature.Folder
-import uk.ac.ox.softeng.maurodatamapper.core.spi.importer.DataModelImporterPlugin
-import uk.ac.ox.softeng.maurodatamapper.core.user.CatalogueUser
+import uk.ac.ox.softeng.maurodatamapper.api.exception.ApiBadRequestException
+import uk.ac.ox.softeng.maurodatamapper.api.exception.ApiException
+import uk.ac.ox.softeng.maurodatamapper.core.container.Folder
+import uk.ac.ox.softeng.maurodatamapper.datamodel.DataModel
+import uk.ac.ox.softeng.maurodatamapper.datamodel.DataModelService
+import uk.ac.ox.softeng.maurodatamapper.datamodel.item.DataClass
+import uk.ac.ox.softeng.maurodatamapper.datamodel.item.DataClassService
+import uk.ac.ox.softeng.maurodatamapper.datamodel.item.DataElement
+import uk.ac.ox.softeng.maurodatamapper.datamodel.item.DataElementService
+import uk.ac.ox.softeng.maurodatamapper.datamodel.item.datatype.DataType
+import uk.ac.ox.softeng.maurodatamapper.datamodel.item.datatype.PrimitiveTypeService
+import uk.ac.ox.softeng.maurodatamapper.datamodel.item.datatype.ReferenceTypeService
+import uk.ac.ox.softeng.maurodatamapper.datamodel.provider.importer.DataModelImporterProviderService
+import uk.ac.ox.softeng.maurodatamapper.security.CatalogueUser
 
 import org.springframework.beans.factory.annotation.Autowired
 
@@ -28,7 +28,7 @@ import javax.sql.DataSource
  * @since 23/08/2017
  */
 //@CompileStatic
-abstract class AbstractDatabaseImporter<P extends DatabaseImportParameters> implements DataModelImporterPlugin<P> {
+abstract class AbstractDatabaseImporter<P extends DatabaseImportParameters> extends DataModelImporterProviderService<P> {
 
     public static final String IS_NOT_NULL_CONSTRAINT = 'IS NOT NULL'
 

@@ -1,8 +1,8 @@
 package uk.ac.ox.softeng.maurodatamapper.plugin.database;
 
-import uk.ac.ox.softeng.maurodatamapper.core.spi.importer.parameter.DataModelImporterPluginParameters;
-import uk.ac.ox.softeng.maurodatamapper.core.spi.importer.parameter.config.ImportGroupConfig;
-import uk.ac.ox.softeng.maurodatamapper.core.spi.importer.parameter.config.ImportParameterConfig;
+import uk.ac.ox.softeng.maurodatamapper.core.provider.importer.parameter.config.ImportGroupConfig;
+import uk.ac.ox.softeng.maurodatamapper.core.provider.importer.parameter.config.ImportParameterConfig;
+import uk.ac.ox.softeng.maurodatamapper.datamodel.provider.importer.parameter.DataModelImporterProviderServiceParameters;
 
 import java.sql.SQLException;
 import java.util.Properties;
@@ -12,7 +12,7 @@ import javax.sql.DataSource;
 /**
  * @since 23/08/2017
  */
-public abstract class DatabaseImportParameters<K extends DataSource> extends DataModelImporterPluginParameters {
+public abstract class DatabaseImportParameters<K extends DataSource> extends DataModelImporterProviderServiceParameters {
 
     @ImportParameterConfig(
         displayName = "DataModel name suffix",

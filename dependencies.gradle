@@ -1,6 +1,7 @@
 dependencies {
 
     implementation 'uk.ac.ox.softeng.maurodatamapper:mdm-core:4.0.0-SNAPSHOT'
+    implementation 'uk.ac.ox.softeng.maurodatamapper:mdm-security:4.0.0-SNAPSHOT'
     implementation 'uk.ac.ox.softeng.maurodatamapper:mdm-plugin-datamodel:4.0.0-SNAPSHOT'
 
     runtimeOnly group: 'org.postgresql', name: 'postgresql'

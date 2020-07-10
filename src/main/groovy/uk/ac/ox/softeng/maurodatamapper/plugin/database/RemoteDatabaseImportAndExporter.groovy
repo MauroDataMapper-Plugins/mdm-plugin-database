@@ -1,24 +1,15 @@
 package uk.ac.ox.softeng.maurodatamapper.plugin.database
 
-import uk.ac.ox.softeng.maurodatamapper.core.Application
-import uk.ac.ox.softeng.maurodatamapper.core.api.exception.ApiException
-import uk.ac.ox.softeng.maurodatamapper.core.catalogue.linkable.datamodel.DataModel
-import uk.ac.ox.softeng.maurodatamapper.core.feature.Folder
-import uk.ac.ox.softeng.maurodatamapper.core.gorm.UuidDomain
-import uk.ac.ox.softeng.maurodatamapper.core.spi.importer.ImporterService
-import uk.ac.ox.softeng.maurodatamapper.core.spi.importer.parameter.DataModelFileImporterPluginParameters
-import uk.ac.ox.softeng.maurodatamapper.core.spi.importer.parameter.FileParameter
-import uk.ac.ox.softeng.maurodatamapper.core.spi.importer.parameter.ImporterPluginParameters
-import uk.ac.ox.softeng.maurodatamapper.core.spi.json.JsonExporterService
-import uk.ac.ox.softeng.maurodatamapper.core.type.user.UserRole
-import uk.ac.ox.softeng.maurodatamapper.core.user.CatalogueUser
+import uk.ac.ox.softeng.maurodatamapper.api.exception.ApiException
+import uk.ac.ox.softeng.maurodatamapper.core.container.Folder
+import uk.ac.ox.softeng.maurodatamapper.core.importer.ImporterService
+import uk.ac.ox.softeng.maurodatamapper.core.provider.importer.parameter.FileParameter
+import uk.ac.ox.softeng.maurodatamapper.core.provider.importer.parameter.ImporterProviderServiceParameters
+import uk.ac.ox.softeng.maurodatamapper.datamodel.DataModel
+import uk.ac.ox.softeng.maurodatamapper.datamodel.provider.exporter.JsonExporterService
+import uk.ac.ox.softeng.maurodatamapper.datamodel.provider.importer.parameter.DataModelFileImporterProviderServiceParameters
+import uk.ac.ox.softeng.maurodatamapper.security.CatalogueUser
 
-import grails.boot.GrailsApp
-import grails.plugin.json.view.JsonViewTemplateEngine
-import grails.web.mime.MimeType
-import groovy.json.JsonBuilder
-import groovy.json.JsonException
-import groovy.json.JsonSlurper
 import org.grails.orm.hibernate.HibernateDatastore
 import org.slf4j.Logger
 import org.slf4j.LoggerFactory
@@ -27,15 +18,16 @@ import org.springframework.context.MessageSource
 import org.springframework.http.HttpStatus
 import org.springframework.orm.hibernate5.SessionHolder
 import org.springframework.transaction.PlatformTransactionManager
-import org.springframework.transaction.support.TransactionSynchronizationManager
 import org.springframework.validation.Errors
 import org.springframework.validation.FieldError
 
-import java.lang.management.ManagementFactory
+import grails.plugin.json.view.JsonViewTemplateEngine
+import groovy.json.JsonBuilder
+import groovy.json.JsonException
+import groovy.json.JsonSlurper
+
 import java.lang.management.RuntimeMXBean
 import java.security.SecureRandom
-import javax.net.ssl.HttpsURLConnection
-import javax.net.ssl.SSLContext
 import javax.net.ssl.TrustManager
 import javax.net.ssl.X509TrustManager
 
@@ -173,7 +165,7 @@ class RemoteDatabaseImportAndExporter {
                         ByteArrayOutputStream outputStream = jsonExporterService.exportDataModel(catalogueUser, dataModel)
 
                         logger.info('Using JSON importer {}.{} (v{})', jsonImporterInfo.namespace, jsonImporterInfo.name, jsonImporterInfo.version)
-                        DataModelFileImporterPluginParameters importerPluginParameters = new DataModelFileImporterPluginParameters(
+                        DataModelFileImporterProviderServiceParameters importerPluginParameters = new DataModelFileImporterProviderServiceParameters(
                             importAsNewDocumentationVersion: true,
                             finalised: loadedProperties.getProperty('export.dataModel.finalised') ?: true,
                             dataModelName: loadedProperties.getProperty('export.dataModel.name') ?: dataModel.label,
@@ -246,7 +238,7 @@ class RemoteDatabaseImportAndExporter {
 
                             logger.
                                 info('Using JSON importer {}.{} (v{})', jsonImporterInfo.namespace, jsonImporterInfo.name, jsonImporterInfo.version)
-                            DataModelFileImporterPluginParameters importerPluginParameters = new DataModelFileImporterPluginParameters(
+                            DataModelFileImporterProviderServiceParameters importerPluginParameters = new DataModelFileImporterProviderServiceParameters(
                                 importAsNewDocumentationVersion: true,
                                 finalised: loadedProperties.getProperty('export.dataModel.finalised') ?: true,
                                 dataModelName: loadedProperties.getProperty('export.dataModel.name') ?: dataModel.label,
@@ -288,7 +280,7 @@ class RemoteDatabaseImportAndExporter {
         post("${host}${path}", bytes)
     }
 
-    Object post(String host, String path, ImporterPluginParameters importerPluginParameters) {
+    Object post(String host, String path, ImporterProviderServiceParameters importerPluginParameters) {
         JsonViewTemplateEngine templateEngine = applicationContext.getBean(JsonViewTemplateEngine)
         def template = templateEngine.resolveTemplate(getDomainTemplateUri(importerPluginParameters))
         def writable = template.make(getRenderModel(importerPluginParameters))

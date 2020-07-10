@@ -1,6 +1,10 @@
 pipeline {
     agent any
 
+    tools {
+        jdk 'jdk-12'
+    }
+
     options {
         timestamps()
         skipStagesAfterUnstable()

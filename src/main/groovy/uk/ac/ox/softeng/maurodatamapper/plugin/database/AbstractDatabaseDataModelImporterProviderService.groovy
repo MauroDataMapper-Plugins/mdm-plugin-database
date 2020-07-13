@@ -192,7 +192,7 @@ WHERE
     }
 
     List<DataModel> importDataModels(CatalogueUser currentUser, String databaseName, P params) {
-        String modelName = params.isMultipleDataModelImport() ? databaseName : params.getDataModelName() ?: databaseName
+        String modelName = params.isMultipleDataModelImport() ? databaseName : params.getModelName() ?: databaseName
         modelName = params.dataModelNameSuffix ? "${modelName}_${params.dataModelNameSuffix}" : modelName
         Folder folder = Folder.get(params.folderId)
 
@@ -343,7 +343,7 @@ WHERE
 
             results.each {row ->
 
-                DataClass tableClass = schemaClass.findChildDataClass(row.table_name as String)
+                DataClass tableClass = schemaClass.findDataClass(row.table_name as String)
 
                 if (tableClass) {
                     String checkClause = row.check_clause
@@ -381,7 +381,7 @@ WHERE
             results.groupBy {it.constraint_name}.each {constraintName, rows ->
                 Map firstRow = rows.first()
                 String value = rows.size() == 1 ? firstRow.column_name : rows.sort {it.ordinal_position}.collect {it.column_name}.join(', ')
-                DataClass tableClass = schemaClass.findChildDataClass(firstRow.table_name as String)
+                DataClass tableClass = schemaClass.findDataClass(firstRow.table_name as String)
 
                 if (tableClass) {
 
@@ -392,7 +392,7 @@ WHERE
                                              value, dataModel.createdBy)
 
                     rows.each {row ->
-                        DataElement columnElement = tableClass.findChildDataElement(row.column_name as String)
+                        DataElement columnElement = tableClass.findDataElement(row.column_name as String)
                         if (columnElement) {
                             columnElement.addToMetadata(namespace, (row.constraint_type as String).toLowerCase(),
                                                         row.ordinal_position as String, dataModel.createdBy)
@@ -434,8 +434,8 @@ WHERE
                     )
                 }
 
-                DataClass tableClass = schemaClass.findChildDataClass(row.table_name as String)
-                DataElement columnElement = tableClass.findChildDataElement(row.column_name as String)
+                DataClass tableClass = schemaClass.findDataClass(row.table_name as String)
+                DataElement columnElement = tableClass.findDataElement(row.column_name as String)
                 columnElement.dataType = dataType
                 columnElement.addToMetadata(namespace, "foreign_key[${row.constraint_name}]",
                                             row.reference_column_name as String, dataModel.createdBy)
@@ -456,7 +456,7 @@ WHERE
             st.close()
 
             results.each {row ->
-                DataClass tableClass = schemaClass.findChildDataClass(row.table_name as String)
+                DataClass tableClass = schemaClass.findDataClass(row.table_name as String)
 
                 if (tableClass) {
                     String indexType = row.primary_index ? 'primary_index' : row.unique_index ? 'unique_index' : 'index'

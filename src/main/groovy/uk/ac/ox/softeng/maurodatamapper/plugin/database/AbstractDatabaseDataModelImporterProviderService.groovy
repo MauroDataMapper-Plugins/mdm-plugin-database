@@ -176,7 +176,7 @@ WHERE
         List<String> databases = params.databaseNames.split(',').toList()
         List<DataModel> dataModels = []
 
-        getLogger().info('Importing {} DataModel/s', databases.size())
+        log.info('Importing {} DataModel/s', databases.size())
 
         databases.each {name ->
             dataModels.addAll(importDataModels(currentUser, name, params))
@@ -199,10 +199,10 @@ WHERE
             Connection connection = getConnection(databaseName, params)
             List<Map<String, Object>> results = executeCoreStatement(connection, params)
 
-            getLogger().debug('Size of results from statement {}', results.size())
+            log.debug('Size of results from statement {}', results.size())
 
             if (results.size() == 0) {
-                getLogger().warn('No results from database statement, therefore nothing to import for {}.', modelName)
+                log.warn('No results from database statement, therefore nothing to import for {}.', modelName)
                 return []
             }
 
@@ -211,7 +211,7 @@ WHERE
             connection.close()
             dataModels
         } catch (SQLException ex) {
-            getLogger().error('Something went wrong executing statement while importing {} : {}', modelName, ex.message)
+            log.error('Something went wrong executing statement while importing {} : {}', modelName, ex.message)
             throw new ApiBadRequestException('DIS03', 'Cannot execute statement', ex)
         }
     }
@@ -231,7 +231,7 @@ WHERE
             dataSource = params.getDataSource(databaseName)
             return dataSource.getConnection(params.getDatabaseUsername(), params.getDatabasePassword())
         } catch (SQLException e) {
-            getLogger().error('Cannot connect to database [{}]: {}', params.getUrl(databaseName), e.getMessage())
+            log.error('Cannot connect to database [{}]: {}', params.getUrl(databaseName), e.getMessage())
             throw new ApiBadRequestException('DIS02', "Cannot connect to database [${params.getUrl(databaseName)}]", e)
         }
     }
@@ -336,7 +336,7 @@ WHERE
                 st.close()
             } catch (SQLException ex) {
                 if (ex.message.contains('Invalid object name \'information_schema.table_constraints\'')) {
-                    logger.warn('No table_constraints available for {}', dataModel.label)
+                    log.warn('No table_constraints available for {}', dataModel.label)
                 } else throw ex
             }
 
@@ -351,7 +351,7 @@ WHERE
                     if (constraint && constraint != IS_NOT_NULL_CONSTRAINT) {
                         //                    String columnName = checkClause.replace(/ ${constraint}/, '')
                         //                    DataElement columnElement = tableClass.findChildDataElement(columnName)
-                        logger.warn('Unhandled constraint {}', constraint)
+                        log.warn('Unhandled constraint {}', constraint)
                     }
                 }
             }
@@ -373,7 +373,7 @@ WHERE
                 st.close()
             } catch (SQLException ex) {
                 if (ex.message.contains('Invalid object name \'information_schema.table_constraints\'')) {
-                    logger.warn('No table_constraints available for {}', dataModel.label)
+                    log.warn('No table_constraints available for {}', dataModel.label)
                 } else throw ex
             }
 
@@ -462,7 +462,7 @@ WHERE
                     indexType = row.clustered ? "clustered_${indexType}" : indexType
 
                     tableClass.addToMetadata(namespace, "${indexType}[${row.index_name}]", row.column_names as String, dataModel.createdBy)
-                } else logger.warn('Could not add {} as DataClass for table {} does not exist', row.index_name, row.table_name)
+                } else log.warn('Could not add {} as DataClass for table {} does not exist', row.index_name, row.table_name)
             }
         }
     }

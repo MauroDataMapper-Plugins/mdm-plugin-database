@@ -14,6 +14,7 @@ import uk.ac.ox.softeng.maurodatamapper.datamodel.item.datatype.PrimitiveTypeSer
 import uk.ac.ox.softeng.maurodatamapper.datamodel.item.datatype.ReferenceTypeService
 import uk.ac.ox.softeng.maurodatamapper.datamodel.provider.importer.DataModelImporterProviderService
 import uk.ac.ox.softeng.maurodatamapper.security.CatalogueUser
+import uk.ac.ox.softeng.maurodatamapper.security.User
 
 import groovy.transform.CompileStatic
 import groovy.util.logging.Slf4j
@@ -422,14 +423,14 @@ WHERE
                 if (foreignTableClass) {
                     dataType = referenceTypeService.findOrCreateDataTypeForDataModel(
                         dataModel, "${foreignTableClass.label}Type", "Linked to DataElement [${row.reference_column_name}]",
-                        dataModel.createdBy, foreignTableClass)
+                        dataModel.createdBy as User, foreignTableClass)
 
                     dataModel.addToDataTypes(dataType)
                 } else {
                     dataType = primitiveTypeService.findOrCreateDataTypeForDataModel(
                         dataModel, "${row.reference_table_name}Type",
                         "Missing link to foreign key table [${row.reference_table_name}.${row.reference_column_name}]",
-                        dataModel.createdBy
+                        dataModel.createdBy as User
                     )
                 }
 

@@ -38,8 +38,8 @@ import javax.sql.DataSource
  */
 @CompileStatic
 @Slf4j
-abstract class AbstractDatabaseDataModelImporterProviderService<P extends DatabaseDataModelImporterProviderServiceParameters>
-    extends DataModelImporterProviderService<P> {
+abstract class AbstractDatabaseDataModelImporterProviderService<T extends DatabaseDataModelImporterProviderServiceParameters>
+    extends DataModelImporterProviderService<T> {
 
     public static final String DATABASE_NAMESPACE = 'uk.ac.ox.softeng.maurodatamapper.plugin.database'
     public static final String IS_NOT_NULL_CONSTRAINT = 'IS NOT NULL'
@@ -167,11 +167,11 @@ WHERE
          getTableCatalogColumnName(),]
     }
 
-    DataModel importDataModel(User currentUser, P params) {
+    DataModel importDataModel(User currentUser, T params) {
         importDataModels(currentUser, params.databaseNames, params).first()
     }
 
-    List<DataModel> importDataModels(User currentUser, P params) {
+    List<DataModel> importDataModels(User currentUser, T params) {
 
         List<String> databases = params.databaseNames.split(',').toList()
         List<DataModel> dataModels = []
@@ -190,7 +190,7 @@ WHERE
         true
     }
 
-    List<DataModel> importDataModels(User currentUser, String databaseName, P params) {
+    List<DataModel> importDataModels(User currentUser, String databaseName, T params) {
         String modelName = params.isMultipleDataModelImport() ? databaseName : params.getModelName() ?: databaseName
         modelName = params.dataModelNameSuffix ? "${modelName}_${params.dataModelNameSuffix}" : modelName
         Folder folder = Folder.get(params.folderId)
@@ -216,7 +216,7 @@ WHERE
         }
     }
 
-    List<DataModel> importAndUpdateDataModelsFromResults(User currentUser, String databaseName, P params, Folder folder,
+    List<DataModel> importAndUpdateDataModelsFromResults(User currentUser, String databaseName, T params, Folder folder,
                                                          String modelName, List<Map<String, Object>> results, Connection connection) {
         DataModel dataModel = importDataModelFromResults(currentUser, folder, modelName, params.databaseDialect, results)
         if (params.dataModelNameSuffix) dataModel.aliasesString = databaseName
@@ -225,7 +225,7 @@ WHERE
         [dataModel]
     }
 
-    Connection getConnection(String databaseName, P params) throws ApiException {
+    Connection getConnection(String databaseName, T params) throws ApiException {
         DataSource dataSource
         try {
             dataSource = params.getDataSource(databaseName)
@@ -237,7 +237,7 @@ WHERE
     }
 
     @SuppressWarnings(['unchecked', 'UnusedMethodParameter'])
-    List<Map<String, Object>> executeCoreStatement(Connection connection, P params) throws ApiException {
+    List<Map<String, Object>> executeCoreStatement(Connection connection, T params) throws ApiException {
         List<Map<String, Object>> results = []
         PreparedStatement st = prepareCoreStatement(connection, params)
         results = executeStatement(st)
@@ -246,7 +246,7 @@ WHERE
     }
 
     @SuppressWarnings(['unchecked', 'UnusedMethodParameter'])
-    PreparedStatement prepareCoreStatement(Connection connection, P params) {
+    PreparedStatement prepareCoreStatement(Connection connection, T params) {
         connection.prepareStatement(getDatabaseStructureQueryString())
     }
 

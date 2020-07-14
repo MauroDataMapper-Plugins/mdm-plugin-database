@@ -108,10 +108,7 @@ abstract class DatabaseDataModelImporterProviderServiceParameters<K extends Data
         setImportAsNewDocumentationVersion false
         setFolderId UUID.randomUUID()
 
-        databaseNames = properties.containsKey('import.database.name') ?
-            properties.getProperty('import.database.name')
-            : properties.getProperty('import.database.names')
-
+        databaseNames = properties.getProperty(properties.containsKey('import.database.name') ? 'import.database.name' : 'import.database.names')
         databaseHost = properties.getProperty 'import.database.host'
         databaseUsername = properties.getProperty 'import.database.username'
         databasePassword = properties.getProperty 'import.database.password'
@@ -126,7 +123,10 @@ abstract class DatabaseDataModelImporterProviderServiceParameters<K extends Data
     }
 
     abstract K getDataSource(String databaseName) throws SQLException
+
     abstract String getUrl(String databaseName)
+
     abstract String getDatabaseDialect()
+
     abstract int getDefaultPort()
 }

@@ -7,8 +7,6 @@ import uk.ac.ox.softeng.maurodatamapper.datamodel.provider.importer.parameter.Da
 import groovy.transform.CompileStatic
 
 import java.sql.SQLException
-import java.util.Properties
-import java.util.UUID
 import javax.sql.DataSource
 
 @CompileStatic

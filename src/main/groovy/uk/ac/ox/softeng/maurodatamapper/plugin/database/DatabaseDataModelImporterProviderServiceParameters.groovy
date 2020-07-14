@@ -39,7 +39,7 @@ abstract class DatabaseDataModelImporterProviderServiceParameters<K extends Data
         order = 1,
         group = @ImportGroupConfig(
             name = 'Database Import Details',
-            order = 2
+            order = 0
         )
     )
     String databaseNames
@@ -50,7 +50,7 @@ abstract class DatabaseDataModelImporterProviderServiceParameters<K extends Data
         order = 2,
         group = @ImportGroupConfig(
             name = 'Database Connection Details',
-            order = 1
+            order = 0
         )
     )
     String databaseHost
@@ -59,7 +59,7 @@ abstract class DatabaseDataModelImporterProviderServiceParameters<K extends Data
         optional = true,
         displayName = 'Database Port',
         description = 'The port that the database is accessed through. If not supplied then the default port for the specified type will be used.',
-        order = 2,
+        order = 3,
         group = @ImportGroupConfig(
             name = 'Database Connection Details',
             order = 1
@@ -70,10 +70,10 @@ abstract class DatabaseDataModelImporterProviderServiceParameters<K extends Data
     @ImportParameterConfig(
         displayName = 'Username',
         description = 'The username used to connect to the database.',
-        order = 3,
+        order = 4,
         group = @ImportGroupConfig(
             name = 'Database Connection Details',
-            order = 1
+            order = 2
         )
     )
     String databaseUsername
@@ -82,10 +82,10 @@ abstract class DatabaseDataModelImporterProviderServiceParameters<K extends Data
         displayName = 'Password',
         description = 'The password used to connect to the database.',
         password = true,
-        order = 4,
+        order = 5,
         group = @ImportGroupConfig(
             name = 'Database Connection Details',
-            order = 1
+            order = 3
         )
     )
     String databasePassword
@@ -93,10 +93,10 @@ abstract class DatabaseDataModelImporterProviderServiceParameters<K extends Data
     @ImportParameterConfig(
         displayName = 'SSL',
         description = 'Whether SSL should be used to connect to the database.',
-        order = 2,
+        order = 6,
         group = @ImportGroupConfig(
             name = 'Database Connection Details',
-            order = 1
+            order = 4
         )
     )
     Boolean databaseSSL

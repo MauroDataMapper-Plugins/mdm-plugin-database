@@ -14,6 +14,8 @@ import ch.qos.logback.classic.LoggerContext
 import ch.qos.logback.core.util.StatusPrinter
 import org.slf4j.LoggerFactory
 
+import groovy.transform.CompileStatic
+
 import java.nio.file.Files
 import java.nio.file.Path
 import java.nio.file.Paths
@@ -21,7 +23,7 @@ import java.nio.file.Paths
 /**
  * @since 15/03/2018
  */
-// @CompileStatic
+@CompileStatic
 trait RemoteDatabaseDataModelImporterProviderService {
 
     private static final CommandLineParser parser = new DefaultParser()

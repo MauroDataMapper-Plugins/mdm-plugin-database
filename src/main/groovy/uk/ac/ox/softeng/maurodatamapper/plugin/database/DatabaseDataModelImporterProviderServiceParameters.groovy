@@ -101,12 +101,6 @@ abstract class DatabaseDataModelImporterProviderServiceParameters<K extends Data
     )
     String databaseUsername
 
-    abstract String getDatabaseDialect()
-
-    abstract K getDataSource(String databaseName) throws SQLException
-
-    abstract String getUrl(String databaseName)
-
     Integer getDatabasePort() {
         if (databasePort == null) databasePort = getDefaultPort()
         databasePort
@@ -138,5 +132,8 @@ abstract class DatabaseDataModelImporterProviderServiceParameters<K extends Data
         }
     }
 
+    abstract K getDataSource(String databaseName) throws SQLException
+    abstract String getUrl(String databaseName)
+    abstract String getDatabaseDialect()
     abstract int getDefaultPort()
 }

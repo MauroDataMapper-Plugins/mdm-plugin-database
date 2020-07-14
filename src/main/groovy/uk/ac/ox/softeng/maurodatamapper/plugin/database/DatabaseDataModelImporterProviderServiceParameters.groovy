@@ -1,21 +1,21 @@
-package uk.ac.ox.softeng.maurodatamapper.plugin.database;
+package uk.ac.ox.softeng.maurodatamapper.plugin.database
 
-import uk.ac.ox.softeng.maurodatamapper.core.provider.importer.parameter.config.ImportGroupConfig;
-import uk.ac.ox.softeng.maurodatamapper.core.provider.importer.parameter.config.ImportParameterConfig;
-import uk.ac.ox.softeng.maurodatamapper.datamodel.provider.importer.parameter.DataModelImporterProviderServiceParameters;
+import uk.ac.ox.softeng.maurodatamapper.core.provider.importer.parameter.config.ImportGroupConfig
+import uk.ac.ox.softeng.maurodatamapper.core.provider.importer.parameter.config.ImportParameterConfig
+import uk.ac.ox.softeng.maurodatamapper.datamodel.provider.importer.parameter.DataModelImporterProviderServiceParameters
 
-import groovy.transform.CompileStatic;
+import groovy.transform.CompileStatic
 
-import java.sql.SQLException;
-import java.util.Properties;
-import java.util.UUID;
-import javax.sql.DataSource;
+import java.sql.SQLException
+import java.util.Properties
+import java.util.UUID
+import javax.sql.DataSource
 
 @CompileStatic
-public abstract class DatabaseDataModelImporterProviderServiceParameters<K extends DataSource> extends DataModelImporterProviderServiceParameters {
+abstract class DatabaseDataModelImporterProviderServiceParameters<K extends DataSource> extends DataModelImporterProviderServiceParameters {
 
     @ImportParameterConfig(
-        displayName = "DataModel name suffix",
+        displayName = 'DataModel name suffix',
         description = [
             'A suffix to attach to the end of the auto-imported DataModel name.',
             'This should only be used if the DataModel name property is not supplied.',
@@ -24,25 +24,25 @@ public abstract class DatabaseDataModelImporterProviderServiceParameters<K exten
         order = 0,
         optional = true,
         group = @ImportGroupConfig(
-            name = "DataModel",
+            name = 'DataModel',
             order = 0
         )
     )
-    private String dataModelNameSuffix;
+    String dataModelNameSuffix
 
     @ImportParameterConfig(
-        displayName = "Database Host",
-        description = "The hostname of the server that is running the database",
+        displayName = 'Database Host',
+        description = 'The hostname of the server that is running the database',
         order = 2,
         group = @ImportGroupConfig(
-            name = "Database Connection Details",
+            name = 'Database Connection Details',
             order = 1
         )
     )
-    private String databaseHost;
+    String databaseHost
 
     @ImportParameterConfig(
-        displayName = "Database Name/s",
+        displayName = 'Database Name/s',
         description = [
             'A comma separated list of names of the databases to connect to, the database name will be used as the DataModel name ',
             'unless the DataModel name option is supplied.\n',
@@ -51,150 +51,94 @@ public abstract class DatabaseDataModelImporterProviderServiceParameters<K exten
         ],
         order = 1,
         group = @ImportGroupConfig(
-            name = "Database Import Details",
+            name = 'Database Import Details',
             order = 2
         )
     )
-    private String databaseNames;
+    String databaseNames
 
     @ImportParameterConfig(
-        displayName = "Password",
-        description = "The password used to connect to the database.",
+        displayName = 'Password',
+        description = 'The password used to connect to the database.',
         password = true,
         order = 4,
         group = @ImportGroupConfig(
-            name = "Database Connection Details",
+            name = 'Database Connection Details',
             order = 1
         )
     )
-    private String databasePassword;
+    String databasePassword
 
     @ImportParameterConfig(
         optional = true,
-        displayName = "Database Port",
-        description = "The port that the database is accessed through. If not supplied then the default port for the specified type will be used.",
+        displayName = 'Database Port',
+        description = 'The port that the database is accessed through. If not supplied then the default port for the specified type will be used.',
         order = 2,
         group = @ImportGroupConfig(
-            name = "Database Connection Details",
+            name = 'Database Connection Details',
             order = 1
         )
     )
-    private Integer databasePort;
+    Integer databasePort
 
     @ImportParameterConfig(
-        displayName = "SSL",
-        description = "Whether SSL should be used to connect to the database.",
+        displayName = 'SSL',
+        description = 'Whether SSL should be used to connect to the database.',
         order = 2,
         group = @ImportGroupConfig(
-            name = "Database Connection Details",
+            name = 'Database Connection Details',
             order = 1
         )
     )
-    private Boolean databaseSSL;
+    Boolean databaseSSL
 
     @ImportParameterConfig(
-        displayName = "Username",
-        description = "The username used to connect to the database.",
+        displayName = 'Username',
+        description = 'The username used to connect to the database.',
         order = 3,
         group = @ImportGroupConfig(
-            name = "Database Connection Details",
+            name = 'Database Connection Details',
             order = 1
         )
     )
-    private String databaseUsername;
+    String databaseUsername
 
-    public String getDatabaseHost() {
-        return databaseHost;
+    abstract String getDatabaseDialect()
+
+    abstract K getDataSource(String databaseName) throws SQLException
+
+    abstract String getUrl(String databaseName)
+
+    Integer getDatabasePort() {
+        if (databasePort == null) databasePort = getDefaultPort()
+        databasePort
     }
 
-    public void setDatabaseHost(String databaseHost) {
-        this.databaseHost = databaseHost;
+    boolean isMultipleDataModelImport() {
+        databaseNames.contains ','
     }
 
-    public String getDatabaseNames() {
-        return databaseNames;
-    }
+    void populateFromProperties(Properties properties) {
+        setFinalised true
+        setImportAsNewDocumentationVersion false
+        setFolderId UUID.randomUUID()
 
-    public String getDatabasePassword() {
-        return databasePassword;
-    }
+        databaseNames = properties.containsKey('import.database.name') ?
+            properties.getProperty('import.database.name')
+            : properties.getProperty('import.database.names')
 
-    public void setDatabasePassword(String databasePassword) {
-        this.databasePassword = databasePassword;
-    }
+        databaseHost = properties.getProperty 'import.database.host'
+        databaseUsername = properties.getProperty 'import.database.username'
+        databasePassword = properties.getProperty 'import.database.password'
 
-    public void setDatabaseNames(String databaseNames) {
-        this.databaseNames = databaseNames;
-    }
-
-    public void setDatabasePort(Integer databasePort) {
-        this.databasePort = databasePort;
-    }
-
-    public Boolean getDatabaseSSL() {
-        return databaseSSL;
-    }
-
-    public void setDatabaseSSL(Boolean databaseSSL) {
-        this.databaseSSL = databaseSSL;
-    }
-
-    public String getDatabaseUsername() {
-        return databaseUsername;
-    }
-
-    public void setDatabaseUsername(String databaseUsername) {
-        this.databaseUsername = databaseUsername;
-    }
-
-    public String getDataModelNameSuffix() {
-        return dataModelNameSuffix;
-    }
-
-    public void setDataModelNameSuffix(String dataModelNmaeSuffix) {
-        this.dataModelNameSuffix = dataModelNmaeSuffix;
-    }
-
-    public abstract String getDatabaseDialect();
-
-    public abstract K getDataSource(String databaseName) throws SQLException;
-
-    public abstract String getUrl(String databaseName);
-
-    protected Integer getDatabasePort() {
-        if (databasePort == null) setDatabasePort(getDefaultPort());
-        return databasePort;
-    }
-
-    public boolean isMultipleDataModelImport() {
-        return databaseNames.contains(",");
-    }
-
-    public void populateFromProperties(Properties properties) {
-
-        setFinalised(true);
-        setImportAsNewDocumentationVersion(false);
-        setFolderId(UUID.randomUUID());
-
-        databaseHost = properties.getProperty("import.database.host");
-        databaseNames = properties.containsKey("import.database.name") ? properties.getProperty("import.database.name") :
-                        properties.getProperty("import.database.names");
-        databasePassword = properties.getProperty("import.database.password");
-        databaseUsername = properties.getProperty("import.database.username");
-
-        databaseSSL = Boolean.parseBoolean(properties.getProperty("import.database.ssl"));
+        databaseSSL = Boolean.parseBoolean(properties.getProperty('import.database.ssl'))
 
         try {
-            databasePort = Integer.parseInt(properties.getProperty("import.database.port"));
+            databasePort = Integer.parseInt(properties.getProperty('import.database.port'))
         } catch (NumberFormatException ignored) {
-            databasePort = getDefaultPort();
+            databasePort = getDefaultPort()
         }
     }
 
-    public abstract int getDefaultPort();
-
-    public void setDatabaseName(String databaseName) {
-        databaseNames = databaseName;
-    }
-
+    abstract int getDefaultPort()
 }

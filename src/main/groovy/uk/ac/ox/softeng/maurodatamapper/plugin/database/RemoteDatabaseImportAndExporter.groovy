@@ -15,8 +15,6 @@ import groovy.json.JsonBuilder
 import groovy.json.JsonException
 import groovy.json.JsonSlurper
 import org.grails.orm.hibernate.HibernateDatastore
-import org.slf4j.Logger
-import org.slf4j.LoggerFactory
 import org.springframework.context.ApplicationContext
 import org.springframework.context.MessageSource
 import org.springframework.http.HttpStatus
@@ -25,6 +23,8 @@ import org.springframework.transaction.PlatformTransactionManager
 import org.springframework.validation.Errors
 import org.springframework.validation.FieldError
 
+import groovy.util.logging.Slf4j
+
 import java.security.SecureRandom
 import javax.net.ssl.TrustManager
 import javax.net.ssl.X509TrustManager
@@ -32,9 +32,8 @@ import javax.net.ssl.X509TrustManager
 /**
  * @since 16/03/2018
  */
+@Slf4j
 class RemoteDatabaseImportAndExporter {
-
-    private static final Logger logger = LoggerFactory.getLogger(RemoteDatabaseImportAndExporter)
 
     private static ApplicationContext applicationContext
     private static PlatformTransactionManager transactionManager
@@ -54,7 +53,7 @@ class RemoteDatabaseImportAndExporter {
     ]
 
     void performImportAndExport(Properties loadedProperties) {
-        logger.info('Performing remote import and export of DataModel')
+        log.info('Performing remote import and export of DataModel')
         try {
 
             CatalogueUser exportUser = setupGorm()
@@ -62,15 +61,15 @@ class RemoteDatabaseImportAndExporter {
             List<DataModel> importedModels = importDatabases(loadedProperties, exportUser)
 
             if (!importedModels) {
-                logger.error('Cannot import databases due to errors')
+                log.error('Cannot import databases due to errors')
                 return
             }
             sendModelsToMetadataCatalogue(loadedProperties, exportUser, importedModels)
         } catch (ApiException ex) {
-            logger.error('Failed to import and export database', ex.cause ?: ex)
+            log.error('Failed to import and export database', ex.cause ?: ex)
         }
         catch (Exception ex) {
-            logger.error('Unhandled exception, failed to import and export database', ex)
+            log.error('Unhandled exception, failed to import and export database', ex)
         } finally {
             shutdownGorm()
         }
@@ -78,7 +77,7 @@ class RemoteDatabaseImportAndExporter {
 
     List<DataModel> importDatabases(Properties loadedProperties, CatalogueUser catalogueUser) {
         AbstractDatabaseDataModelImporterProviderService databaseImporter = applicationContext.getBean(AbstractDatabaseDataModelImporterProviderService)
-        logger.info('Importing Databases using {} (v{})', databaseImporter.class.simpleName, databaseImporter.version)
+        log.info('Importing Databases using {} (v{})', databaseImporter.class.simpleName, databaseImporter.version)
 
         ImporterService importerService = applicationContext.getBean(ImporterService)
 
@@ -115,7 +114,7 @@ class RemoteDatabaseImportAndExporter {
 
     @Deprecated
     void sendModelToMetadataCatalogue(Properties loadedProperties, CatalogueUser catalogueUser, DataModel dataModel) {
-        logger.info('Sending DataModel to Metadata Catalogue server')
+        log.info('Sending DataModel to Metadata Catalogue server')
 
         String failReason = null
         // Ensure session is maintained throughout
@@ -127,36 +126,36 @@ class RemoteDatabaseImportAndExporter {
 
         if (host.startsWith('https')) enableSslConnection()
 
-        logger.info('Using Metadata Catalogue server: {}', host)
+        log.info('Using Metadata Catalogue server: {}', host)
 
-        logger.info('Logging into server as "{}"', loadedProperties.getProperty('server.username'))
+        log.info('Logging into server as "{}"', loadedProperties.getProperty('server.username'))
         Object loggedIn = post(host, '/authentication/login', '{' +
                                                               "\"username\" : \"${loadedProperties.getProperty('server.username')}\"," +
                                                               "\"password\" : \"${loadedProperties.getProperty('server.password')}\"" +
                                                               '}')
         def result = null
         if (loggedIn) {
-            logger.debug('Logged in, now exporting DataModel')
+            log.debug('Logged in, now exporting DataModel')
 
             // We need to do this to ensure we use the correct version of importer
-            logger.info('Getting list of importers in server')
+            log.info('Getting list of importers in server')
             List<Map> importersList = get(host, '/public/plugins/dataModelImporters') as List
 
             if (importersList) {
                 Map jsonImporterInfo = importersList.find {it.name == 'JsonImporterService'}
 
-                logger.debug('Getting Folder for DataModel')
+                log.debug('Getting Folder for DataModel')
                 String folderPath = loadedProperties.getProperty('export.folder.path')
                 if (folderPath) {
 
                     Object folderJson = get(host, "/folders/${URLEncoder.encode(folderPath, 'UTF-8')}")
 
                     if (folderJson) {
-                        logger.debug('Exporting DataModel to JSON')
+                        log.debug('Exporting DataModel to JSON')
                         JsonExporterService jsonExporterService = applicationContext.getBean(JsonExporterService)
                         ByteArrayOutputStream outputStream = jsonExporterService.exportDataModel(catalogueUser, dataModel)
 
-                        logger.info('Using JSON importer {}.{} (v{})', jsonImporterInfo.namespace, jsonImporterInfo.name, jsonImporterInfo.version)
+                        log.info('Using JSON importer {}.{} (v{})', jsonImporterInfo.namespace, jsonImporterInfo.name, jsonImporterInfo.version)
                         DataModelFileImporterProviderServiceParameters importerPluginParameters = new DataModelFileImporterProviderServiceParameters(
                             importAsNewDocumentationVersion: true,
                             finalised: loadedProperties.getProperty('export.dataModel.finalised') ?: true,
@@ -171,20 +170,20 @@ class RemoteDatabaseImportAndExporter {
                 } else failReason = 'Property export.folder.path was not supplied'
             } else failReason = 'No importers could be retrieved'
 
-            logger.info('Logging out')
+            log.info('Logging out')
             get(host, '/authentication/logout')
 
         } else failReason = 'Could not log in'
 
         if (result) {
-            logger.info("Successfully exported to remote server")
+            log.info("Successfully exported to remote server")
         } else {
-            logger.error("Could not export to remote server: {}", failReason)
+            log.error("Could not export to remote server: {}", failReason)
         }
     }
 
     void sendModelsToMetadataCatalogue(Properties loadedProperties, CatalogueUser catalogueUser, List<DataModel> dataModels) {
-        logger.info('Sending DataModel to Metadata Catalogue server')
+        log.info('Sending DataModel to Metadata Catalogue server')
 
         String failReason = null
         // Ensure session is maintained throughout
@@ -196,40 +195,39 @@ class RemoteDatabaseImportAndExporter {
 
         if (host.startsWith('https')) enableSslConnection()
 
-        logger.info('Using Metadata Catalogue server: {}', host)
+        log.info('Using Metadata Catalogue server: {}', host)
 
-        logger.info('Logging into server as "{}"', loadedProperties.getProperty('server.username'))
+        log.info('Logging into server as "{}"', loadedProperties.getProperty('server.username'))
         Object loggedIn = post(host, '/authentication/login', '{' +
                                                               "\"username\" : \"${loadedProperties.getProperty('server.username')}\"," +
                                                               "\"password\" : \"${loadedProperties.getProperty('server.password')}\"" +
                                                               '}')
         def result = null
         if (loggedIn) {
-            logger.debug('Logged in, now exporting DataModel')
+            log.debug('Logged in, now exporting DataModel')
 
             // We need to do this to ensure we use the correct version of importer
-            logger.info('Getting list of importers in server')
+            log.info('Getting list of importers in server')
             List<Map> importersList = get(host, '/public/plugins/dataModelImporters') as List
 
             if (importersList) {
                 Map jsonImporterInfo = importersList.find {it.name == 'JsonImporterService'}
 
-                logger.debug('Getting Folder for DataModel')
+                log.debug('Getting Folder for DataModel')
                 String folderPath = loadedProperties.getProperty('export.folder.path')
                 if (folderPath) {
 
                     Object folderJson = get(host, "/folders/${URLEncoder.encode(folderPath, 'UTF-8')}")
 
                     if (folderJson) {
-                        logger.debug('Exporting DataModels to JSON')
+                        log.debug('Exporting DataModels to JSON')
                         JsonExporterService jsonExporterService = applicationContext.getBean(JsonExporterService)
 
                         dataModels.each {dataModel ->
-                            logger.debug('Exporting DataModel {} to JSON', dataModel.label)
+                            log.debug('Exporting DataModel {} to JSON', dataModel.label)
                             ByteArrayOutputStream outputStream = jsonExporterService.exportDataModel(catalogueUser, dataModel)
 
-                            logger.
-                                info('Using JSON importer {}.{} (v{})', jsonImporterInfo.namespace, jsonImporterInfo.name, jsonImporterInfo.version)
+                            log.info('Using JSON importer {}.{} (v{})', jsonImporterInfo.namespace, jsonImporterInfo.name, jsonImporterInfo.version)
                             DataModelFileImporterProviderServiceParameters importerPluginParameters = new DataModelFileImporterProviderServiceParameters(
                                 importAsNewDocumentationVersion: true,
                                 finalised: loadedProperties.getProperty('export.dataModel.finalised') ?: true,
@@ -245,15 +243,15 @@ class RemoteDatabaseImportAndExporter {
                 } else failReason = 'Property export.folder.path was not supplied'
             } else failReason = 'No importers could be retrieved'
 
-            logger.info('Logging out')
+            log.info('Logging out')
             get(host, '/authentication/logout')
 
         } else failReason = 'Could not log in'
 
         if (result) {
-            logger.info("Successfully exported to remote server")
+            log.info("Successfully exported to remote server")
         } else {
-            logger.error("Could not export to remote server: {}", failReason)
+            log.error("Could not export to remote server: {}", failReason)
         }
     }
 
@@ -307,13 +305,13 @@ class RemoteDatabaseImportAndExporter {
 
     private Object connect(HttpURLConnection connection) {
 
-        logger.debug('Performing {} to {}', connection.requestMethod, connection.getURL())
+        log.debug('Performing {} to {}', connection.requestMethod, connection.getURL())
 
         HttpStatus response = HttpStatus.valueOf(connection.responseCode)
 
         if (response.is2xxSuccessful()) {
             String body = connection.inputStream.text
-            logger.trace('Success Response:\n{}', prettyPrint(body))
+            log.trace('Success Response:\n{}', prettyPrint(body))
             try {
                 return jsonSlurper.parseText(body)
             } catch (JsonException ignored) {
@@ -321,9 +319,9 @@ class RemoteDatabaseImportAndExporter {
             }
 
         }
-        logger.error('Could not {} to Metadata Catalogue server at [{}]. Response: {} {}. Message: {}', connection.requestMethod,
-                     connection.getURL(), response.value(),
-                     response.reasonPhrase, prettyPrint(connection.errorStream?.text))
+        log.error('Could not {} to Metadata Catalogue server at [{}]. Response: {} {}. Message: {}', connection.requestMethod,
+                  connection.getURL(), response.value(),
+                  response.reasonPhrase, prettyPrint(connection.errorStream?.text))
         null
     }
 
@@ -347,7 +345,7 @@ class RemoteDatabaseImportAndExporter {
     }
 
     private CatalogueUser setupGorm() {
-        logger.info('Starting Grails Application to handle GORM')
+        log.info('Starting Grails Application to handle GORM')
         gormProperties.each {k, v -> System.setProperty(k, v as String)}
 
         applicationContext = GrailsApp.run(Application)
@@ -372,19 +370,19 @@ class RemoteDatabaseImportAndExporter {
     }
 
     private void shutdownGorm() throws IOException {
-        logger.debug('Shutting down Grails Application')
+        log.debug('Shutting down Grails Application')
         if (applicationContext != null) GrailsApp.exit(applicationContext)
     }
 
     private void outputErrors(Errors errors, MessageSource messageSource) {
-        logger.error 'Errors validating domain: {}', errors.objectName
+        log.error 'Errors validating domain: {}', errors.objectName
         errors.allErrors.each {error ->
 
             String msg = messageSource ? messageSource.getMessage(error, Locale.default) :
                          "${error.defaultMessage} :: ${Arrays.asList(error.arguments)}"
 
             if (error instanceof FieldError) msg += " :: [${error.field}]"
-            logger.error msg
+            log.error msg
         }
     }
 }

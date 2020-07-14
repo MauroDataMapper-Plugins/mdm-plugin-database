@@ -56,15 +56,13 @@ trait RemoteDatabaseDataModelImporterProviderService {
     }
 
     private static void help() {
-        HelpFormatter formatter = new HelpFormatter()
-
-        String header = 'Export database to Metadata Catalogue.\n' +
-                        'Connect to a database, export to DataModel and push to Metadata Catalogue server\n\n'
-        String footer = "\n${version()}\n\nPlease report issues at https://metadatacatalogue.myjetbrains.com\n"
-
-        formatter.printHelp(120,
-                            'remote-database-importer -c <FILE> -u <USERNAME> -p <PASSWORD> -w <DATABASE_PASSWORD>',
-                            header, defineOptions(), footer, false)
+        new HelpFormatter().printHelp(
+            120,
+            'remote-database-importer -c <FILE> -u <USERNAME> -p <PASSWORD> -w <DATABASE_PASSWORD>',
+            'Export database to Metadata Catalogue\nConnect to a database, export to DataModel and push to Metadata Catalogue server\n\n',
+            defineOptions(),
+            "\n${version()}\n\nPlease report issues at https://metadatacatalogue.myjetbrains.com\n",
+            false)
     }
 
     private static String fullVersion() {

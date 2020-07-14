@@ -29,17 +29,6 @@ abstract class DatabaseDataModelImporterProviderServiceParameters<K extends Data
     String dataModelNameSuffix
 
     @ImportParameterConfig(
-        displayName = 'Database Host',
-        description = 'The hostname of the server that is running the database',
-        order = 2,
-        group = @ImportGroupConfig(
-            name = 'Database Connection Details',
-            order = 1
-        )
-    )
-    String databaseHost
-
-    @ImportParameterConfig(
         displayName = 'Database Name/s',
         description = [
             'A comma separated list of names of the databases to connect to, the database name will be used as the DataModel name ',
@@ -56,16 +45,15 @@ abstract class DatabaseDataModelImporterProviderServiceParameters<K extends Data
     String databaseNames
 
     @ImportParameterConfig(
-        displayName = 'Password',
-        description = 'The password used to connect to the database.',
-        password = true,
-        order = 4,
+        displayName = 'Database Host',
+        description = 'The hostname of the server that is running the database',
+        order = 2,
         group = @ImportGroupConfig(
             name = 'Database Connection Details',
             order = 1
         )
     )
-    String databasePassword
+    String databaseHost
 
     @ImportParameterConfig(
         optional = true,
@@ -80,17 +68,6 @@ abstract class DatabaseDataModelImporterProviderServiceParameters<K extends Data
     Integer databasePort
 
     @ImportParameterConfig(
-        displayName = 'SSL',
-        description = 'Whether SSL should be used to connect to the database.',
-        order = 2,
-        group = @ImportGroupConfig(
-            name = 'Database Connection Details',
-            order = 1
-        )
-    )
-    Boolean databaseSSL
-
-    @ImportParameterConfig(
         displayName = 'Username',
         description = 'The username used to connect to the database.',
         order = 3,
@@ -100,6 +77,29 @@ abstract class DatabaseDataModelImporterProviderServiceParameters<K extends Data
         )
     )
     String databaseUsername
+
+    @ImportParameterConfig(
+        displayName = 'Password',
+        description = 'The password used to connect to the database.',
+        password = true,
+        order = 4,
+        group = @ImportGroupConfig(
+            name = 'Database Connection Details',
+            order = 1
+        )
+    )
+    String databasePassword
+
+    @ImportParameterConfig(
+        displayName = 'SSL',
+        description = 'Whether SSL should be used to connect to the database.',
+        order = 2,
+        group = @ImportGroupConfig(
+            name = 'Database Connection Details',
+            order = 1
+        )
+    )
+    Boolean databaseSSL
 
     Integer getDatabasePort() {
         if (databasePort == null) databasePort = getDefaultPort()

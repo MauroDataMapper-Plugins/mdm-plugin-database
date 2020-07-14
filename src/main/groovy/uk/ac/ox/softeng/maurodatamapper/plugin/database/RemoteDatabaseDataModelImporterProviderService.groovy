@@ -55,6 +55,12 @@ trait RemoteDatabaseDataModelImporterProviderService {
         options
     }
 
+    private static String version() {
+        "remote-database-importer " +
+        "  Version: \"${RemoteDatabaseDataModelImporterProviderService.getPackage().getSpecificationVersion()}\"\n" +
+        "  Java Version: \"${System.getProperty('java.version')}\""
+    }
+
     private static void help() {
         new HelpFormatter().printHelp(
             120,
@@ -63,15 +69,6 @@ trait RemoteDatabaseDataModelImporterProviderService {
             defineOptions(),
             "\n${version()}\n\nPlease report issues at https://metadatacatalogue.myjetbrains.com\n",
             false)
-    }
-
-    private static String fullVersion() {
-        "remote-database-importer ${version()}"
-    }
-
-    private static String version() {
-        "  Version: \"${RemoteDatabaseDataModelImporterProviderService.getPackage().getSpecificationVersion()}\"\n" +
-        "  Java Version: \"${System.getProperty('java.version')}\""
     }
 
     @SuppressWarnings('Println')
@@ -85,7 +82,7 @@ trait RemoteDatabaseDataModelImporterProviderService {
         // parse the command line arguments
         CommandLine line = parser.parse(defineOptions(), args)
         if (line.hasOption('h')) help()
-        else if (line.hasOption('v')) println(fullVersion())
+        else if (line.hasOption('v')) println(version())
         else if (line.hasOption('c') && line.hasOption('u') && line.hasOption('p')) {
 
             Path path = Paths.get(line.getOptionValue('c'))

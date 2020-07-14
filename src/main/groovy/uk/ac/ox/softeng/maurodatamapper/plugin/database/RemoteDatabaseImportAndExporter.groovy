@@ -13,6 +13,7 @@ import uk.ac.ox.softeng.maurodatamapper.security.CatalogueUser
 import uk.ac.ox.softeng.maurodatamapper.security.User
 import uk.ac.ox.softeng.maurodatamapper.util.Utils
 
+import org.grails.web.json.JSONObject
 import org.springframework.transaction.support.TransactionSynchronizationManager
 
 import grails.boot.GrailsApp
@@ -30,6 +31,7 @@ import org.springframework.transaction.PlatformTransactionManager
 import org.springframework.validation.Errors
 import org.springframework.validation.FieldError
 
+import groovy.transform.CompileStatic
 import groovy.util.logging.Slf4j
 
 import java.security.SecureRandom
@@ -41,6 +43,7 @@ import javax.net.ssl.X509TrustManager
 /**
  * @since 16/03/2018
  */
+// @CompileStatic
 @Slf4j
 class RemoteDatabaseImportAndExporter {
 
@@ -90,7 +93,8 @@ class RemoteDatabaseImportAndExporter {
 
         ImporterService importerService = applicationContext.getBean(ImporterService)
 
-        DatabaseDataModelImporterProviderServiceParameters databaseImportParameters = importerService.createNewImporterProviderServiceParameters(databaseImporter)
+        DatabaseDataModelImporterProviderServiceParameters databaseImportParameters =
+            importerService.createNewImporterProviderServiceParameters(databaseImporter) as DatabaseDataModelImporterProviderServiceParameters
         databaseImportParameters.populateFromProperties(loadedProperties)
 
         Folder randomFolder = new Folder(label: 'random', createdBy: user)
@@ -151,13 +155,13 @@ class RemoteDatabaseImportAndExporter {
             List<Map> importersList = get(host, '/public/plugins/dataModelImporters') as List
 
             if (importersList) {
-                Map jsonImporterInfo = importersList.find {it.name == 'JsonImporterService'}
+                Map jsonImporterInfo = importersList.find { (it as JSONObject).name == 'JsonImporterService' } as Map
 
                 log.debug('Getting Folder for DataModel')
                 String folderPath = loadedProperties.getProperty('export.folder.path')
                 if (folderPath) {
 
-                    Object folderJson = get(host, "/folders/${URLEncoder.encode(folderPath, 'UTF-8')}")
+                    JSONObject folderJson = get(host, "/folders/${URLEncoder.encode(folderPath, 'UTF-8')}") as JSONObject
 
                     if (folderJson) {
                         log.debug('Exporting DataModel to JSON')
@@ -167,9 +171,9 @@ class RemoteDatabaseImportAndExporter {
                         log.info('Using JSON importer {}.{} (v{})', jsonImporterInfo.namespace, jsonImporterInfo.name, jsonImporterInfo.version)
                         DataModelFileImporterProviderServiceParameters importerPluginParameters = new DataModelFileImporterProviderServiceParameters(
                             importAsNewDocumentationVersion: true,
-                            finalised: loadedProperties.getProperty('export.dataModel.finalised') ?: true,
+                            finalised: loadedProperties.getProperty('export.dataModel.finalised') as boolean ?: true,
                             modelName: loadedProperties.getProperty('export.dataModel.name') ?: dataModel.label,
-                            folderId: Utils.toUuid(folderJson.id),
+                            folderId: Utils.toUuid(folderJson.id as String),
                             importFile: new FileParameter(dataModel.label, MimeType.JSON.name, outputStream.toByteArray())
                         )
                         result = post(host, "/dataModels/import/${jsonImporterInfo.namespace}/${jsonImporterInfo.name}/${jsonImporterInfo.version}",
@@ -217,16 +221,16 @@ class RemoteDatabaseImportAndExporter {
 
             // We need to do this to ensure we use the correct version of importer
             log.info('Getting list of importers in server')
-            List<Map> importersList = get(host, '/public/plugins/dataModelImporters') as List
+            List<JSONObject> importersList = get(host, '/public/plugins/dataModelImporters') as List
 
             if (importersList) {
-                Map jsonImporterInfo = importersList.find {it.name == 'JsonImporterService'}
+                Map jsonImporterInfo = importersList.find { (it as JSONObject).name == 'JsonImporterService' } as Map
 
                 log.debug('Getting Folder for DataModel')
                 String folderPath = loadedProperties.getProperty('export.folder.path')
                 if (folderPath) {
 
-                    Object folderJson = get(host, "/folders/${URLEncoder.encode(folderPath, 'UTF-8')}")
+                    JSONObject folderJson = get(host, "/folders/${URLEncoder.encode(folderPath, 'UTF-8')}") as JSONObject
 
                     if (folderJson) {
                         log.debug('Exporting DataModels to JSON')
@@ -239,9 +243,9 @@ class RemoteDatabaseImportAndExporter {
                             log.info('Using JSON importer {}.{} (v{})', jsonImporterInfo.namespace, jsonImporterInfo.name, jsonImporterInfo.version)
                             DataModelFileImporterProviderServiceParameters importerPluginParameters = new DataModelFileImporterProviderServiceParameters(
                                 importAsNewDocumentationVersion: true,
-                                finalised: loadedProperties.getProperty('export.dataModel.finalised') ?: true,
+                                finalised: loadedProperties.getProperty('export.dataModel.finalised') as boolean ?: true,
                                 modelName: loadedProperties.getProperty('export.dataModel.name') ?: dataModel.label,
-                                folderId: Utils.toUuid(folderJson.id),
+                                folderId: Utils.toUuid(folderJson.id as String),
                                 importFile: new FileParameter(dataModel.label, MimeType.JSON.name, outputStream.toByteArray())
                             )
                             result =

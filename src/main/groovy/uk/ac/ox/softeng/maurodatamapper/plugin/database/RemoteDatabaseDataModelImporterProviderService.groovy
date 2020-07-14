@@ -26,31 +26,32 @@ trait RemoteDatabaseDataModelImporterProviderService {
     private static final CommandLineParser parser = new DefaultParser()
 
     private static Options defineOptions() {
+        Collection<Option> optionsList = [
+            Option.builder('c').longOpt('config')
+                .desc('The config file defining the import config')
+                .argName('FILE').hasArg().required().build(),
+            Option.builder('h').longOpt('help').build(),
+            Option.builder('v').longOpt('version').build()
+        ]
+
+        OptionGroup mainGroup = new OptionGroup()
+        optionsList.each { Option option -> mainGroup.addOption option }
+
+        optionsList = [
+            Option.builder('u').longOpt('username')
+                .desc('Username for Metadata Catalogue (Required)')
+                .argName('USERNAME').hasArg().build(),
+            Option.builder('p').longOpt('password')
+                .desc('Password for Metadata Catalogue (Required)')
+                .argName('PASSWORD').hasArg().build(),
+            Option.builder('w').longOpt('databasePassword')
+                .desc('Password for Database (Required)')
+                .argName('DATABASE_PASSWORD').hasArg().build()
+        ]
 
         Options options = new Options()
-        OptionGroup mainGroup = new OptionGroup()
-        mainGroup.addOption(
-            Option.builder('c').longOpt('config')
-                .argName('FILE')
-                .hasArg().required()
-                .desc('The config file defining the import config')
-                .build())
-        mainGroup.addOption(Option.builder('h').longOpt('help').build())
-        mainGroup.addOption(Option.builder('v').longOpt('version').build())
         options.addOptionGroup(mainGroup)
-
-        options.addOption(Option.builder('u').longOpt('username')
-                              .desc('Username for Metadata Catalogue (Required)')
-                              .argName('USERNAME').hasArg()
-                              .build())
-        options.addOption(Option.builder('p').longOpt('password')
-                              .desc('Password for Metadata Catalogue (Required)')
-                              .argName('PASSWORD').hasArg()
-                              .build())
-        options.addOption(Option.builder('w').longOpt('databasePassword')
-                              .desc('Password for Database (Required)')
-                              .argName('DATABASE_PASSWORD').hasArg()
-                              .build())
+        optionsList.each { Option option -> options.addOption option }
         options
     }
 

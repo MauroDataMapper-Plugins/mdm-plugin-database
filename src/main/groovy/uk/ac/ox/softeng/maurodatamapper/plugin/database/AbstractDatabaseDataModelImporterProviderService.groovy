@@ -5,6 +5,7 @@ import uk.ac.ox.softeng.maurodatamapper.api.exception.ApiException
 import uk.ac.ox.softeng.maurodatamapper.core.container.Folder
 import uk.ac.ox.softeng.maurodatamapper.datamodel.DataModel
 import uk.ac.ox.softeng.maurodatamapper.datamodel.DataModelService
+import uk.ac.ox.softeng.maurodatamapper.datamodel.DataModelType
 import uk.ac.ox.softeng.maurodatamapper.datamodel.item.DataClass
 import uk.ac.ox.softeng.maurodatamapper.datamodel.item.DataClassService
 import uk.ac.ox.softeng.maurodatamapper.datamodel.item.DataElement
@@ -41,6 +42,7 @@ import javax.sql.DataSource
 abstract class AbstractDatabaseDataModelImporterProviderService<P extends DatabaseDataModelImporterProviderServiceParameters>
     extends DataModelImporterProviderService<P> {
 
+    public static final String DATABASE_NAMESPACE = 'uk.ac.ox.softeng.maurodatamapper.plugin.database'
     public static final String IS_NOT_NULL_CONSTRAINT = 'IS NOT NULL'
 
     @Autowired
@@ -274,8 +276,7 @@ WHERE
     DataModel importDataModelFromResults(CatalogueUser catalogueUser, Folder folder, String modelName, String dialect,
                                          List<Map<String, Object>> results, boolean importSchemaAsDataClass = true) throws ApiException {
 
-        final DataModel dataModel = dataModelService.createDatabase(catalogueUser, modelName, null, null, null, dialect,
-                                                                    folder)
+        final DataModel dataModel = createDatabase(catalogueUser, modelName, dialect, folder)
 
         for (Map<String, Object> row : results) {
             String dataTypeName = (String) row[getDataTypeColumnName()]
@@ -466,6 +467,13 @@ WHERE
                 } else log.warn('Could not add {} as DataClass for table {} does not exist', row.index_name, row.table_name)
             }
         }
+    }
+
+    private static DataModel createDatabase(CatalogueUser catalogeUser, String modelName, String dialect, Folder folder) {
+        DataModel dataModel = new DataModel(createdBy: catalogeUser, label: modelName, type: DataModelType.DATA_ASSET, folder: folder)
+        dataModel.addCreatedEdit(catalogeUser)
+        dataModel.addToMetadata(namespace: DATABASE_NAMESPACE, key: 'dialect', value: dialect)
+        dataModel
     }
 
     private static String extractConstraint(String checkClause) {

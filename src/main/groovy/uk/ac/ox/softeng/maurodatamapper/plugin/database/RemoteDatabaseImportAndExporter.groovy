@@ -5,12 +5,18 @@ import uk.ac.ox.softeng.maurodatamapper.core.container.Folder
 import uk.ac.ox.softeng.maurodatamapper.core.importer.ImporterService
 import uk.ac.ox.softeng.maurodatamapper.core.provider.importer.parameter.FileParameter
 import uk.ac.ox.softeng.maurodatamapper.core.provider.importer.parameter.ImporterProviderServiceParameters
+import uk.ac.ox.softeng.maurodatamapper.datamodel.Application
 import uk.ac.ox.softeng.maurodatamapper.datamodel.DataModel
 import uk.ac.ox.softeng.maurodatamapper.datamodel.provider.exporter.JsonExporterService
 import uk.ac.ox.softeng.maurodatamapper.datamodel.provider.importer.parameter.DataModelFileImporterProviderServiceParameters
 import uk.ac.ox.softeng.maurodatamapper.security.CatalogueUser
+import uk.ac.ox.softeng.maurodatamapper.util.Utils
 
+import org.springframework.transaction.support.TransactionSynchronizationManager
+
+import grails.boot.GrailsApp
 import grails.plugin.json.view.JsonViewTemplateEngine
+import grails.web.mime.MimeType
 import groovy.json.JsonBuilder
 import groovy.json.JsonException
 import groovy.json.JsonSlurper
@@ -26,6 +32,8 @@ import org.springframework.validation.FieldError
 import groovy.util.logging.Slf4j
 
 import java.security.SecureRandom
+import javax.net.ssl.HttpsURLConnection
+import javax.net.ssl.SSLContext
 import javax.net.ssl.TrustManager
 import javax.net.ssl.X509TrustManager
 
@@ -81,21 +89,21 @@ class RemoteDatabaseImportAndExporter {
 
         ImporterService importerService = applicationContext.getBean(ImporterService)
 
-        DatabaseDataModelImporterProviderServiceParameters databaseImportParameters = importerService.createNewImporterPluginParameters(databaseImporter)
+        DatabaseDataModelImporterProviderServiceParameters databaseImportParameters = importerService.createNewImporterProviderServiceParameters(databaseImporter)
         databaseImportParameters.populateFromProperties(loadedProperties)
 
         Folder randomFolder = new Folder(label: 'random', createdBy: catalogueUser)
         randomFolder.id = UUID.randomUUID()
         databaseImportParameters.setFolderId(randomFolder.id)
 
-        Errors errors = importerService.validateParameters(databaseImportParameters, databaseImporter.importerPluginParametersClass)
+        Errors errors = importerService.validateParameters(databaseImportParameters, databaseImporter.getImporterProviderServiceParametersClass())
 
         if (errors.hasErrors()) {
             outputErrors(errors, applicationContext.getBean(MessageSource))
             return []
         }
 
-        List<DataModel> dataModels = importerService.importDataModels(catalogueUser, databaseImporter, databaseImportParameters)
+        List<DataModel> dataModels = importerService.importModels(catalogueUser, databaseImporter, databaseImportParameters)
 
         dataModels.each {dataModel ->
             dataModel.folder = randomFolder
@@ -160,7 +168,7 @@ class RemoteDatabaseImportAndExporter {
                             importAsNewDocumentationVersion: true,
                             finalised: loadedProperties.getProperty('export.dataModel.finalised') ?: true,
                             dataModelName: loadedProperties.getProperty('export.dataModel.name') ?: dataModel.label,
-                            folderId: UuidDomain.toUuid(folderJson.id),
+                            folderId: Utils.toUuid(folderJson.id),
                             importFile: new FileParameter(dataModel.label, MimeType.JSON.name, outputStream.toByteArray())
                         )
                         result = post(host, "/dataModels/import/${jsonImporterInfo.namespace}/${jsonImporterInfo.name}/${jsonImporterInfo.version}",
@@ -232,7 +240,7 @@ class RemoteDatabaseImportAndExporter {
                                 importAsNewDocumentationVersion: true,
                                 finalised: loadedProperties.getProperty('export.dataModel.finalised') ?: true,
                                 dataModelName: loadedProperties.getProperty('export.dataModel.name') ?: dataModel.label,
-                                folderId: UuidDomain.toUuid(folderJson.id),
+                                folderId: Utils.toUuid(folderJson.id),
                                 importFile: new FileParameter(dataModel.label, MimeType.JSON.name, outputStream.toByteArray())
                             )
                             result =
@@ -359,7 +367,6 @@ class RemoteDatabaseImportAndExporter {
 
         new CatalogueUser().with {
             setEmailAddress('databaseImporter@metadatacatalogue.com')
-            setUserRole(UserRole.ADMINISTRATOR)
             setFirstName('Database')
             setLastName('Importer')
             setOrganisation('Oxford BRC Informatics')

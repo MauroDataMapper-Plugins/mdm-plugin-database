@@ -14,7 +14,6 @@ import uk.ac.ox.softeng.maurodatamapper.datamodel.item.datatype.DataType
 import uk.ac.ox.softeng.maurodatamapper.datamodel.item.datatype.PrimitiveTypeService
 import uk.ac.ox.softeng.maurodatamapper.datamodel.item.datatype.ReferenceTypeService
 import uk.ac.ox.softeng.maurodatamapper.datamodel.provider.importer.DataModelImporterProviderService
-import uk.ac.ox.softeng.maurodatamapper.security.CatalogueUser
 import uk.ac.ox.softeng.maurodatamapper.security.User
 
 import groovy.transform.CompileStatic
@@ -168,11 +167,11 @@ WHERE
          getTableCatalogColumnName(),]
     }
 
-    DataModel importDataModel(CatalogueUser currentUser, P params) {
+    DataModel importDataModel(User currentUser, P params) {
         importDataModels(currentUser, params.databaseNames, params).first()
     }
 
-    List<DataModel> importDataModels(CatalogueUser currentUser, P params) {
+    List<DataModel> importDataModels(User currentUser, P params) {
 
         List<String> databases = params.databaseNames.split(',').toList()
         List<DataModel> dataModels = []
@@ -191,7 +190,7 @@ WHERE
         true
     }
 
-    List<DataModel> importDataModels(CatalogueUser currentUser, String databaseName, P params) {
+    List<DataModel> importDataModels(User currentUser, String databaseName, P params) {
         String modelName = params.isMultipleDataModelImport() ? databaseName : params.getModelName() ?: databaseName
         modelName = params.dataModelNameSuffix ? "${modelName}_${params.dataModelNameSuffix}" : modelName
         Folder folder = Folder.get(params.folderId)
@@ -217,7 +216,7 @@ WHERE
         }
     }
 
-    List<DataModel> importAndUpdateDataModelsFromResults(CatalogueUser currentUser, String databaseName, P params, Folder folder,
+    List<DataModel> importAndUpdateDataModelsFromResults(User currentUser, String databaseName, P params, Folder folder,
                                                          String modelName, List<Map<String, Object>> results, Connection connection) {
         DataModel dataModel = importDataModelFromResults(currentUser, folder, modelName, params.databaseDialect, results)
         if (params.dataModelNameSuffix) dataModel.aliasesString = databaseName
@@ -271,36 +270,36 @@ WHERE
         nullableColumnValue.toLowerCase() == 'yes'
     }
 
-    DataModel importDataModelFromResults(CatalogueUser catalogueUser, Folder folder, String modelName, String dialect,
+    DataModel importDataModelFromResults(User user, Folder folder, String modelName, String dialect,
                                          List<Map<String, Object>> results, boolean importSchemaAsDataClass = true) throws ApiException {
 
-        final DataModel dataModel = createDatabase(catalogueUser, modelName, dialect, folder)
+        final DataModel dataModel = createDatabase(user, modelName, dialect, folder)
 
         for (Map<String, Object> row : results) {
             String dataTypeName = (String) row[getDataTypeColumnName()]
-            DataType dataType = primitiveTypeService.findOrCreateDataTypeForDataModel(dataModel, dataTypeName, null, catalogueUser)
+            DataType dataType = primitiveTypeService.findOrCreateDataTypeForDataModel(dataModel, dataTypeName, null, user)
 
             String tableName = (String) row[getTableNameColumnName()]
             DataClass tableDataClass
             if (importSchemaAsDataClass) {
                 String schemaName = (String) row[getSchemaNameColumnName()]
 
-                DataClass schemaDataClass = dataClassService.findOrCreateDataClass(dataModel, schemaName, null, catalogueUser)
-                tableDataClass = dataClassService.findOrCreateDataClass(schemaDataClass, tableName, null, catalogueUser)
+                DataClass schemaDataClass = dataClassService.findOrCreateDataClass(dataModel, schemaName, null, user)
+                tableDataClass = dataClassService.findOrCreateDataClass(schemaDataClass, tableName, null, user)
             } else {
-                tableDataClass = dataClassService.findOrCreateDataClass(dataModel, tableName, null, catalogueUser)
+                tableDataClass = dataClassService.findOrCreateDataClass(dataModel, tableName, null, user)
             }
 
             String columnName = (String) row[getColumnNameColumnName()]
             String isNullable = (String) row[getColumnIsNullableColumnName()]
             Integer min = isColumnNullable(isNullable) ? 0 : 1
-            DataElement de = dataElementService.findOrCreateDataElementForDataClass(tableDataClass, columnName, null, catalogueUser, dataType,
+            DataElement de = dataElementService.findOrCreateDataElementForDataClass(tableDataClass, columnName, null, user, dataType,
                                                                                     min, 1)
 
             row.findAll {col, data ->
                 data && !(col in coreColumns)
             }.each {col, data ->
-                de.addToMetadata(namespace, col, data.toString(), catalogueUser)
+                de.addToMetadata(namespace, col, data.toString(), user)
             }
         }
         dataModel
@@ -467,9 +466,9 @@ WHERE
         }
     }
 
-    private static DataModel createDatabase(CatalogueUser catalogeUser, String modelName, String dialect, Folder folder) {
-        DataModel dataModel = new DataModel(createdBy: catalogeUser, label: modelName, type: DataModelType.DATA_ASSET, folder: folder)
-        dataModel.addCreatedEdit(catalogeUser)
+    private static DataModel createDatabase(User user, String modelName, String dialect, Folder folder) {
+        DataModel dataModel = new DataModel(createdBy: user, label: modelName, type: DataModelType.DATA_ASSET, folder: folder)
+        dataModel.addCreatedEdit(user)
         dataModel.addToMetadata(namespace: DATABASE_NAMESPACE, key: 'dialect', value: dialect)
         dataModel
     }

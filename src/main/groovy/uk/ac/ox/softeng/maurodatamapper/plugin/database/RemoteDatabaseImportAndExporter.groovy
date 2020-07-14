@@ -10,6 +10,7 @@ import uk.ac.ox.softeng.maurodatamapper.datamodel.DataModel
 import uk.ac.ox.softeng.maurodatamapper.datamodel.provider.exporter.JsonExporterService
 import uk.ac.ox.softeng.maurodatamapper.datamodel.provider.importer.parameter.DataModelFileImporterProviderServiceParameters
 import uk.ac.ox.softeng.maurodatamapper.security.CatalogueUser
+import uk.ac.ox.softeng.maurodatamapper.security.User
 import uk.ac.ox.softeng.maurodatamapper.util.Utils
 
 import org.springframework.transaction.support.TransactionSynchronizationManager
@@ -83,7 +84,7 @@ class RemoteDatabaseImportAndExporter {
         }
     }
 
-    List<DataModel> importDatabases(Properties loadedProperties, CatalogueUser catalogueUser) {
+    List<DataModel> importDatabases(Properties loadedProperties, User user) {
         AbstractDatabaseDataModelImporterProviderService databaseImporter = applicationContext.getBean(AbstractDatabaseDataModelImporterProviderService)
         log.info('Importing Databases using {} (v{})', databaseImporter.class.simpleName, databaseImporter.version)
 
@@ -92,7 +93,7 @@ class RemoteDatabaseImportAndExporter {
         DatabaseDataModelImporterProviderServiceParameters databaseImportParameters = importerService.createNewImporterProviderServiceParameters(databaseImporter)
         databaseImportParameters.populateFromProperties(loadedProperties)
 
-        Folder randomFolder = new Folder(label: 'random', createdBy: catalogueUser)
+        Folder randomFolder = new Folder(label: 'random', createdBy: user)
         randomFolder.id = UUID.randomUUID()
         databaseImportParameters.setFolderId(randomFolder.id)
 
@@ -103,7 +104,7 @@ class RemoteDatabaseImportAndExporter {
             return []
         }
 
-        List<DataModel> dataModels = importerService.importModels(catalogueUser, databaseImporter, databaseImportParameters)
+        List<DataModel> dataModels = importerService.importModels(user, databaseImporter, databaseImportParameters)
 
         dataModels.each {dataModel ->
             dataModel.folder = randomFolder
@@ -121,7 +122,7 @@ class RemoteDatabaseImportAndExporter {
     }
 
     @Deprecated
-    void sendModelToMetadataCatalogue(Properties loadedProperties, CatalogueUser catalogueUser, DataModel dataModel) {
+    void sendModelToMetadataCatalogue(Properties loadedProperties, User user, DataModel dataModel) {
         log.info('Sending DataModel to Metadata Catalogue server')
 
         String failReason = null
@@ -161,7 +162,7 @@ class RemoteDatabaseImportAndExporter {
                     if (folderJson) {
                         log.debug('Exporting DataModel to JSON')
                         JsonExporterService jsonExporterService = applicationContext.getBean(JsonExporterService)
-                        ByteArrayOutputStream outputStream = jsonExporterService.exportDataModel(catalogueUser, dataModel)
+                        ByteArrayOutputStream outputStream = jsonExporterService.exportDataModel(user, dataModel)
 
                         log.info('Using JSON importer {}.{} (v{})', jsonImporterInfo.namespace, jsonImporterInfo.name, jsonImporterInfo.version)
                         DataModelFileImporterProviderServiceParameters importerPluginParameters = new DataModelFileImporterProviderServiceParameters(
@@ -190,7 +191,7 @@ class RemoteDatabaseImportAndExporter {
         }
     }
 
-    void sendModelsToMetadataCatalogue(Properties loadedProperties, CatalogueUser catalogueUser, List<DataModel> dataModels) {
+    void sendModelsToMetadataCatalogue(Properties loadedProperties, User user, List<DataModel> dataModels) {
         log.info('Sending DataModel to Metadata Catalogue server')
 
         String failReason = null
@@ -233,7 +234,7 @@ class RemoteDatabaseImportAndExporter {
 
                         dataModels.each {dataModel ->
                             log.debug('Exporting DataModel {} to JSON', dataModel.label)
-                            ByteArrayOutputStream outputStream = jsonExporterService.exportDataModel(catalogueUser, dataModel)
+                            ByteArrayOutputStream outputStream = jsonExporterService.exportDataModel(user, dataModel)
 
                             log.info('Using JSON importer {}.{} (v{})', jsonImporterInfo.namespace, jsonImporterInfo.name, jsonImporterInfo.version)
                             DataModelFileImporterProviderServiceParameters importerPluginParameters = new DataModelFileImporterProviderServiceParameters(

@@ -19,9 +19,11 @@ public abstract class DatabaseDataModelImporterProviderServiceParameters<K exten
 
     @ImportParameterConfig(
         displayName = "DataModel name suffix",
-        description =
-            "A suffix to attach to the end of the auto-imported DataModel name. This should only be used if the DataModel name property is" +
-            "not supplied. The suffix will be appended in the form ${modelName}_${suffix}.",
+        description = [
+            'A suffix to attach to the end of the auto-imported DataModel name.',
+            'This should only be used if the DataModel name property is not supplied.',
+            'The suffix will be appended in the form ${modelName}_${suffix}.'
+        ],
         order = 0,
         optional = true,
         group = @ImportGroupConfig(
@@ -44,10 +46,12 @@ public abstract class DatabaseDataModelImporterProviderServiceParameters<K exten
 
     @ImportParameterConfig(
         displayName = "Database Name/s",
-        description = "A comma separated list of names of the databases to connect to, the database name will be used as the DataModel name " +
-                      "unless the DataModel name option is supplied.\n" +
-                      "If multiple names supplied then DataModel name will be ignored and the database name will be used as the DataModel name, " +
-                      "and the same username and password will be used for all named databases.",
+        description = [
+            'A comma separated list of names of the databases to connect to, the database name will be used as the DataModel name ',
+            'unless the DataModel name option is supplied.\n',
+            'If multiple names supplied then DataModel name will be ignored and the database name will be used as the DataModel name, ',
+            'and the same username and password will be used for all named databases.'
+        ],
         order = 1,
         group = @ImportGroupConfig(
             name = "Database Import Details",

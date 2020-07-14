@@ -11,9 +11,6 @@ import java.util.Properties;
 import java.util.UUID;
 import javax.sql.DataSource;
 
-/**
- * @since 23/08/2017
- */
 @CompileStatic
 public abstract class DatabaseDataModelImporterProviderServiceParameters<K extends DataSource> extends DataModelImporterProviderServiceParameters {
 

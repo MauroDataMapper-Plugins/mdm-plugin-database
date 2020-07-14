@@ -336,7 +336,7 @@ WHERE
                 st.close()
             } catch (SQLException ex) {
                 if (ex.message.contains('Invalid object name \'information_schema.table_constraints\'')) {
-                    log.warn('No table_constraints available for {}', dataModel.label)
+                    getLog().warn('No table_constraints available for {}', dataModel.label)
                 } else throw ex
             }
 
@@ -373,7 +373,7 @@ WHERE
                 st.close()
             } catch (SQLException ex) {
                 if (ex.message.contains('Invalid object name \'information_schema.table_constraints\'')) {
-                    log.warn('No table_constraints available for {}', dataModel.label)
+                    getLog().warn('No table_constraints available for {}', dataModel.label)
                 } else throw ex
             }
 

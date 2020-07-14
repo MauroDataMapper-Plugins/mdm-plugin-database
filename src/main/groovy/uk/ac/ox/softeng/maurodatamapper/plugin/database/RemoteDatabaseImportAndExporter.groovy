@@ -168,7 +168,7 @@ class RemoteDatabaseImportAndExporter {
                         DataModelFileImporterProviderServiceParameters importerPluginParameters = new DataModelFileImporterProviderServiceParameters(
                             importAsNewDocumentationVersion: true,
                             finalised: loadedProperties.getProperty('export.dataModel.finalised') ?: true,
-                            dataModelName: loadedProperties.getProperty('export.dataModel.name') ?: dataModel.label,
+                            modelName: loadedProperties.getProperty('export.dataModel.name') ?: dataModel.label,
                             folderId: Utils.toUuid(folderJson.id),
                             importFile: new FileParameter(dataModel.label, MimeType.JSON.name, outputStream.toByteArray())
                         )
@@ -240,7 +240,7 @@ class RemoteDatabaseImportAndExporter {
                             DataModelFileImporterProviderServiceParameters importerPluginParameters = new DataModelFileImporterProviderServiceParameters(
                                 importAsNewDocumentationVersion: true,
                                 finalised: loadedProperties.getProperty('export.dataModel.finalised') ?: true,
-                                dataModelName: loadedProperties.getProperty('export.dataModel.name') ?: dataModel.label,
+                                modelName: loadedProperties.getProperty('export.dataModel.name') ?: dataModel.label,
                                 folderId: Utils.toUuid(folderJson.id),
                                 importFile: new FileParameter(dataModel.label, MimeType.JSON.name, outputStream.toByteArray())
                             )

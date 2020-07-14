@@ -20,9 +20,6 @@ import java.nio.file.Files
 import java.nio.file.Path
 import java.nio.file.Paths
 
-/**
- * @since 15/03/2018
- */
 @CompileStatic
 trait RemoteDatabaseDataModelImporterProviderService {
 

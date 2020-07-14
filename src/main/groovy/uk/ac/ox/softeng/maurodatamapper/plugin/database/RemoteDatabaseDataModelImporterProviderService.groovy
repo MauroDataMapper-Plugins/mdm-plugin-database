@@ -2,18 +2,17 @@ package uk.ac.ox.softeng.maurodatamapper.plugin.database
 
 import uk.ac.ox.softeng.maurodatamapper.util.Utils
 
+import org.apache.commons.cli.CommandLine
+import org.apache.commons.cli.CommandLineParser
+import org.apache.commons.cli.DefaultParser
+import org.apache.commons.cli.HelpFormatter
+import org.apache.commons.cli.Option
+import org.apache.commons.cli.OptionGroup
+import org.apache.commons.cli.Options
+
 import ch.qos.logback.classic.LoggerContext
 import ch.qos.logback.core.util.StatusPrinter
-import groovyjarjarcommonscli.CommandLine
-import groovyjarjarcommonscli.CommandLineParser
-import groovyjarjarcommonscli.DefaultParser
-import groovyjarjarcommonscli.HelpFormatter
-import groovyjarjarcommonscli.Option
-import groovyjarjarcommonscli.OptionGroup
-import groovyjarjarcommonscli.Options
 import org.slf4j.LoggerFactory
-
-// TODO adei please use the proper commons-cli dependency
 
 import java.nio.file.Path
 import java.nio.file.Paths

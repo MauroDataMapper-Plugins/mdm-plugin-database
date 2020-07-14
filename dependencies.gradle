@@ -6,6 +6,7 @@ dependencies {
 
     runtimeOnly group: 'org.postgresql', name: 'postgresql'
 
+    implementation group: 'commons-cli', name: 'commons-cli', version: '1.4'
     implementation group: 'org.codehaus.groovy', name: 'groovy'
 
     // Logging

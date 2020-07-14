@@ -4,6 +4,8 @@ import uk.ac.ox.softeng.maurodatamapper.core.provider.importer.parameter.config.
 import uk.ac.ox.softeng.maurodatamapper.core.provider.importer.parameter.config.ImportParameterConfig;
 import uk.ac.ox.softeng.maurodatamapper.datamodel.provider.importer.parameter.DataModelImporterProviderServiceParameters;
 
+import groovy.transform.CompileStatic;
+
 import java.sql.SQLException;
 import java.util.Properties;
 import java.util.UUID;
@@ -12,6 +14,7 @@ import javax.sql.DataSource;
 /**
  * @since 23/08/2017
  */
+@CompileStatic
 public abstract class DatabaseDataModelImporterProviderServiceParameters<K extends DataSource> extends DataModelImporterProviderServiceParameters {
 
     @ImportParameterConfig(

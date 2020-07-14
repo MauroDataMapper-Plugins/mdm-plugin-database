@@ -14,6 +14,7 @@ import ch.qos.logback.classic.LoggerContext
 import ch.qos.logback.core.util.StatusPrinter
 import org.slf4j.LoggerFactory
 
+import java.nio.file.Files
 import java.nio.file.Path
 import java.nio.file.Paths
 
@@ -100,8 +101,7 @@ trait RemoteDatabaseDataModelImporterProviderService {
             Utils.outputRuntimeArgs(getClass())
 
             remoteDatabaseImportAndExporter.performImportAndExport(new Properties().with {
-                // TODO adei please find the correct replacement for this call
-                load(path.newInputStream())
+                load(Files.newInputStream(path))
                 setProperty('server.username', line.getOptionValue('u'))
                 setProperty('server.password', line.getOptionValue('p'))
                 setProperty('import.database.password', line.getOptionValue('w'))

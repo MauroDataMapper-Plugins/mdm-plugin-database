@@ -1,21 +1,15 @@
 dependencies {
+    implementation group: 'uk.ac.ox.softeng.maurodatamapper', name: 'mdm-core', version: mdmCoreVersion
+    implementation group: 'uk.ac.ox.softeng.maurodatamapper', name: 'mdm-security', version: mdmSecurityVersion
+    implementation group: 'uk.ac.ox.softeng.maurodatamapper', name: 'mdm-plugin-datamodel', version: mdmPluginDataModelVersion
 
-    implementation 'uk.ac.ox.softeng.maurodatamapper:mdm-core:4.0.0-SNAPSHOT'
-    implementation 'uk.ac.ox.softeng.maurodatamapper:mdm-security:4.0.0-SNAPSHOT'
-    implementation 'uk.ac.ox.softeng.maurodatamapper:mdm-plugin-datamodel:4.0.0-SNAPSHOT'
+    implementation group: 'org.codehaus.groovy', name: 'groovy-all', version: groovyVersion
+    implementation group: 'commons-cli', name: 'commons-cli', version: commonsCliVersion
+    implementation group: 'org.slf4j', name: 'slf4j-api', version: slf4jVersion
+    implementation group: 'ch.qos.logback', name: 'logback-classic', version: logbackVersion
 
-    runtimeOnly group: 'org.postgresql', name: 'postgresql'
+    runtimeOnly group: 'org.postgresql', name: 'postgresql', version: postgresJdbcVersion
 
-    implementation group: 'commons-cli', name: 'commons-cli', version: '1.4'
-    implementation group: 'org.codehaus.groovy', name: 'groovy'
-
-    // Logging
-    api group: 'org.slf4j', name: 'slf4j-api'
-    implementation group: 'ch.qos.logback', name: 'logback-classic'
-
-    /**
-     * Testing
-     */
     testImplementation group: 'junit', name: 'junit', version: junitVersion
-    integrationTestImplementation group: 'org.flywaydb.flyway-test-extensions', name: 'flyway-spring-test', version: project.ext['flyway.version']
+    integrationTestImplementation group: 'org.flywaydb.flyway-test-extensions', name: 'flyway-spring-test', version: flywayVersion
 }

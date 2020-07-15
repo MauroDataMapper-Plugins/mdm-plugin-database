@@ -338,16 +338,11 @@ WHERE
         }
     }
 
-    void addIndexInformation(DataModel dataModel, Connection connection) {
+    void addIndexInformation(DataModel dataModel, Connection connection) throws ApiException, SQLException {
         if (!getIndexInformationQueryString()) return
 
         dataModel.childDataClasses.each { schemaClass ->
-            PreparedStatement st = connection.prepareStatement(getIndexInformationQueryString())
-            st.setString(1, schemaClass.label)
-            List<Map<String, Object>> results = executeStatement(st)
-            st.close()
-
-            results.each { row ->
+            executePreparedStatement(dataModel, schemaClass, connection, this.&getIndexInformationQueryString).each { row ->
                 DataClass tableClass = schemaClass.findDataClass(row.table_name as String)
 
                 if (tableClass) {
@@ -360,16 +355,11 @@ WHERE
         }
     }
 
-    void addForeignKeyInformation(DataModel dataModel, Connection connection) {
+    void addForeignKeyInformation(DataModel dataModel, Connection connection) throws ApiException, SQLException {
         if (!getForeignKeyInformationQueryString()) return
 
         dataModel.childDataClasses.each { schemaClass ->
-            PreparedStatement st = connection.prepareStatement(getForeignKeyInformationQueryString())
-            st.setString(1, schemaClass.label)
-            List<Map<String, Object>> results = executeStatement(st)
-            st.close()
-
-            results.each { row ->
+            executePreparedStatement(dataModel, schemaClass, connection, this.&getForeignKeyInformationQueryString).each { row ->
                 DataClass foreignTableClass = dataModel.dataClasses.find { it.label == row.reference_table_name }
                 DataType dataType
 

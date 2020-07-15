@@ -33,8 +33,8 @@ import javax.sql.DataSource
 abstract class AbstractDatabaseDataModelImporterProviderService<T extends DatabaseDataModelImporterProviderServiceParameters>
     extends DataModelImporterProviderService<T> {
 
-    public static final String DATABASE_NAMESPACE = 'uk.ac.ox.softeng.maurodatamapper.plugin.database'
-    public static final String IS_NOT_NULL_CONSTRAINT = 'IS NOT NULL'
+    static final String DATABASE_NAMESPACE = 'uk.ac.ox.softeng.maurodatamapper.plugin.database'
+    static final String IS_NOT_NULL_CONSTRAINT = 'IS NOT NULL'
 
     @Autowired
     DataModelService dataModelService

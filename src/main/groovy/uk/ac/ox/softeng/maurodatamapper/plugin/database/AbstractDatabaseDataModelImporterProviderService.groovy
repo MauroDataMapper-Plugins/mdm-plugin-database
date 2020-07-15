@@ -365,20 +365,20 @@ WHERE
         }
     }
 
-    List<Map<String, Object>> executePreparedStatement(
-        DataModel dataModel, DataClass schemaClass, Connection connection, Closure<String> queryStringGetter) throws ApiException, SQLException {
-        List<Map<String, Object>> results = []
+    StatementExecutionResults executePreparedStatement(
+            DataModel dataModel, DataClass schemaClass, Connection connection, String queryString) throws ApiException, SQLException {
+        StatementExecutionResults results = null
         try {
-            PreparedStatement st = connection.prepareStatement(queryStringGetter())
-            st.setString(1, schemaClass.label)
-            results = executeStatement(st)
-            st.close()
+            final PreparedStatement preparedStatement = connection.prepareStatement(queryString)
+            preparedStatement.setString(1, schemaClass.label)
+            results = executeStatement(preparedStatement)
+            preparedStatement.close()
         } catch (SQLException e) {
             if (e.message.contains('Invalid object name \'information_schema.table_constraints\'')) {
-                log.warn('No table_constraints available for {}', dataModel.label)
+                log.warn 'No table_constraints available for {}', dataModel.label
             } else throw e
         }
-        results
+        results as StatementExecutionResults
     }
 
     StatementExecutionResults executeStatement(PreparedStatement preparedStatement) throws ApiException, SQLException {

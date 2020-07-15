@@ -29,7 +29,6 @@ import grails.web.mime.MimeType
 import groovy.json.JsonBuilder
 import groovy.json.JsonException
 import groovy.json.JsonSlurper
-import groovy.transform.CompileStatic
 import groovy.util.logging.Slf4j
 
 import java.lang.management.ManagementFactory
@@ -40,9 +39,9 @@ import javax.net.ssl.SSLContext
 import javax.net.ssl.TrustManager
 import javax.net.ssl.X509TrustManager
 
-@CompileStatic
+// @CompileStatic
 @Slf4j
-class RemoteDatabaseImportAndExporter {
+class RemoteDatabaseImporterService extends AbstractDatabaseDataModelImporterProviderService<DatabaseDataModelImporterProviderServiceParameters> {
 
     private static ApplicationContext applicationContext
     private static PlatformTransactionManager transactionManager
@@ -331,5 +330,30 @@ class RemoteDatabaseImportAndExporter {
             if (error instanceof FieldError) msg += " :: [${error.field}]"
             log.error msg
         }
+    }
+
+    @Override
+    String getIndexInformationQueryString() {
+        ''
+    }
+
+    @Override
+    String getForeignKeyInformationQueryString() {
+        ''
+    }
+
+    @Override
+    String getDatabaseStructureQueryString() {
+        ''
+    }
+
+    @Override
+    String getDisplayName() {
+        'Remote Database Importer'
+    }
+
+    @Override
+    String getVersion() {
+        '2.0.0-SNAPSHOT'
     }
 }

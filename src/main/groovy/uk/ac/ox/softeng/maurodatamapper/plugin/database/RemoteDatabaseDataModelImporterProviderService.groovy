@@ -71,7 +71,7 @@ trait RemoteDatabaseDataModelImporterProviderService {
         final Path path = Paths.get(commandLine.getOptionValue('c'))
         println "Starting Remote Database Import service\n${getVersionInfo()}\nConfig file: ${path.toAbsolutePath()}\n"
         Utils.outputRuntimeArgs(getClass())
-        new RemoteDatabaseImportAndExporter().performImportAndExport(
+        new RemoteDatabaseImporterService().performImportAndExport(
                 new Properties().with { Properties properties ->
                     load Files.newInputStream(path)
                     setProperty 'server.username', commandLine.getOptionValue('u')

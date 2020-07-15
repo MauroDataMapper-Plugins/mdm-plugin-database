@@ -27,15 +27,6 @@ import java.sql.ResultSetMetaData
 import java.sql.SQLException
 import javax.sql.DataSource
 
-/**
- * @since 23/08/2017
- * TODO adei please work through this file inside intellij
- * all "red" line needs to be fixed
- * this will/must compile with @CompileStatic in place
- * as a start the @Slf4j will allow you to replace getLogger(). with log.
- * Also make sure the correct methods are overriden for the importing
- * check the extended class for whats not yet implemented
- */
 @CompileStatic
 @Slf4j
 abstract class AbstractDatabaseDataModelImporterProviderService<T extends DatabaseDataModelImporterProviderServiceParameters>

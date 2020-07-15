@@ -214,39 +214,35 @@ WHERE
         }
     }
 
-    DataModel importDataModelFromResults(User user, Folder folder, String modelName, String dialect,
-                                         List<Map<String, Object>> results, boolean importSchemaAsDataClass = true) throws ApiException {
+    DataModel importDataModelFromResults(
+            User user, Folder folder, String modelName, String dialect, StatementExecutionResults results, boolean importSchemaAsDataClass = true)
+            throws ApiException {
         final DataModel dataModel = new DataModel(createdBy: user, label: modelName, type: DataModelType.DATA_ASSET, folder: folder)
-        dataModel.addCreatedEdit(user)
-        dataModel.addToMetadata(namespace: DATABASE_NAMESPACE, key: 'dialect', value: dialect)
+        dataModel.addCreatedEdit user
+        dataModel.addToMetadata namespace: DATABASE_NAMESPACE, key: 'dialect', value: dialect
 
-        for (Map<String, Object> row : results) {
-            String dataTypeName = (String) row[getDataTypeColumnName()]
-            DataType dataType = primitiveTypeService.findOrCreateDataTypeForDataModel(dataModel, dataTypeName, null, user)
+        results.each { StatementExecutionResultsRow row ->
+            final DataType dataType = primitiveTypeService.findOrCreateDataTypeForDataModel(dataModel, row(dataTypeColumnName), null, user)
 
-            String tableName = (String) row[getTableNameColumnName()]
-            DataClass tableDataClass
+            DataClass tableDataClass = null
             if (importSchemaAsDataClass) {
-                String schemaName = (String) row[getSchemaNameColumnName()]
-
-                DataClass schemaDataClass = dataClassService.findOrCreateDataClass(dataModel, schemaName, null, user)
-                tableDataClass = dataClassService.findOrCreateDataClass(schemaDataClass, tableName, null, user)
+                DataClass schemaDataClass = dataClassService.findOrCreateDataClass(dataModel, row(schemaNameColumnName), null, user)
+                tableDataClass = dataClassService.findOrCreateDataClass(schemaDataClass, row(tableNameColumnName), null, user)
             } else {
-                tableDataClass = dataClassService.findOrCreateDataClass(dataModel, tableName, null, user)
+                tableDataClass = dataClassService.findOrCreateDataClass(dataModel, row(tableNameColumnName), null, user)
             }
 
-            String columnName = (String) row[getColumnNameColumnName()]
-            String isNullable = (String) row[getColumnIsNullableColumnName()]
-            int  min = isColumnNullable(isNullable) ? 0 : 1
-            DataElement de = dataElementService.findOrCreateDataElementForDataClass(tableDataClass, columnName, null, user, dataType,
-                                                                                    min, 1)
+            final int minMultiplicity = isColumnNullable(row(columnIsNullableColumnName)) ? 0 : 1
+            final DataElement dataElement = dataElementService.findOrCreateDataElementForDataClass(
+                    tableDataClass, row(columnNameColumnName), null, user, dataType, minMultiplicity, 1)
 
-            row.findAll { col, data ->
-                data && !(col in coreColumns)
-            }.each { col, data ->
-                de.addToMetadata(namespace, col, data.toString(), user)
+            row.findAll { String column, Object data ->
+                data && !(column in coreColumns)
+            }.each { String column, Object data ->
+                dataElement.addToMetadata(namespace, column, data.toString(), user)
             }
         }
+
         dataModel
     }
 

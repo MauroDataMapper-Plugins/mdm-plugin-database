@@ -367,11 +367,9 @@ WHERE
         if (!getIndexInformationQueryString()) return
 
         dataModel.childDataClasses.each { schemaClass ->
-            List<Map<String, Object>> results = []
-
             PreparedStatement st = connection.prepareStatement(getIndexInformationQueryString())
             st.setString(1, schemaClass.label)
-            results = executeStatement(st)
+            List<Map<String, Object>> results = executeStatement(st)
             st.close()
 
             results.each { row ->
@@ -391,11 +389,9 @@ WHERE
         if (!getForeignKeyInformationQueryString()) return
 
         dataModel.childDataClasses.each { schemaClass ->
-            List<Map<String, Object>> results = []
-
             PreparedStatement st = connection.prepareStatement(getForeignKeyInformationQueryString())
             st.setString(1, schemaClass.label)
-            results = executeStatement(st)
+            List<Map<String, Object>> results = executeStatement(st)
             st.close()
 
             results.each { row ->
@@ -432,9 +428,8 @@ WHERE
 
     @SuppressWarnings(['unchecked', 'UnusedMethodParameter'])
     List<Map<String, Object>> executeCoreStatement(Connection connection, T params) throws ApiException {
-        List<Map<String, Object>> results = []
         PreparedStatement st = prepareCoreStatement(connection, params)
-        results = executeStatement(st)
+        List<Map<String, Object>> results = executeStatement(st)
         st.close()
         results
     }

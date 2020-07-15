@@ -3,113 +3,115 @@ package uk.ac.ox.softeng.maurodatamapper.plugin.database
 import uk.ac.ox.softeng.maurodatamapper.util.Utils
 
 import org.apache.commons.cli.CommandLine
-import org.apache.commons.cli.CommandLineParser
 import org.apache.commons.cli.DefaultParser
 import org.apache.commons.cli.HelpFormatter
 import org.apache.commons.cli.Option
 import org.apache.commons.cli.OptionGroup
 import org.apache.commons.cli.Options
+import org.slf4j.LoggerFactory
 
 import ch.qos.logback.classic.LoggerContext
 import ch.qos.logback.core.util.StatusPrinter
-import org.slf4j.LoggerFactory
-
 import groovy.transform.CompileStatic
 
 import java.nio.file.Files
 import java.nio.file.Path
 import java.nio.file.Paths
 
-/**
- * @since 15/03/2018
- */
 @CompileStatic
 trait RemoteDatabaseDataModelImporterProviderService {
 
-    private static final CommandLineParser parser = new DefaultParser()
+    private static Options options
 
-    private static Options defineOptions() {
+    private static Options getOptions() {
+        if (options) return options
 
-        Options options = new Options()
-        OptionGroup mainGroup = new OptionGroup()
-        mainGroup.addOption(
-            Option.builder('c').longOpt('config')
-                .argName('FILE')
-                .hasArg().required()
-                .desc('The config file defining the import config')
-                .build())
-        mainGroup.addOption(Option.builder('h').longOpt('help').build())
-        mainGroup.addOption(Option.builder('v').longOpt('version').build())
-        options.addOptionGroup(mainGroup)
+        Collection<Option> optionDefinitions = [
+            Option.builder('c').with {
+                longOpt 'config'
+                desc 'Config file defining the import configuration'
+                argName 'FILE'
+                hasArg().required().build()
+            },
+            Option.builder('v').longOpt('version').build(),
+            Option.builder('h').longOpt('help').build()
+        ]
 
-        options.addOption(Option.builder('u').longOpt('username')
-                              .desc('Username for Metadata Catalogue (Required)')
-                              .argName('USERNAME').hasArg()
-                              .build())
-        options.addOption(Option.builder('p').longOpt('password')
-                              .desc('Password for Metadata Catalogue (Required)')
-                              .argName('PASSWORD').hasArg()
-                              .build())
-        options.addOption(Option.builder('w').longOpt('databasePassword')
-                              .desc('Password for Database (Required)')
-                              .argName('DATABASE_PASSWORD').hasArg()
-                              .build())
+        final OptionGroup mainOptions = new OptionGroup()
+        optionDefinitions.each { Option option -> mainOptions.addOption option }
+
+        optionDefinitions = [
+            Option.builder('u').with {
+                longOpt 'username'
+                desc 'Username for the Mauro Data Mapper (required)'
+                argName 'USERNAME'
+                hasArg().build()
+            },
+            Option.builder('p').with {
+                longOpt 'password'
+                desc 'Password for the Mauro Data Mapper (required)'
+                argName 'PASSWORD'
+                hasArg().build()
+            },
+            Option.builder('w').with {
+                longOpt 'databasePassword'
+                desc 'Password for the database to import (required)'
+                argName 'DATABASE_PASSWORD'
+                hasArg().build()
+            }
+        ]
+
+        options = new Options()
+        options.addOptionGroup mainOptions
+        optionDefinitions.each { Option option -> options.addOption option }
         options
     }
 
-    private static void help() {
-        HelpFormatter formatter = new HelpFormatter()
-
-        String header = 'Export database to Metadata Catalogue.\n' +
-                        'Connect to a database, export to DataModel and push to Metadata Catalogue server\n\n'
-        String footer = "\n${version()}\n\nPlease report issues at https://metadatacatalogue.myjetbrains.com\n"
-
-        formatter.printHelp(120,
-                            'remote-database-importer -c <FILE> -u <USERNAME> -p <PASSWORD> -w <DATABASE_PASSWORD>',
-                            header, defineOptions(), footer, false)
-    }
-
-    private static String fullVersion() {
-        "remote-database-importer ${version()}"
-    }
-
-    private static String version() {
-        "  Version: \"${RemoteDatabaseDataModelImporterProviderService.getPackage().getSpecificationVersion()}\"\n" +
-        "  Java Version: \"${System.getProperty('java.version')}\""
-    }
-
-    @SuppressWarnings('Println')
-    static void main(String[] args) {
-
-        // assume SLF4J is bound to logback in the current environment
-        LoggerContext lc = (LoggerContext) LoggerFactory.getILoggerFactory()
-        // print logback's internal status
-        StatusPrinter.print(lc)
-
-        // parse the command line arguments
-        CommandLine line = parser.parse(defineOptions(), args)
-        if (line.hasOption('h')) help()
-        else if (line.hasOption('v')) println(fullVersion())
-        else if (line.hasOption('c') && line.hasOption('u') && line.hasOption('p')) {
-
-            Path path = Paths.get(line.getOptionValue('c'))
-
-            println('Starting Remote Database Import service\n' +
-                    "${version()}\n" +
-                    "  Config File: ${path.toAbsolutePath().toString()}\n")
-
-            RemoteDatabaseImportAndExporter remoteDatabaseImportAndExporter = new RemoteDatabaseImportAndExporter()
-
-            Utils.outputRuntimeArgs(getClass())
-
-            remoteDatabaseImportAndExporter.performImportAndExport(new Properties().with {
-                load(Files.newInputStream(path))
-                setProperty('server.username', line.getOptionValue('u'))
-                setProperty('server.password', line.getOptionValue('p'))
-                setProperty('import.database.password', line.getOptionValue('w'))
-                it
+    private static void startService(CommandLine commandLine) {
+        final Path path = Paths.get(commandLine.getOptionValue('c'))
+        println "Starting Remote Database Import service\n${getVersionInfo()}\nConfig file: ${path.toAbsolutePath()}\n"
+        Utils.outputRuntimeArgs(getClass())
+        new RemoteDatabaseImportAndExporter().performImportAndExport(
+            new Properties().with { Properties properties ->
+                load Files.newInputStream(path)
+                setProperty 'server.username', commandLine.getOptionValue('u')
+                setProperty 'server.password', commandLine.getOptionValue('p')
+                setProperty 'import.database.password', commandLine.getOptionValue('w')
+                properties
             })
+    }
 
-        } else help()
+    private static String getVersionInfo() {
+        new StringBuilder().with {
+            append "remote-database-importer version: ${RemoteDatabaseDataModelImporterProviderService.package.specificationVersion}\n"
+            append "Java version: ${System.getProperty('java.version')}\n"
+            toString()
+        }
+    }
+
+    private static void printHelp() {
+        new HelpFormatter().printHelp(
+            120,
+            'remote-database-importer -c <FILE> -u <USERNAME> -p <PASSWORD> -w <DATABASE_PASSWORD>',
+            'Import database to the Mauro Data Mapper\nConnect to a database, import to a DataModel and push to the Mauro server\n\n',
+            getOptions(),
+            "\n${getVersionInfo()}\nPlease report issues at https://metadatacatalogue.myjetbrains.com\n",
+            false)
+    }
+
+    static void main(String[] args) {
+        // Assume Slf4j is bound to Logback in the current environment
+        final LoggerContext loggerContext = LoggerFactory.getILoggerFactory() as LoggerContext
+        StatusPrinter.print loggerContext // Print Logback's internal status
+
+        // Parse command line arguments
+        final CommandLine commandLine = new DefaultParser().parse(getOptions(), args)
+        if ('cpu'.any { String option -> commandLine.hasOption option }) {
+            startService commandLine
+        } else if (commandLine.hasOption('v')) {
+            println getVersionInfo()
+        } else {
+            printHelp()
+        }
     }
 }

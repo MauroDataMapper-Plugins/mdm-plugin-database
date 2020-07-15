@@ -316,18 +316,20 @@ WHERE
     }
 
     void addIndexInformation(DataModel dataModel, Connection connection) throws ApiException, SQLException {
-        if (!getIndexInformationQueryString()) return
+        if (indexInformationQueryString == null) return
 
-        dataModel.childDataClasses.each { schemaClass ->
-            executePreparedStatement(dataModel, schemaClass, connection, this.&getIndexInformationQueryString).each { row ->
-                DataClass tableClass = schemaClass.findDataClass(row.table_name as String)
+        dataModel.childDataClasses.each { DataClass schemaClass ->
+            final StatementExecutionResults results = executePreparedStatement(dataModel, schemaClass, connection, indexInformationQueryString)
+            results.each { StatementExecutionResultsRow row ->
+                final DataClass tableClass = schemaClass.findDataClass(row.table_name as String)
+                if (tableClass == null) {
+                    log.warn 'Could not add {} as DataClass for table {} does not exist', row.index_name, row.table_name
+                    return
+                }
 
-                if (tableClass) {
-                    String indexType = row.primary_index ? 'primary_index' : row.unique_index ? 'unique_index' : 'index'
-                    indexType = row.clustered ? "clustered_${indexType}" : indexType
-
-                    tableClass.addToMetadata(namespace, "${indexType}[${row.index_name}]", row.column_names as String, dataModel.createdBy)
-                } else log.warn('Could not add {} as DataClass for table {} does not exist', row.index_name, row.table_name)
+                String indexType = row.primary_index ? 'primary_index' : row.unique_index ? 'unique_index' : 'index'
+                indexType = row.clustered ? "clustered_$indexType" : indexType
+                tableClass.addToMetadata namespace, "$indexType[${row.index_name}]", row.column_names as String, dataModel.createdBy
             }
         }
     }

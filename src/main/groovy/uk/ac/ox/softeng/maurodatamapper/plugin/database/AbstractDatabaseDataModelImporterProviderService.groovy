@@ -287,7 +287,7 @@ WHERE
         null
     }
 
-    void addStandardConstraintInformation(DataModel dataModel, Connection connection) {
+    void addStandardConstraintInformation(DataModel dataModel, Connection connection) throws ApiException, SQLException {
         if (!getStandardConstraintInformationQueryString()) return
 
         dataModel.childDataClasses.each { schemaClass ->
@@ -308,8 +308,7 @@ WHERE
         }
     }
 
-    @SuppressWarnings("UnnecessaryCollectCall")
-    void addPrimaryKeyAndUniqueConstraintInformation(DataModel dataModel, Connection connection) {
+    void addPrimaryKeyAndUniqueConstraintInformation(DataModel dataModel, Connection connection) throws ApiException, SQLException {
         if (!getPrimaryKeyAndUniqueConstraintInformationQueryString()) return
 
         dataModel.childDataClasses.each { schemaClass ->
@@ -405,7 +404,8 @@ WHERE
     }
 
     List<Map<String, Object>> executePreparedStatement(
-        DataModel dataModel, DataClass schemaClass, Connection connection, Closure<String> queryStringGetter) {
+        DataModel dataModel, DataClass schemaClass, Connection connection, Closure<String> queryStringGetter)
+        throws ApiException, SQLException {
         List<Map<String, Object>> results = []
         try {
             PreparedStatement st = connection.prepareStatement(queryStringGetter())
@@ -414,7 +414,7 @@ WHERE
             st.close()
         } catch (SQLException e) {
             if (e.message.contains('Invalid object name \'information_schema.table_constraints\'')) {
-                getLog().warn('No table_constraints available for {}', dataModel.label)
+                log.warn('No table_constraints available for {}', dataModel.label)
             } else throw e
         }
         results

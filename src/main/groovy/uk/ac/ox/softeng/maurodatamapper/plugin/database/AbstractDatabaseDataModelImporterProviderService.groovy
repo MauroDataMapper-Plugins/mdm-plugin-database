@@ -60,7 +60,7 @@ abstract class AbstractDatabaseDataModelImporterProviderService<T extends Databa
      *  * check_clause (the constraint information)
      * @return
      */
-    String getStandardConstraintInformationQueryString() {
+    static String getStandardConstraintInformationQueryString() {
         '''
 SELECT
   tc.table_name,
@@ -81,7 +81,7 @@ WHERE tc.constraint_schema = ?;
      *  * ordinal_position
      * @return
      */
-    String getPrimaryKeyAndUniqueConstraintInformationQueryString() {
+    static String getPrimaryKeyAndUniqueConstraintInformationQueryString() {
         '''
 SELECT
   tc.constraint_name,
@@ -123,31 +123,31 @@ WHERE
      */
     abstract String getForeignKeyInformationQueryString()
 
-    String getColumnNameColumnName() {
+    static String getColumnNameColumnName() {
         'column_name'
     }
 
-    String getDataTypeColumnName() {
+    static String getDataTypeColumnName() {
         'data_type'
     }
 
-    String getSchemaNameColumnName() {
+    static String getSchemaNameColumnName() {
         'table_schema'
     }
 
-    String getTableCatalogColumnName() {
+    static String getTableCatalogColumnName() {
         'table_catalog'
     }
 
-    String getTableNameColumnName() {
+    static String getTableNameColumnName() {
         'table_name'
     }
 
-    String getColumnIsNullableColumnName() {
+    static String getColumnIsNullableColumnName() {
         'is_nullable'
     }
 
-    List<String> getCoreColumns() {
+    static List<String> getCoreColumns() {
         [getSchemaNameColumnName(),
          getDataTypeColumnName(),
          getTableNameColumnName(),
@@ -237,7 +237,7 @@ WHERE
         connection.prepareStatement(getDatabaseStructureQueryString())
     }
 
-    List<Map<String, Object>> executeStatement(PreparedStatement preparedStatement) throws ApiException {
+    static List<Map<String, Object>> executeStatement(PreparedStatement preparedStatement) throws ApiException {
         List list = new ArrayList(50)
         ResultSet rs = preparedStatement.executeQuery()
         ResultSetMetaData md = rs.getMetaData()
@@ -253,7 +253,7 @@ WHERE
         list
     }
 
-    Boolean isColumnNullable(String nullableColumnValue) {
+    static Boolean isColumnNullable(String nullableColumnValue) {
         nullableColumnValue.toLowerCase() == 'yes'
     }
 

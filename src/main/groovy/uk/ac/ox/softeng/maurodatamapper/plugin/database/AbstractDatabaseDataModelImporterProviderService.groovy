@@ -270,21 +270,19 @@ WHERE
     }
 
     void addStandardConstraintInformation(DataModel dataModel, Connection connection) throws ApiException, SQLException {
-        if (!getStandardConstraintInformationQueryString()) return
+        if (standardConstraintInformationQueryString == null) return
 
-        dataModel.childDataClasses.each { schemaClass ->
-            executePreparedStatement(dataModel, schemaClass, connection, this.&getStandardConstraintInformationQueryString).each { row ->
-                DataClass tableClass = schemaClass.findDataClass(row.table_name as String)
+        dataModel.childDataClasses.each { DataClass schemaClass ->
+            final StatementExecutionResults results = executePreparedStatement(
+                    dataModel, schemaClass, connection, standardConstraintInformationQueryString)
+            results.each { StatementExecutionResultsRow row ->
+                final DataClass tableClass = schemaClass.findDataClass(row.table_name as String)
+                if (tableClass == null) return
 
-                if (tableClass) {
-                    String checkClause = row.check_clause
-                    String constraint = checkClause && checkClause.contains(IS_NOT_NULL_CONSTRAINT) ? IS_NOT_NULL_CONSTRAINT : null
-
-                    if (constraint && constraint != IS_NOT_NULL_CONSTRAINT) {
-                        // String columnName = checkClause.replace(/ ${constraint}/, '')
-                        // DataElement columnElement = tableClass.findChildDataElement(columnName)
-                        log.warn('Unhandled constraint {}', constraint)
-                    }
+                final String constraint = row.check_clause && (row.check_clause as String).contains(IS_NOT_NULL_CONSTRAINT) ?
+                                          IS_NOT_NULL_CONSTRAINT : null
+                if (constraint && constraint != IS_NOT_NULL_CONSTRAINT) {
+                    log.warn 'Unhandled constraint {}', constraint
                 }
             }
         }

@@ -155,7 +155,7 @@ WHERE
         'is_nullable'
     }
 
-    Boolean isColumnNullable(String nullableColumnValue) {
+    boolean isColumnNullable(String nullableColumnValue) {
         nullableColumnValue.toLowerCase() == 'yes'
     }
 
@@ -244,7 +244,7 @@ WHERE
 
             String columnName = (String) row[getColumnNameColumnName()]
             String isNullable = (String) row[getColumnIsNullableColumnName()]
-            Integer min = isColumnNullable(isNullable) ? 0 : 1
+            int  min = isColumnNullable(isNullable) ? 0 : 1
             DataElement de = dataElementService.findOrCreateDataElementForDataClass(tableDataClass, columnName, null, user, dataType,
                                                                                     min, 1)
 

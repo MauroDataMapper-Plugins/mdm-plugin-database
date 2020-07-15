@@ -21,33 +21,49 @@ import java.nio.file.Paths
 @CompileStatic
 trait RemoteDatabaseDataModelImporterProviderService {
 
-    private static Options defineOptions() {
-        Collection<Option> optionsList = [
-            Option.builder('c').longOpt('config')
-                .desc('The config file defining the import config')
-                .argName('FILE').hasArg().required().build(),
-            Option.builder('h').longOpt('help').build(),
-            Option.builder('v').longOpt('version').build()
+    private static Options options
+
+    private static Options getOptions() {
+        if (options) return options
+
+        Collection<Option> optionDefinitions = [
+            Option.builder('c').with {
+                longOpt 'config'
+                desc 'The config file defining the import config'
+                argName 'FILE'
+                hasArg().required().build()
+            },
+            Option.builder('v').longOpt('version').build(),
+            Option.builder('h').longOpt('help').build()
         ]
 
-        OptionGroup mainGroup = new OptionGroup()
-        optionsList.each { Option option -> mainGroup.addOption option }
+        OptionGroup mainOptions = new OptionGroup()
+        optionDefinitions.each { Option option -> mainOptions.addOption option }
 
-        optionsList = [
-            Option.builder('u').longOpt('username')
-                .desc('Username for Metadata Catalogue (Required)')
-                .argName('USERNAME').hasArg().build(),
-            Option.builder('p').longOpt('password')
-                .desc('Password for Metadata Catalogue (Required)')
-                .argName('PASSWORD').hasArg().build(),
-            Option.builder('w').longOpt('databasePassword')
-                .desc('Password for Database (Required)')
-                .argName('DATABASE_PASSWORD').hasArg().build()
+        optionDefinitions = [
+            Option.builder('u').with {
+                longOpt 'username'
+                desc 'Username for Metadata Catalogue (Required)'
+                argName 'USERNAME'
+                hasArg().build()
+            },
+            Option.builder('p').with {
+                longOpt 'password'
+                desc 'Password for Metadata Catalogue (Required)'
+                argName 'PASSWORD'
+                hasArg().build()
+            },
+            Option.builder('w').with {
+                longOpt 'databasePassword'
+                desc 'Password for Database (Required)'
+                argName 'DATABASE_PASSWORD'
+                hasArg().build()
+            }
         ]
 
-        Options options = new Options()
-        options.addOptionGroup(mainGroup)
-        optionsList.each { Option option -> options.addOption option }
+        options = new Options()
+        options.addOptionGroup mainOptions
+        optionDefinitions.each { Option option -> options.addOption option }
         options
     }
 
@@ -66,11 +82,11 @@ trait RemoteDatabaseDataModelImporterProviderService {
     }
 
     private static String getVersionInfo() {
-        new StringBuilder().with { StringBuilder stringBuilder ->
+        new StringBuilder().with {
             append 'remote-database-importer\n'
-            append "  Version: \"${RemoteDatabaseDataModelImporterProviderService.getPackage().getSpecificationVersion()}\"\n"
-            append "  Java version: \"${System.getProperty('java.version')}\""
-            stringBuilder.toString()
+            append "Version: \"${RemoteDatabaseDataModelImporterProviderService.getPackage().getSpecificationVersion()}\"\n"
+            append "Java version: \"${System.getProperty('java.version')}\""
+            toString()
         }
     }
 
@@ -79,7 +95,7 @@ trait RemoteDatabaseDataModelImporterProviderService {
             120,
             'remote-database-importer -c <FILE> -u <USERNAME> -p <PASSWORD> -w <DATABASE_PASSWORD>',
             'Export database to Metadata Catalogue\nConnect to a database, export to DataModel and push to Metadata Catalogue server\n\n',
-            defineOptions(),
+            getOptions(),
             "\n${getVersionInfo()}\n\nPlease report issues at https://metadatacatalogue.myjetbrains.com\n",
             false)
     }
@@ -90,7 +106,7 @@ trait RemoteDatabaseDataModelImporterProviderService {
         StatusPrinter.print loggerContext // Print Logback's internal status
 
         // Parse command line arguments
-        CommandLine commandLine = new DefaultParser().parse(defineOptions(), args)
+        CommandLine commandLine = new DefaultParser().parse(getOptions(), args)
         if ('cpu'.any { String option -> commandLine.hasOption option }) {
             startService commandLine
         } else if (commandLine.hasOption('v')) {

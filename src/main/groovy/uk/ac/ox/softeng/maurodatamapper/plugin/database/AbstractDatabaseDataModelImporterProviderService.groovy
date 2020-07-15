@@ -247,12 +247,11 @@ WHERE
     }
 
     List<DataModel> importAndUpdateDataModelsFromResults(
-        User currentUser, String databaseName, T params, Folder folder, String modelName, List<Map<String, Object>> results, Connection connection)
-        throws ApiException, SQLException {
-        DataModel dataModel = importDataModelFromResults(currentUser, folder, modelName, params.databaseDialect, results)
+            User currentUser, String databaseName, T params, Folder folder, String modelName, StatementExecutionResults results,
+            Connection connection) throws ApiException, SQLException {
+        final DataModel dataModel = importDataModelFromResults(currentUser, folder, modelName, params.databaseDialect, results)
         if (params.dataModelNameSuffix) dataModel.aliasesString = databaseName
-
-        updateDataModelWithDatabaseSpecificInformation(dataModel, connection)
+        updateDataModelWithDatabaseSpecificInformation dataModel, connection
         [dataModel]
     }
 

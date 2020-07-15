@@ -164,7 +164,7 @@ WHERE
         true
     }
 
-    Connection getConnection(String databaseName, T params) throws ApiException {
+    Connection getConnection(String databaseName, T params) throws ApiException, ApiBadRequestException {
         DataSource dataSource
         try {
             dataSource = params.getDataSource(databaseName)
@@ -175,11 +175,11 @@ WHERE
         }
     }
 
-    DataModel importDataModel(User currentUser, T params) {
+    DataModel importDataModel(User currentUser, T params) throws ApiException, ApiBadRequestException {
         importDataModels(currentUser, params.databaseNames, params).first()
     }
 
-    List<DataModel> importDataModels(User currentUser, T params) {
+    List<DataModel> importDataModels(User currentUser, T params) throws ApiException, ApiBadRequestException {
         List<String> databases = params.databaseNames.split(',').toList()
         List<DataModel> dataModels = []
 
@@ -274,7 +274,7 @@ WHERE
      * @param connection Connection to database
      * @return
      */
-    void updateDataModelWithDatabaseSpecificInformation(DataModel dataModel, Connection connection) {
+    void updateDataModelWithDatabaseSpecificInformation(DataModel dataModel, Connection connection) throws ApiException, SQLException {
         addStandardConstraintInformation(dataModel, connection)
         addPrimaryKeyAndUniqueConstraintInformation(dataModel, connection)
         addIndexInformation(dataModel, connection)
@@ -381,8 +381,7 @@ WHERE
     }
 
     List<Map<String, Object>> executePreparedStatement(
-        DataModel dataModel, DataClass schemaClass, Connection connection, Closure<String> queryStringGetter)
-        throws ApiException, SQLException {
+        DataModel dataModel, DataClass schemaClass, Connection connection, Closure<String> queryStringGetter) throws ApiException, SQLException {
         List<Map<String, Object>> results = []
         try {
             PreparedStatement st = connection.prepareStatement(queryStringGetter())
@@ -397,7 +396,7 @@ WHERE
         results
     }
 
-    static List<Map<String, Object>> executeStatement(PreparedStatement preparedStatement) throws ApiException {
+    static List<Map<String, Object>> executeStatement(PreparedStatement preparedStatement) throws ApiException, SQLException {
         List list = new ArrayList(50)
         ResultSet rs = preparedStatement.executeQuery()
         ResultSetMetaData md = rs.getMetaData()

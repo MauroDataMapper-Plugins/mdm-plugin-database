@@ -30,7 +30,7 @@ import java.sql.SQLException
 @CompileStatic
 @Slf4j
 abstract class AbstractDatabaseDataModelImporterProviderService<T extends DatabaseDataModelImporterProviderServiceParameters>
-    extends DataModelImporterProviderService<T> {
+        extends DataModelImporterProviderService<T> {
 
     private static final String DATABASE_NAMESPACE = 'uk.ac.ox.softeng.maurodatamapper.plugin.database'
     private static final String IS_NOT_NULL_CONSTRAINT = 'IS NOT NULL'
@@ -92,7 +92,7 @@ FROM
 WHERE
   tc.constraint_schema = ?
   AND constraint_type NOT IN ('FOREIGN KEY', 'CHECK');
-  '''
+'''
     }
 
     /**
@@ -127,7 +127,7 @@ WHERE
          getDataTypeColumnName(),
          getTableNameColumnName(),
          getColumnNameColumnName(),
-         getTableCatalogColumnName(),]
+         getTableCatalogColumnName()]
     }
 
     String getSchemaNameColumnName() {

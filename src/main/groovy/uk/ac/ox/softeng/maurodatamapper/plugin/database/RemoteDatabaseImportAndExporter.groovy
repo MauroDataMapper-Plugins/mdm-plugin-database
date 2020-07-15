@@ -112,7 +112,7 @@ class RemoteDatabaseImportAndExporter {
             return []
         }
 
-        List<DataModel> dataModels = importerService.importDataModels(catalogueUser, databaseImporter, databaseImportParameters)
+        List<DataModel> dataModels = importerService.importModels(catalogueUser, databaseImporter, databaseImportParameters)
 
         dataModels.each { dataModel ->
             dataModel.folder = randomFolder

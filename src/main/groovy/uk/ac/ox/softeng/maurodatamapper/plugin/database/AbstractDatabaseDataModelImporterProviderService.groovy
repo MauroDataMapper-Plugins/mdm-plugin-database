@@ -335,32 +335,32 @@ WHERE
     }
 
     void addForeignKeyInformation(DataModel dataModel, Connection connection) throws ApiException, SQLException {
-        if (!getForeignKeyInformationQueryString()) return
+        if (foreignKeyInformationQueryString == null) return
 
-        dataModel.childDataClasses.each { schemaClass ->
-            executePreparedStatement(dataModel, schemaClass, connection, this.&getForeignKeyInformationQueryString).each { row ->
-                DataClass foreignTableClass = dataModel.dataClasses.find { it.label == row.reference_table_name }
-                DataType dataType
+        dataModel.childDataClasses.each { DataClass schemaClass ->
+            final StatementExecutionResults results = executePreparedStatement(dataModel, schemaClass, connection, foreignKeyInformationQueryString)
+            results.each { StatementExecutionResultsRow row ->
+                final DataClass foreignTableClass = dataModel.dataClasses.find { DataClass dataClass -> dataClass.label == row.reference_table_name }
 
+                DataType dataType = null
                 if (foreignTableClass) {
                     dataType = referenceTypeService.findOrCreateDataTypeForDataModel(
-                        dataModel, "${foreignTableClass.label}Type", "Linked to DataElement [${row.reference_column_name}]",
-                        dataModel.createdBy as User, foreignTableClass)
-
-                    dataModel.addToDataTypes(dataType)
+                            dataModel, "${foreignTableClass.label}Type", "Linked to DataElement [${row.reference_column_name}]",
+                            dataModel.createdBy as User, foreignTableClass)
+                    dataModel.addToDataTypes dataType
                 } else {
                     dataType = primitiveTypeService.findOrCreateDataTypeForDataModel(
-                        dataModel, "${row.reference_table_name}Type",
-                        "Missing link to foreign key table [${row.reference_table_name}.${row.reference_column_name}]",
-                        dataModel.createdBy as User
+                            dataModel, "${row.reference_table_name}Type",
+                            "Missing link to foreign key table [${row.reference_table_name}.${row.reference_column_name}]",
+                            dataModel.createdBy as User
                     )
                 }
 
-                DataClass tableClass = schemaClass.findDataClass(row.table_name as String)
-                DataElement columnElement = tableClass.findDataElement(row.column_name as String)
+                final DataClass tableClass = schemaClass.findDataClass(row.table_name as String)
+                final DataElement columnElement = tableClass.findDataElement(row.column_name as String)
                 columnElement.dataType = dataType
-                columnElement.addToMetadata(namespace, "foreign_key[${row.constraint_name}]",
-                                            row.reference_column_name as String, dataModel.createdBy)
+                columnElement.addToMetadata(
+                        namespace, "foreign_key[${row.constraint_name}]", row.reference_column_name as String, dataModel.createdBy)
             }
         }
     }

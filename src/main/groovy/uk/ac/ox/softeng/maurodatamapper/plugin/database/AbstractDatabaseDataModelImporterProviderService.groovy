@@ -391,19 +391,33 @@ WHERE
         results
     }
 
-    List<Map<String, Object>> executeStatement(PreparedStatement preparedStatement) throws ApiException, SQLException {
-        List list = new ArrayList(50)
-        ResultSet rs = preparedStatement.executeQuery()
-        ResultSetMetaData md = rs.getMetaData()
-        int columns = md.getColumnCount()
-        while (rs.next()) {
-            Map row = new HashMap(columns)
-            for (int i = 1; i <= columns; ++i) {
-                row[md.getColumnName(i).toLowerCase()] = rs.getObject(i)
+    StatementExecutionResults executeStatement(PreparedStatement preparedStatement) throws ApiException, SQLException {
+        final StatementExecutionResults results = new ArrayList(50) as StatementExecutionResults
+
+        final ResultSet resultSet = preparedStatement.executeQuery()
+        final ResultSetMetaData resultSetMetaData = resultSet.metaData
+        final int columnCount = resultSetMetaData.columnCount
+
+        while (resultSet.next()) {
+            final StatementExecutionResultsRow row = new HashMap(columnCount) as StatementExecutionResultsRow
+            (1..columnCount).each { int i ->
+                row[resultSetMetaData.getColumnName(i).toLowerCase()] = resultSet.getObject(i)
             }
-            list.add(row)
+            results.add(row)
         }
-        rs.close()
-        list
+        resultSet.close()
+
+        results as StatementExecutionResults
+    }
+
+    private static trait StatementExecutionResultsRow implements Map<String, Object> {
+        String call(String columnName) {
+            this[columnName] as String
+        }
+    }
+
+    private static trait StatementExecutionResults implements List<StatementExecutionResultsRow> {
+        @Override
+        abstract boolean add(StatementExecutionResultsRow statementExecutionResultsRow)
     }
 }

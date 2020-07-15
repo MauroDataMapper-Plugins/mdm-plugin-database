@@ -58,7 +58,7 @@ abstract class AbstractDatabaseDataModelImporterProviderService<T extends Databa
      *  * check_clause (the constraint information)
      * @return
      */
-    static String getStandardConstraintInformationQueryString() {
+    String getStandardConstraintInformationQueryString() {
         '''
 SELECT
   tc.table_name,
@@ -79,7 +79,7 @@ WHERE tc.constraint_schema = ?;
      *  * ordinal_position
      * @return
      */
-    static String getPrimaryKeyAndUniqueConstraintInformationQueryString() {
+    String getPrimaryKeyAndUniqueConstraintInformationQueryString() {
         '''
 SELECT
   tc.constraint_name,
@@ -123,7 +123,7 @@ WHERE
 
     abstract String getDatabaseStructureQueryString()
 
-    static List<String> getCoreColumns() {
+    List<String> getCoreColumns() {
         [getSchemaNameColumnName(),
          getDataTypeColumnName(),
          getTableNameColumnName(),
@@ -131,31 +131,31 @@ WHERE
          getTableCatalogColumnName(),]
     }
 
-    static String getSchemaNameColumnName() {
+    String getSchemaNameColumnName() {
         'table_schema'
     }
 
-    static String getDataTypeColumnName() {
+    String getDataTypeColumnName() {
         'data_type'
     }
 
-    static String getTableNameColumnName() {
+    String getTableNameColumnName() {
         'table_name'
     }
 
-    static String getColumnNameColumnName() {
+    String getColumnNameColumnName() {
         'column_name'
     }
 
-    static String getTableCatalogColumnName() {
+    String getTableCatalogColumnName() {
         'table_catalog'
     }
 
-    static String getColumnIsNullableColumnName() {
+    String getColumnIsNullableColumnName() {
         'is_nullable'
     }
 
-    static Boolean isColumnNullable(String nullableColumnValue) {
+    Boolean isColumnNullable(String nullableColumnValue) {
         nullableColumnValue.toLowerCase() == 'yes'
     }
 
@@ -396,7 +396,7 @@ WHERE
         results
     }
 
-    static List<Map<String, Object>> executeStatement(PreparedStatement preparedStatement) throws ApiException, SQLException {
+    List<Map<String, Object>> executeStatement(PreparedStatement preparedStatement) throws ApiException, SQLException {
         List list = new ArrayList(50)
         ResultSet rs = preparedStatement.executeQuery()
         ResultSetMetaData md = rs.getMetaData()

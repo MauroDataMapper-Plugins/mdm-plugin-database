@@ -21,44 +21,44 @@ import java.nio.file.Paths
 @CompileStatic
 trait RemoteDatabaseDataModelImporterProviderService {
 
-    private static Options options
+    private static Options options = null
 
     private static Options getOptions() {
         if (options) return options
 
         Collection<Option> optionDefinitions = [
-            Option.builder('c').with {
-                longOpt 'config'
-                desc 'Config file defining the import configuration'
-                argName 'FILE'
-                hasArg().required().build()
-            },
-            Option.builder('v').longOpt('version').build(),
-            Option.builder('h').longOpt('help').build()
+                Option.builder('c').with {
+                    longOpt 'config'
+                    desc 'Config file defining the import configuration'
+                    argName 'FILE'
+                    hasArg().required().build()
+                },
+                Option.builder('v').longOpt('version').build(),
+                Option.builder('h').longOpt('help').build()
         ]
 
         final OptionGroup mainOptions = new OptionGroup()
         optionDefinitions.each { Option option -> mainOptions.addOption option }
 
         optionDefinitions = [
-            Option.builder('u').with {
-                longOpt 'username'
-                desc 'Username for the Mauro Data Mapper (required)'
-                argName 'USERNAME'
-                hasArg().build()
-            },
-            Option.builder('p').with {
-                longOpt 'password'
-                desc 'Password for the Mauro Data Mapper (required)'
-                argName 'PASSWORD'
-                hasArg().build()
-            },
-            Option.builder('w').with {
-                longOpt 'databasePassword'
-                desc 'Password for the database to import (required)'
-                argName 'DATABASE_PASSWORD'
-                hasArg().build()
-            }
+                Option.builder('u').with {
+                    longOpt 'username'
+                    desc 'Username for the Mauro Data Mapper (required)'
+                    argName 'USERNAME'
+                    hasArg().build()
+                },
+                Option.builder('p').with {
+                    longOpt 'password'
+                    desc 'Password for the Mauro Data Mapper (required)'
+                    argName 'PASSWORD'
+                    hasArg().build()
+                },
+                Option.builder('w').with {
+                    longOpt 'databasePassword'
+                    desc 'Password for the database to import (required)'
+                    argName 'DATABASE_PASSWORD'
+                    hasArg().build()
+                }
         ]
 
         options = new Options()
@@ -72,13 +72,13 @@ trait RemoteDatabaseDataModelImporterProviderService {
         println "Starting Remote Database Import service\n${getVersionInfo()}\nConfig file: ${path.toAbsolutePath()}\n"
         Utils.outputRuntimeArgs(getClass())
         new RemoteDatabaseImportAndExporter().performImportAndExport(
-            new Properties().with { Properties properties ->
-                load Files.newInputStream(path)
-                setProperty 'server.username', commandLine.getOptionValue('u')
-                setProperty 'server.password', commandLine.getOptionValue('p')
-                setProperty 'import.database.password', commandLine.getOptionValue('w')
-                properties
-            })
+                new Properties().with { Properties properties ->
+                    load Files.newInputStream(path)
+                    setProperty 'server.username', commandLine.getOptionValue('u')
+                    setProperty 'server.password', commandLine.getOptionValue('p')
+                    setProperty 'import.database.password', commandLine.getOptionValue('w')
+                    properties
+                })
     }
 
     private static String getVersionInfo() {
@@ -91,12 +91,12 @@ trait RemoteDatabaseDataModelImporterProviderService {
 
     private static void printHelp() {
         new HelpFormatter().printHelp(
-            120,
-            'remote-database-importer -c <FILE> -u <USERNAME> -p <PASSWORD> -w <DATABASE_PASSWORD>',
-            'Import database to the Mauro Data Mapper\nConnect to a database, import to a DataModel and push to the Mauro server\n\n',
-            getOptions(),
-            "\n${getVersionInfo()}\nPlease report issues at https://metadatacatalogue.myjetbrains.com\n",
-            false)
+                120,
+                'remote-database-importer -c <FILE> -u <USERNAME> -p <PASSWORD> -w <DATABASE_PASSWORD>',
+                'Import database to the Mauro Data Mapper\nConnect to a database, import to a DataModel and push to the Mauro server\n\n',
+                getOptions(),
+                "\n${getVersionInfo()}\nPlease report issues at https://metadatacatalogue.myjetbrains.com\n",
+                false)
     }
 
     static void main(String[] args) {

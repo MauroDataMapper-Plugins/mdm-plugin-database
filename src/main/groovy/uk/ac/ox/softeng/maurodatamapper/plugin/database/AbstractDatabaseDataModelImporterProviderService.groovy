@@ -199,7 +199,7 @@ WHERE
 
         try {
             Connection connection = getConnection(databaseName, params)
-            List<Map<String, Object>> results = executeCoreStatement(connection, params)
+            List<Map<String, Object>> results = executeCoreStatement(connection)
 
             log.debug('Size of results from statement {}', results.size())
 
@@ -397,14 +397,8 @@ WHERE
         }
     }
 
-    @SuppressWarnings(['unchecked', 'UnusedMethodParameter'])
-    PreparedStatement prepareCoreStatement(Connection connection, T params) {
-        connection.prepareStatement(getDatabaseStructureQueryString())
-    }
-
-    @SuppressWarnings(['unchecked', 'UnusedMethodParameter'])
-    List<Map<String, Object>> executeCoreStatement(Connection connection, T params) throws ApiException {
-        PreparedStatement st = prepareCoreStatement(connection, params)
+    List<Map<String, Object>> executeCoreStatement(Connection connection) throws ApiException, SQLException {
+        PreparedStatement st = connection.prepareStatement(getDatabaseStructureQueryString())
         List<Map<String, Object>> results = executeStatement(st)
         st.close()
         results

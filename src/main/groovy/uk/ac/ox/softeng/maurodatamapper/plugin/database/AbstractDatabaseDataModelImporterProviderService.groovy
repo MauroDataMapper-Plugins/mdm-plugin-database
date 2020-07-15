@@ -57,8 +57,7 @@ abstract class AbstractDatabaseDataModelImporterProviderService<T extends Databa
      *  * check_clause (the constraint information)
      * @return
      */
-    String getStandardConstraintInformationQueryString() {
-        '''
+    final String standardConstraintInformationQueryString = '''
 SELECT
   tc.table_name,
   cc.check_clause
@@ -66,7 +65,6 @@ FROM information_schema.table_constraints tc
   INNER JOIN information_schema.check_constraints cc ON tc.constraint_name = cc.constraint_name
 WHERE tc.constraint_schema = ?;
 '''
-    }
 
     /**
      * Must return a String which will be queryable by schema name,
@@ -78,8 +76,7 @@ WHERE tc.constraint_schema = ?;
      *  * ordinal_position
      * @return
      */
-    String getPrimaryKeyAndUniqueConstraintInformationQueryString() {
-        '''
+    final String primaryKeyAndUniqueConstraintInformationQueryString = '''
 SELECT
   tc.constraint_name,
   tc.table_name,
@@ -93,7 +90,6 @@ WHERE
   tc.constraint_schema = ?
   AND constraint_type NOT IN ('FOREIGN KEY', 'CHECK');
 '''
-    }
 
     /**
      * Must return a String which will be queryable by schema name,
@@ -122,37 +118,20 @@ WHERE
 
     abstract String getDatabaseStructureQueryString()
 
-    List<String> getCoreColumns() {
-        [getSchemaNameColumnName(),
-         getDataTypeColumnName(),
-         getTableNameColumnName(),
-         getColumnNameColumnName(),
-         getTableCatalogColumnName()]
-    }
+    final String schemaNameColumnName = 'table_schema'
+    final String dataTypeColumnName = 'data_type'
+    final String tableNameColumnName = 'table_name'
+    final String columnNameColumnName = 'column_name'
+    final String tableCatalogColumnName = 'table_catalog'
+    final String columnIsNullableColumnName = 'is_nullable'
 
-    String getSchemaNameColumnName() {
-        'table_schema'
-    }
-
-    String getDataTypeColumnName() {
-        'data_type'
-    }
-
-    String getTableNameColumnName() {
-        'table_name'
-    }
-
-    String getColumnNameColumnName() {
-        'column_name'
-    }
-
-    String getTableCatalogColumnName() {
-        'table_catalog'
-    }
-
-    String getColumnIsNullableColumnName() {
-        'is_nullable'
-    }
+    final Collection<String> coreColumns = [
+        schemaNameColumnName,
+        dataTypeColumnName,
+        tableNameColumnName,
+        columnNameColumnName,
+        tableCatalogColumnName
+    ]
 
     @Override
     Boolean canImportMultipleDomains() {

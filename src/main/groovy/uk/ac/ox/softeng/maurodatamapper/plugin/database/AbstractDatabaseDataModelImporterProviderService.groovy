@@ -26,7 +26,6 @@ import java.sql.PreparedStatement
 import java.sql.ResultSet
 import java.sql.ResultSetMetaData
 import java.sql.SQLException
-import javax.sql.DataSource
 
 @CompileStatic
 @Slf4j
@@ -165,12 +164,10 @@ WHERE
     }
 
     Connection getConnection(String databaseName, T params) throws ApiException, ApiBadRequestException {
-        DataSource dataSource
         try {
-            dataSource = params.getDataSource(databaseName)
-            return dataSource.getConnection(params.getDatabaseUsername(), params.getDatabasePassword())
+            params.getDataSource(databaseName).getConnection(params.databaseUsername, params.databasePassword)
         } catch (SQLException e) {
-            log.error('Cannot connect to database [{}]: {}', params.getUrl(databaseName), e.getMessage())
+            log.error 'Cannot connect to database [{}]: {}', params.getUrl(databaseName), e.message
             throw new ApiBadRequestException('DIS02', "Cannot connect to database [${params.getUrl(databaseName)}]", e)
         }
     }

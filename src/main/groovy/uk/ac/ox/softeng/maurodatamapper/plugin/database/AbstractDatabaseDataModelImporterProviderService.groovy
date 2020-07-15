@@ -126,11 +126,11 @@ WHERE
     final String columnIsNullableColumnName = 'is_nullable'
 
     final Collection<String> coreColumns = [
-        schemaNameColumnName,
-        dataTypeColumnName,
-        tableNameColumnName,
-        columnNameColumnName,
-        tableCatalogColumnName
+            schemaNameColumnName,
+            dataTypeColumnName,
+            tableNameColumnName,
+            columnNameColumnName,
+            tableCatalogColumnName
     ]
 
     @Override
@@ -140,7 +140,7 @@ WHERE
 
     @Override
     DataModel importDataModel(User currentUser, T params) throws ApiException, ApiBadRequestException {
-        importDataModelsWithParams(currentUser, params.databaseNames, params).head()
+        importDataModelsFromParameters(currentUser, params.databaseNames, params).head()
     }
 
     @Override
@@ -149,11 +149,12 @@ WHERE
         log.info 'Importing {} DataModel(s)', databaseNames.size()
 
         final List<DataModel> dataModels = []
-        databaseNames.each { String databaseName -> dataModels.addAll importDataModelsWithParams(currentUser, databaseName, params) }
+        databaseNames.each { String databaseName -> dataModels.addAll importDataModelsFromParameters(currentUser, databaseName, params) }
         dataModels
     }
 
-    private List<DataModel> importDataModelsWithParams(User currentUser, String databaseName, T params) throws ApiException, ApiBadRequestException {
+    private List<DataModel> importDataModelsFromParameters(
+            User currentUser, String databaseName, T params) throws ApiException, ApiBadRequestException {
         String modelName = databaseName
         if (!params.isMultipleDataModelImport()) modelName = params.modelName ?: modelName
         modelName = params.dataModelNameSuffix ? "${modelName}_${params.dataModelNameSuffix}" : modelName

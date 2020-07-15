@@ -188,30 +188,28 @@ WHERE
     }
 
     List<DataModel> importDataModels(User currentUser, String databaseName, T params) throws ApiException, ApiBadRequestException {
-        String modelName = params.isMultipleDataModelImport() ? databaseName : params.getModelName() ?: databaseName
+        String modelName = databaseName
+        if (!params.isMultipleDataModelImport()) modelName = params.modelName ?: modelName
         modelName = params.dataModelNameSuffix ? "${modelName}_${params.dataModelNameSuffix}" : modelName
-        Folder folder = Folder.get(params.folderId)
 
         try {
-            Connection connection = getConnection(databaseName, params)
-            PreparedStatement st = connection.prepareStatement(getDatabaseStructureQueryString())
-            List<Map<String, Object>> results = executeStatement(st)
-            st.close()
-            results
+            final Connection connection = getConnection(databaseName, params)
+            final PreparedStatement preparedStatement = connection.prepareStatement(databaseStructureQueryString)
+            final StatementExecutionResults results = executeStatement(preparedStatement)
+            preparedStatement.close()
 
-            log.debug('Size of results from statement {}', results.size())
-
-            if (results.size() == 0) {
-                log.warn('No results from database statement, therefore nothing to import for {}.', modelName)
+            log.debug 'Size of results from statement {}', results.size()
+            if (results.isEmpty()) {
+                log.warn 'No results from database statement, therefore nothing to import for {}.', modelName
                 return []
             }
 
-            List<DataModel> dataModels = importAndUpdateDataModelsFromResults(currentUser, databaseName, params,
-                                                                              folder, modelName, results, connection)
+            final List<DataModel> dataModels = importAndUpdateDataModelsFromResults(
+                    currentUser, databaseName, params, Folder.get(params.folderId), modelName, results, connection)
             connection.close()
             dataModels
         } catch (SQLException e) {
-            log.error('Something went wrong executing statement while importing {} : {}', modelName, e.message)
+            log.error 'Something went wrong executing statement while importing {} : {}', modelName, e.message
             throw new ApiBadRequestException('DIS03', 'Cannot execute statement', e)
         }
     }

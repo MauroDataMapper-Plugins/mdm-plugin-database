@@ -174,7 +174,7 @@ WHERE
         dataModels
     }
 
-    List<DataModel> importDataModelsWithParams(User currentUser, String databaseName, T params) throws ApiException, ApiBadRequestException {
+    private List<DataModel> importDataModelsWithParams(User currentUser, String databaseName, T params) throws ApiException, ApiBadRequestException {
         String modelName = databaseName
         if (!params.isMultipleDataModelImport()) modelName = params.modelName ?: modelName
         modelName = params.dataModelNameSuffix ? "${modelName}_${params.dataModelNameSuffix}" : modelName
@@ -360,7 +360,7 @@ WHERE
         connection.prepareStatement(databaseStructureQueryString)
     }
 
-    Connection getConnection(String databaseName, T params) throws ApiException, ApiBadRequestException {
+    private Connection getConnection(String databaseName, T params) throws ApiException, ApiBadRequestException {
         try {
             params.getDataSource(databaseName).getConnection(params.databaseUsername, params.databasePassword)
         } catch (SQLException e) {
@@ -369,7 +369,7 @@ WHERE
         }
     }
 
-    StatementExecutionResults executePreparedStatement(
+    private StatementExecutionResults executePreparedStatement(
             DataModel dataModel, DataClass schemaClass, Connection connection, String queryString) throws ApiException, SQLException {
         StatementExecutionResults results = null
         try {
@@ -385,7 +385,7 @@ WHERE
         results as StatementExecutionResults
     }
 
-    StatementExecutionResults executeStatement(PreparedStatement preparedStatement) throws ApiException, SQLException {
+    private static StatementExecutionResults executeStatement(PreparedStatement preparedStatement) throws ApiException, SQLException {
         final StatementExecutionResults results = new ArrayList(50) as StatementExecutionResults
 
         final ResultSet resultSet = preparedStatement.executeQuery()

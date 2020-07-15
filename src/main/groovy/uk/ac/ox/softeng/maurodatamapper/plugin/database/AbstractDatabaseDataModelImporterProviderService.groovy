@@ -263,10 +263,10 @@ WHERE
      * @return
      */
     void updateDataModelWithDatabaseSpecificInformation(DataModel dataModel, Connection connection) throws ApiException, SQLException {
-        addStandardConstraintInformation(dataModel, connection)
-        addPrimaryKeyAndUniqueConstraintInformation(dataModel, connection)
-        addIndexInformation(dataModel, connection)
-        addForeignKeyInformation(dataModel, connection)
+        addStandardConstraintInformation dataModel, connection
+        addPrimaryKeyAndUniqueConstraintInformation dataModel, connection
+        addIndexInformation dataModel, connection
+        addForeignKeyInformation dataModel, connection
     }
 
     void addStandardConstraintInformation(DataModel dataModel, Connection connection) throws ApiException, SQLException {

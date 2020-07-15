@@ -29,7 +29,7 @@ trait RemoteDatabaseDataModelImporterProviderService {
         Collection<Option> optionDefinitions = [
             Option.builder('c').with {
                 longOpt 'config'
-                desc 'The config file defining the import config'
+                desc 'Config file defining the import configuration'
                 argName 'FILE'
                 hasArg().required().build()
             },
@@ -43,19 +43,19 @@ trait RemoteDatabaseDataModelImporterProviderService {
         optionDefinitions = [
             Option.builder('u').with {
                 longOpt 'username'
-                desc 'Username for Metadata Catalogue (Required)'
+                desc 'Username for the Mauro Data Mapper (required)'
                 argName 'USERNAME'
                 hasArg().build()
             },
             Option.builder('p').with {
                 longOpt 'password'
-                desc 'Password for Metadata Catalogue (Required)'
+                desc 'Password for the Mauro Data Mapper (required)'
                 argName 'PASSWORD'
                 hasArg().build()
             },
             Option.builder('w').with {
                 longOpt 'databasePassword'
-                desc 'Password for Database (Required)'
+                desc 'Password for the database to import (required)'
                 argName 'DATABASE_PASSWORD'
                 hasArg().build()
             }
@@ -83,9 +83,8 @@ trait RemoteDatabaseDataModelImporterProviderService {
 
     private static String getVersionInfo() {
         new StringBuilder().with {
-            append 'remote-database-importer\n'
-            append "Version: \"${RemoteDatabaseDataModelImporterProviderService.getPackage().getSpecificationVersion()}\"\n"
-            append "Java version: \"${System.getProperty('java.version')}\""
+            append "remote-database-importer version: ${RemoteDatabaseDataModelImporterProviderService.package.specificationVersion}\n"
+            append "Java version: ${System.getProperty('java.version')}\n"
             toString()
         }
     }
@@ -94,9 +93,9 @@ trait RemoteDatabaseDataModelImporterProviderService {
         new HelpFormatter().printHelp(
             120,
             'remote-database-importer -c <FILE> -u <USERNAME> -p <PASSWORD> -w <DATABASE_PASSWORD>',
-            'Export database to Metadata Catalogue\nConnect to a database, export to DataModel and push to Metadata Catalogue server\n\n',
+            'Import database to the Mauro Data Mapper\nConnect to a database, import to a DataModel and push to the Mauro server\n\n',
             getOptions(),
-            "\n${getVersionInfo()}\n\nPlease report issues at https://metadatacatalogue.myjetbrains.com\n",
+            "\n${getVersionInfo()}\nPlease report issues at https://metadatacatalogue.myjetbrains.com\n",
             false)
     }
 

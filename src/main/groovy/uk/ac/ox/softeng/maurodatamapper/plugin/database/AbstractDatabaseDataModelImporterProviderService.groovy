@@ -192,14 +192,17 @@ WHERE
         dataModels
     }
 
-    List<DataModel> importDataModels(User currentUser, String databaseName, T params) {
+    List<DataModel> importDataModels(User currentUser, String databaseName, T params) throws ApiException, ApiBadRequestException {
         String modelName = params.isMultipleDataModelImport() ? databaseName : params.getModelName() ?: databaseName
         modelName = params.dataModelNameSuffix ? "${modelName}_${params.dataModelNameSuffix}" : modelName
         Folder folder = Folder.get(params.folderId)
 
         try {
             Connection connection = getConnection(databaseName, params)
-            List<Map<String, Object>> results = executeCoreStatement(connection)
+            PreparedStatement st = connection.prepareStatement(getDatabaseStructureQueryString())
+            List<Map<String, Object>> results = executeStatement(st)
+            st.close()
+            results
 
             log.debug('Size of results from statement {}', results.size())
 
@@ -212,15 +215,17 @@ WHERE
                                                                               folder, modelName, results, connection)
             connection.close()
             dataModels
-        } catch (SQLException ex) {
-            log.error('Something went wrong executing statement while importing {} : {}', modelName, ex.message)
-            throw new ApiBadRequestException('DIS03', 'Cannot execute statement', ex)
+        } catch (SQLException e) {
+            log.error('Something went wrong executing statement while importing {} : {}', modelName, e.message)
+            throw new ApiBadRequestException('DIS03', 'Cannot execute statement', e)
         }
     }
 
     DataModel importDataModelFromResults(User user, Folder folder, String modelName, String dialect,
                                          List<Map<String, Object>> results, boolean importSchemaAsDataClass = true) throws ApiException {
-        final DataModel dataModel = createDatabase(user, modelName, dialect, folder)
+        final DataModel dataModel = new DataModel(createdBy: user, label: modelName, type: DataModelType.DATA_ASSET, folder: folder)
+        dataModel.addCreatedEdit(user)
+        dataModel.addToMetadata(namespace: DATABASE_NAMESPACE, key: 'dialect', value: dialect)
 
         for (Map<String, Object> row : results) {
             String dataTypeName = (String) row[getDataTypeColumnName()]
@@ -252,15 +257,9 @@ WHERE
         dataModel
     }
 
-    private static DataModel createDatabase(User user, String modelName, String dialect, Folder folder) {
-        DataModel dataModel = new DataModel(createdBy: user, label: modelName, type: DataModelType.DATA_ASSET, folder: folder)
-        dataModel.addCreatedEdit(user)
-        dataModel.addToMetadata(namespace: DATABASE_NAMESPACE, key: 'dialect', value: dialect)
-        dataModel
-    }
-
-    List<DataModel> importAndUpdateDataModelsFromResults(User currentUser, String databaseName, T params, Folder folder,
-                                                         String modelName, List<Map<String, Object>> results, Connection connection) {
+    List<DataModel> importAndUpdateDataModelsFromResults(
+        User currentUser, String databaseName, T params, Folder folder, String modelName, List<Map<String, Object>> results, Connection connection)
+        throws ApiException, SQLException {
         DataModel dataModel = importDataModelFromResults(currentUser, folder, modelName, params.databaseDialect, results)
         if (params.dataModelNameSuffix) dataModel.aliasesString = databaseName
 
@@ -282,11 +281,6 @@ WHERE
         addForeignKeyInformation(dataModel, connection)
     }
 
-    private static String extractConstraint(String checkClause) {
-        if (checkClause && checkClause.contains(IS_NOT_NULL_CONSTRAINT)) return IS_NOT_NULL_CONSTRAINT
-        null
-    }
-
     void addStandardConstraintInformation(DataModel dataModel, Connection connection) throws ApiException, SQLException {
         if (!getStandardConstraintInformationQueryString()) return
 
@@ -296,7 +290,7 @@ WHERE
 
                 if (tableClass) {
                     String checkClause = row.check_clause
-                    String constraint = extractConstraint(checkClause)
+                    String constraint = checkClause && checkClause.contains(IS_NOT_NULL_CONSTRAINT) ? IS_NOT_NULL_CONSTRAINT : null
 
                     if (constraint && constraint != IS_NOT_NULL_CONSTRAINT) {
                         // String columnName = checkClause.replace(/ ${constraint}/, '')
@@ -384,13 +378,6 @@ WHERE
                                             row.reference_column_name as String, dataModel.createdBy)
             }
         }
-    }
-
-    List<Map<String, Object>> executeCoreStatement(Connection connection) throws ApiException, SQLException {
-        PreparedStatement st = connection.prepareStatement(getDatabaseStructureQueryString())
-        List<Map<String, Object>> results = executeStatement(st)
-        st.close()
-        results
     }
 
     List<Map<String, Object>> executePreparedStatement(

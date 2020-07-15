@@ -51,8 +51,6 @@ abstract class AbstractDatabaseDataModelImporterProviderService<T extends Databa
     @Autowired
     ReferenceTypeService referenceTypeService
 
-    abstract String getDatabaseStructureQueryString()
-
     /**
      * Must return a String which will be queryable by schema name,
      * and return a row with the following elements:
@@ -123,29 +121,7 @@ WHERE
      */
     abstract String getForeignKeyInformationQueryString()
 
-    static String getColumnNameColumnName() {
-        'column_name'
-    }
-
-    static String getDataTypeColumnName() {
-        'data_type'
-    }
-
-    static String getSchemaNameColumnName() {
-        'table_schema'
-    }
-
-    static String getTableCatalogColumnName() {
-        'table_catalog'
-    }
-
-    static String getTableNameColumnName() {
-        'table_name'
-    }
-
-    static String getColumnIsNullableColumnName() {
-        'is_nullable'
-    }
+    abstract String getDatabaseStructureQueryString()
 
     static List<String> getCoreColumns() {
         [getSchemaNameColumnName(),
@@ -153,6 +129,50 @@ WHERE
          getTableNameColumnName(),
          getColumnNameColumnName(),
          getTableCatalogColumnName(),]
+    }
+
+    static String getSchemaNameColumnName() {
+        'table_schema'
+    }
+
+    static String getDataTypeColumnName() {
+        'data_type'
+    }
+
+    static String getTableNameColumnName() {
+        'table_name'
+    }
+
+    static String getColumnNameColumnName() {
+        'column_name'
+    }
+
+    static String getTableCatalogColumnName() {
+        'table_catalog'
+    }
+
+    static String getColumnIsNullableColumnName() {
+        'is_nullable'
+    }
+
+    static Boolean isColumnNullable(String nullableColumnValue) {
+        nullableColumnValue.toLowerCase() == 'yes'
+    }
+
+    @Override
+    Boolean canImportMultipleDomains() {
+        true
+    }
+
+    Connection getConnection(String databaseName, T params) throws ApiException {
+        DataSource dataSource
+        try {
+            dataSource = params.getDataSource(databaseName)
+            return dataSource.getConnection(params.getDatabaseUsername(), params.getDatabasePassword())
+        } catch (SQLException e) {
+            log.error('Cannot connect to database [{}]: {}', params.getUrl(databaseName), e.getMessage())
+            throw new ApiBadRequestException('DIS02', "Cannot connect to database [${params.getUrl(databaseName)}]", e)
+        }
     }
 
     DataModel importDataModel(User currentUser, T params) {
@@ -170,11 +190,6 @@ WHERE
         }
 
         dataModels
-    }
-
-    @Override
-    Boolean canImportMultipleDomains() {
-        true
     }
 
     List<DataModel> importDataModels(User currentUser, String databaseName, T params) {
@@ -201,60 +216,6 @@ WHERE
             log.error('Something went wrong executing statement while importing {} : {}', modelName, ex.message)
             throw new ApiBadRequestException('DIS03', 'Cannot execute statement', ex)
         }
-    }
-
-    List<DataModel> importAndUpdateDataModelsFromResults(User currentUser, String databaseName, T params, Folder folder,
-                                                         String modelName, List<Map<String, Object>> results, Connection connection) {
-        DataModel dataModel = importDataModelFromResults(currentUser, folder, modelName, params.databaseDialect, results)
-        if (params.dataModelNameSuffix) dataModel.aliasesString = databaseName
-
-        updateDataModelWithDatabaseSpecificInformation(dataModel, connection)
-        [dataModel]
-    }
-
-    Connection getConnection(String databaseName, T params) throws ApiException {
-        DataSource dataSource
-        try {
-            dataSource = params.getDataSource(databaseName)
-            return dataSource.getConnection(params.getDatabaseUsername(), params.getDatabasePassword())
-        } catch (SQLException e) {
-            log.error('Cannot connect to database [{}]: {}', params.getUrl(databaseName), e.getMessage())
-            throw new ApiBadRequestException('DIS02', "Cannot connect to database [${params.getUrl(databaseName)}]", e)
-        }
-    }
-
-    @SuppressWarnings(['unchecked', 'UnusedMethodParameter'])
-    List<Map<String, Object>> executeCoreStatement(Connection connection, T params) throws ApiException {
-        List<Map<String, Object>> results = []
-        PreparedStatement st = prepareCoreStatement(connection, params)
-        results = executeStatement(st)
-        st.close()
-        results
-    }
-
-    @SuppressWarnings(['unchecked', 'UnusedMethodParameter'])
-    PreparedStatement prepareCoreStatement(Connection connection, T params) {
-        connection.prepareStatement(getDatabaseStructureQueryString())
-    }
-
-    static List<Map<String, Object>> executeStatement(PreparedStatement preparedStatement) throws ApiException {
-        List list = new ArrayList(50)
-        ResultSet rs = preparedStatement.executeQuery()
-        ResultSetMetaData md = rs.getMetaData()
-        int columns = md.getColumnCount()
-        while (rs.next()) {
-            Map row = new HashMap(columns)
-            for (int i = 1; i <= columns; ++i) {
-                row[md.getColumnName(i).toLowerCase()] = rs.getObject(i)
-            }
-            list.add(row)
-        }
-        rs.close()
-        list
-    }
-
-    static Boolean isColumnNullable(String nullableColumnValue) {
-        nullableColumnValue.toLowerCase() == 'yes'
     }
 
     DataModel importDataModelFromResults(User user, Folder folder, String modelName, String dialect,
@@ -291,6 +252,22 @@ WHERE
         dataModel
     }
 
+    private static DataModel createDatabase(User user, String modelName, String dialect, Folder folder) {
+        DataModel dataModel = new DataModel(createdBy: user, label: modelName, type: DataModelType.DATA_ASSET, folder: folder)
+        dataModel.addCreatedEdit(user)
+        dataModel.addToMetadata(namespace: DATABASE_NAMESPACE, key: 'dialect', value: dialect)
+        dataModel
+    }
+
+    List<DataModel> importAndUpdateDataModelsFromResults(User currentUser, String databaseName, T params, Folder folder,
+                                                         String modelName, List<Map<String, Object>> results, Connection connection) {
+        DataModel dataModel = importDataModelFromResults(currentUser, folder, modelName, params.databaseDialect, results)
+        if (params.dataModelNameSuffix) dataModel.aliasesString = databaseName
+
+        updateDataModelWithDatabaseSpecificInformation(dataModel, connection)
+        [dataModel]
+    }
+
     /**
      * Updates DataModel with custom information which is Database specific.
      * Default is to do nothing
@@ -303,6 +280,11 @@ WHERE
         addPrimaryKeyAndUniqueConstraintInformation(dataModel, connection)
         addIndexInformation(dataModel, connection)
         addForeignKeyInformation(dataModel, connection)
+    }
+
+    private static String extractConstraint(String checkClause) {
+        if (checkClause && checkClause.contains(IS_NOT_NULL_CONSTRAINT)) return IS_NOT_NULL_CONSTRAINT
+        null
     }
 
     void addStandardConstraintInformation(DataModel dataModel, Connection connection) {
@@ -381,6 +363,30 @@ WHERE
         }
     }
 
+    void addIndexInformation(DataModel dataModel, Connection connection) {
+        if (!getIndexInformationQueryString()) return
+
+        dataModel.childDataClasses.each { schemaClass ->
+            List<Map<String, Object>> results = []
+
+            PreparedStatement st = connection.prepareStatement(getIndexInformationQueryString())
+            st.setString(1, schemaClass.label)
+            results = executeStatement(st)
+            st.close()
+
+            results.each { row ->
+                DataClass tableClass = schemaClass.findDataClass(row.table_name as String)
+
+                if (tableClass) {
+                    String indexType = row.primary_index ? 'primary_index' : row.unique_index ? 'unique_index' : 'index'
+                    indexType = row.clustered ? "clustered_${indexType}" : indexType
+
+                    tableClass.addToMetadata(namespace, "${indexType}[${row.index_name}]", row.column_names as String, dataModel.createdBy)
+                } else log.warn('Could not add {} as DataClass for table {} does not exist', row.index_name, row.table_name)
+            }
+        }
+    }
+
     void addForeignKeyInformation(DataModel dataModel, Connection connection) {
         if (!getForeignKeyInformationQueryString()) return
 
@@ -419,39 +425,33 @@ WHERE
         }
     }
 
-    void addIndexInformation(DataModel dataModel, Connection connection) {
-        if (!getIndexInformationQueryString()) return
+    @SuppressWarnings(['unchecked', 'UnusedMethodParameter'])
+    PreparedStatement prepareCoreStatement(Connection connection, T params) {
+        connection.prepareStatement(getDatabaseStructureQueryString())
+    }
 
-        dataModel.childDataClasses.each { schemaClass ->
-            List<Map<String, Object>> results = []
+    @SuppressWarnings(['unchecked', 'UnusedMethodParameter'])
+    List<Map<String, Object>> executeCoreStatement(Connection connection, T params) throws ApiException {
+        List<Map<String, Object>> results = []
+        PreparedStatement st = prepareCoreStatement(connection, params)
+        results = executeStatement(st)
+        st.close()
+        results
+    }
 
-            PreparedStatement st = connection.prepareStatement(getIndexInformationQueryString())
-            st.setString(1, schemaClass.label)
-            results = executeStatement(st)
-            st.close()
-
-            results.each { row ->
-                DataClass tableClass = schemaClass.findDataClass(row.table_name as String)
-
-                if (tableClass) {
-                    String indexType = row.primary_index ? 'primary_index' : row.unique_index ? 'unique_index' : 'index'
-                    indexType = row.clustered ? "clustered_${indexType}" : indexType
-
-                    tableClass.addToMetadata(namespace, "${indexType}[${row.index_name}]", row.column_names as String, dataModel.createdBy)
-                } else log.warn('Could not add {} as DataClass for table {} does not exist', row.index_name, row.table_name)
+    static List<Map<String, Object>> executeStatement(PreparedStatement preparedStatement) throws ApiException {
+        List list = new ArrayList(50)
+        ResultSet rs = preparedStatement.executeQuery()
+        ResultSetMetaData md = rs.getMetaData()
+        int columns = md.getColumnCount()
+        while (rs.next()) {
+            Map row = new HashMap(columns)
+            for (int i = 1; i <= columns; ++i) {
+                row[md.getColumnName(i).toLowerCase()] = rs.getObject(i)
             }
+            list.add(row)
         }
-    }
-
-    private static DataModel createDatabase(User user, String modelName, String dialect, Folder folder) {
-        DataModel dataModel = new DataModel(createdBy: user, label: modelName, type: DataModelType.DATA_ASSET, folder: folder)
-        dataModel.addCreatedEdit(user)
-        dataModel.addToMetadata(namespace: DATABASE_NAMESPACE, key: 'dialect', value: dialect)
-        dataModel
-    }
-
-    private static String extractConstraint(String checkClause) {
-        if (checkClause && checkClause.contains(IS_NOT_NULL_CONSTRAINT)) return IS_NOT_NULL_CONSTRAINT
-        null
+        rs.close()
+        list
     }
 }

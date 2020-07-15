@@ -172,20 +172,18 @@ WHERE
         }
     }
 
+    @Override
     DataModel importDataModel(User currentUser, T params) throws ApiException, ApiBadRequestException {
-        importDataModels(currentUser, params.databaseNames, params).first()
+        importDataModels(currentUser, params.databaseNames, params).head()
     }
 
+    @Override
     List<DataModel> importDataModels(User currentUser, T params) throws ApiException, ApiBadRequestException {
-        List<String> databases = params.databaseNames.split(',').toList()
-        List<DataModel> dataModels = []
+        final List<String> databaseNames = params.databaseNames.split(',').toList()
+        log.info 'Importing {} DataModel(s)', databaseNames.size()
 
-        log.info('Importing {} DataModel/s', databases.size())
-
-        databases.each { name ->
-            dataModels.addAll(importDataModels(currentUser, name, params))
-        }
-
+        final List<DataModel> dataModels = []
+        databaseNames.each { String databaseName -> dataModels.addAll importDataModels(currentUser, databaseName, params) }
         dataModels
     }
 

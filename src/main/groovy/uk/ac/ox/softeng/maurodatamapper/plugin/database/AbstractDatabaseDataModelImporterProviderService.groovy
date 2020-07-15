@@ -289,32 +289,29 @@ WHERE
     }
 
     void addPrimaryKeyAndUniqueConstraintInformation(DataModel dataModel, Connection connection) throws ApiException, SQLException {
-        if (!getPrimaryKeyAndUniqueConstraintInformationQueryString()) return
+        if (primaryKeyAndUniqueConstraintInformationQueryString == null) return
 
-        dataModel.childDataClasses.each { schemaClass ->
-            executePreparedStatement(dataModel, schemaClass, connection, this.&getPrimaryKeyAndUniqueConstraintInformationQueryString)
-                .groupBy { it.constraint_name }
-                .each { constraintName, rows ->
-                    Map firstRow = rows.first()
-                    String value = rows.size() == 1 ? firstRow.column_name : rows.sort { it.ordinal_position }.collect { it.column_name }.join(', ')
-                    DataClass tableClass = schemaClass.findDataClass(firstRow.table_name as String)
+        dataModel.childDataClasses.each { DataClass schemaClass ->
+            final StatementExecutionResults results = executePreparedStatement(
+                    dataModel, schemaClass, connection, primaryKeyAndUniqueConstraintInformationQueryString)
+            results.groupBy { it.constraint_name }.each { _, List<StatementExecutionResultsRow> rows ->
+                final StatementExecutionResultsRow firstRow = rows.head()
+                final DataClass tableClass = schemaClass.findDataClass(firstRow.table_name as String)
+                if (tableClass == null) return
 
-                    if (tableClass) {
-                        String constraintTypeName = (firstRow.constraint_type as String).toLowerCase().replaceAll(/ /, '_')
+                final String constraintTypeName = (firstRow.constraint_type as String).toLowerCase().replaceAll(/ /, '_')
+                final String constraintTypeValue = rows.size() == 1 ?
+                                                   firstRow.column_name : rows.sort { it.ordinal_position }.collect { it.column_name }.join(', ')
+                tableClass.addToMetadata namespace, "$constraintTypeName[${firstRow.constraint_name}]", constraintTypeValue, dataModel.createdBy
 
-                        tableClass.addToMetadata(namespace,
-                                                 "${constraintTypeName}[${firstRow.constraint_name}]",
-                                                 value, dataModel.createdBy)
-
-                        rows.each { row ->
-                            DataElement columnElement = tableClass.findDataElement(row.column_name as String)
-                            if (columnElement) {
-                                columnElement.addToMetadata(namespace, (row.constraint_type as String).toLowerCase(),
-                                                            row.ordinal_position as String, dataModel.createdBy)
-                            }
-                        }
+                rows.each { StatementExecutionResultsRow row ->
+                    final DataElement columnElement = tableClass.findDataElement(row.column_name as String)
+                    if (columnElement) {
+                        columnElement.addToMetadata(
+                                namespace, (row.constraint_type as String).toLowerCase(), row.ordinal_position as String, dataModel.createdBy)
                     }
                 }
+            }
         }
     }
 

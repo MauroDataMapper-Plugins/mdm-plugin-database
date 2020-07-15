@@ -154,27 +154,14 @@ WHERE
         'is_nullable'
     }
 
-    boolean isColumnNullable(String nullableColumnValue) {
-        nullableColumnValue.toLowerCase() == 'yes'
-    }
-
     @Override
     Boolean canImportMultipleDomains() {
         true
     }
 
-    Connection getConnection(String databaseName, T params) throws ApiException, ApiBadRequestException {
-        try {
-            params.getDataSource(databaseName).getConnection(params.databaseUsername, params.databasePassword)
-        } catch (SQLException e) {
-            log.error 'Cannot connect to database [{}]: {}', params.getUrl(databaseName), e.message
-            throw new ApiBadRequestException('DIS02', "Cannot connect to database [${params.getUrl(databaseName)}]", e)
-        }
-    }
-
     @Override
     DataModel importDataModel(User currentUser, T params) throws ApiException, ApiBadRequestException {
-        importDataModels(currentUser, params.databaseNames, params).head()
+        importDataModelsWithParams(currentUser, params.databaseNames, params).head()
     }
 
     @Override
@@ -183,18 +170,18 @@ WHERE
         log.info 'Importing {} DataModel(s)', databaseNames.size()
 
         final List<DataModel> dataModels = []
-        databaseNames.each { String databaseName -> dataModels.addAll importDataModels(currentUser, databaseName, params) }
+        databaseNames.each { String databaseName -> dataModels.addAll importDataModelsWithParams(currentUser, databaseName, params) }
         dataModels
     }
 
-    List<DataModel> importDataModels(User currentUser, String databaseName, T params) throws ApiException, ApiBadRequestException {
+    List<DataModel> importDataModelsWithParams(User currentUser, String databaseName, T params) throws ApiException, ApiBadRequestException {
         String modelName = databaseName
         if (!params.isMultipleDataModelImport()) modelName = params.modelName ?: modelName
         modelName = params.dataModelNameSuffix ? "${modelName}_${params.dataModelNameSuffix}" : modelName
 
         try {
             final Connection connection = getConnection(databaseName, params)
-            final PreparedStatement preparedStatement = connection.prepareStatement(databaseStructureQueryString)
+            final PreparedStatement preparedStatement = prepareCoreStatement(connection, params)
             final StatementExecutionResults results = executeStatement(preparedStatement)
             preparedStatement.close()
 
@@ -212,6 +199,10 @@ WHERE
             log.error 'Something went wrong executing statement while importing {} : {}', modelName, e.message
             throw new ApiBadRequestException('DIS03', 'Cannot execute statement', e)
         }
+    }
+
+    boolean isColumnNullable(String nullableColumnValue) {
+        nullableColumnValue.toLowerCase() == 'yes'
     }
 
     DataModel importDataModelFromResults(
@@ -365,6 +356,19 @@ WHERE
         }
     }
 
+    PreparedStatement prepareCoreStatement(Connection connection, T params) {
+        connection.prepareStatement(databaseStructureQueryString)
+    }
+
+    Connection getConnection(String databaseName, T params) throws ApiException, ApiBadRequestException {
+        try {
+            params.getDataSource(databaseName).getConnection(params.databaseUsername, params.databasePassword)
+        } catch (SQLException e) {
+            log.error 'Cannot connect to database [{}]: {}', params.getUrl(databaseName), e.message
+            throw new ApiBadRequestException('DIS02', "Cannot connect to database [${params.getUrl(databaseName)}]", e)
+        }
+    }
+
     StatementExecutionResults executePreparedStatement(
             DataModel dataModel, DataClass schemaClass, Connection connection, String queryString) throws ApiException, SQLException {
         StatementExecutionResults results = null
@@ -400,14 +404,14 @@ WHERE
         results as StatementExecutionResults
     }
 
+    private static trait StatementExecutionResults implements List<StatementExecutionResultsRow> {
+        @Override
+        abstract boolean add(StatementExecutionResultsRow statementExecutionResultsRow)
+    }
+
     private static trait StatementExecutionResultsRow implements Map<String, Object> {
         String call(String columnName) {
             this[columnName] as String
         }
-    }
-
-    private static trait StatementExecutionResults implements List<StatementExecutionResultsRow> {
-        @Override
-        abstract boolean add(StatementExecutionResultsRow statementExecutionResultsRow)
     }
 }

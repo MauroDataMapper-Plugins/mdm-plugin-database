@@ -291,20 +291,7 @@ WHERE
         if (!getStandardConstraintInformationQueryString()) return
 
         dataModel.childDataClasses.each { schemaClass ->
-            List<Map<String, Object>> results = []
-
-            try {
-                PreparedStatement st = connection.prepareStatement(getStandardConstraintInformationQueryString())
-                st.setString(1, schemaClass.label)
-                results = executeStatement(st)
-                st.close()
-            } catch (SQLException ex) {
-                if (ex.message.contains('Invalid object name \'information_schema.table_constraints\'')) {
-                    getLog().warn('No table_constraints available for {}', dataModel.label)
-                } else throw ex
-            }
-
-            results.each { row ->
+            executePreparedStatement(dataModel, schemaClass, connection, this.&getStandardConstraintInformationQueryString).each { row ->
                 DataClass tableClass = schemaClass.findDataClass(row.table_name as String)
 
                 if (tableClass) {
@@ -326,40 +313,29 @@ WHERE
         if (!getPrimaryKeyAndUniqueConstraintInformationQueryString()) return
 
         dataModel.childDataClasses.each { schemaClass ->
-            List<Map<String, Object>> results = []
+            executePreparedStatement(dataModel, schemaClass, connection, this.&getPrimaryKeyAndUniqueConstraintInformationQueryString)
+                .groupBy { it.constraint_name }
+                .each { constraintName, rows ->
+                    Map firstRow = rows.first()
+                    String value = rows.size() == 1 ? firstRow.column_name : rows.sort { it.ordinal_position }.collect { it.column_name }.join(', ')
+                    DataClass tableClass = schemaClass.findDataClass(firstRow.table_name as String)
 
-            try {
-                PreparedStatement st = connection.prepareStatement(getPrimaryKeyAndUniqueConstraintInformationQueryString())
-                st.setString(1, schemaClass.label)
-                results = executeStatement(st)
-                st.close()
-            } catch (SQLException ex) {
-                if (ex.message.contains('Invalid object name \'information_schema.table_constraints\'')) {
-                    getLog().warn('No table_constraints available for {}', dataModel.label)
-                } else throw ex
-            }
+                    if (tableClass) {
+                        String constraintTypeName = (firstRow.constraint_type as String).toLowerCase().replaceAll(/ /, '_')
 
-            results.groupBy { it.constraint_name }.each { constraintName, rows ->
-                Map firstRow = rows.first()
-                String value = rows.size() == 1 ? firstRow.column_name : rows.sort { it.ordinal_position }.collect { it.column_name }.join(', ')
-                DataClass tableClass = schemaClass.findDataClass(firstRow.table_name as String)
+                        tableClass.addToMetadata(namespace,
+                                                 "${constraintTypeName}[${firstRow.constraint_name}]",
+                                                 value, dataModel.createdBy)
 
-                if (tableClass) {
-                    String constraintTypeName = (firstRow.constraint_type as String).toLowerCase().replaceAll(/ /, '_')
-
-                    tableClass.addToMetadata(namespace,
-                                             "${constraintTypeName}[${firstRow.constraint_name}]",
-                                             value, dataModel.createdBy)
-
-                    rows.each { row ->
-                        DataElement columnElement = tableClass.findDataElement(row.column_name as String)
-                        if (columnElement) {
-                            columnElement.addToMetadata(namespace, (row.constraint_type as String).toLowerCase(),
-                                                        row.ordinal_position as String, dataModel.createdBy)
+                        rows.each { row ->
+                            DataElement columnElement = tableClass.findDataElement(row.column_name as String)
+                            if (columnElement) {
+                                columnElement.addToMetadata(namespace, (row.constraint_type as String).toLowerCase(),
+                                                            row.ordinal_position as String, dataModel.createdBy)
+                            }
                         }
                     }
                 }
-            }
         }
     }
 
@@ -431,6 +407,22 @@ WHERE
         PreparedStatement st = prepareCoreStatement(connection, params)
         List<Map<String, Object>> results = executeStatement(st)
         st.close()
+        results
+    }
+
+    List<Map<String, Object>> executePreparedStatement(
+        DataModel dataModel, DataClass schemaClass, Connection connection, Closure<String> queryStringGetter) {
+        List<Map<String, Object>> results = []
+        try {
+            PreparedStatement st = connection.prepareStatement(queryStringGetter())
+            st.setString(1, schemaClass.label)
+            results = executeStatement(st)
+            st.close()
+        } catch (SQLException e) {
+            if (e.message.contains('Invalid object name \'information_schema.table_constraints\'')) {
+                getLog().warn('No table_constraints available for {}', dataModel.label)
+            } else throw e
+        }
         results
     }
 

@@ -97,14 +97,14 @@ class RemoteDatabaseImportAndExporter {
         ImporterService importerService = applicationContext.getBean(ImporterService)
 
         DatabaseDataModelImporterProviderServiceParameters databaseImportParameters =
-                importerService.createNewImporterPluginParameters(databaseImporter)
+                importerService.createNewImporterProviderServiceParameters(databaseImporter)
         databaseImportParameters.populateFromProperties(loadedProperties)
 
         Folder randomFolder = new Folder(label: 'random', createdBy: catalogueUser)
         randomFolder.id = UUID.randomUUID()
         databaseImportParameters.setFolderId(randomFolder.id)
 
-        Errors errors = importerService.validateParameters(databaseImportParameters, databaseImporter.importerPluginParametersClass)
+        Errors errors = importerService.validateParameters(databaseImportParameters, databaseImporter.importerProviderServiceParametersClass)
 
         if (errors.hasErrors()) {
             outputErrors(errors, applicationContext.getBean(MessageSource))

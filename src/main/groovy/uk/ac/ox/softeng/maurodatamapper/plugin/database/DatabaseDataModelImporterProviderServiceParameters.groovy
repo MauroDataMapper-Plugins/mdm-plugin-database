@@ -61,7 +61,7 @@ abstract class DatabaseDataModelImporterProviderServiceParameters<K extends Data
             name = 'Database Connection Details',
             order = 1
         ))
-    Integer databasePort
+    int databasePort
 
     @ImportParameterConfig(
         displayName = 'Username',
@@ -92,9 +92,9 @@ abstract class DatabaseDataModelImporterProviderServiceParameters<K extends Data
             name = 'Database Connection Details',
             order = 4
         ))
-    Boolean databaseSSL
+    boolean databaseSSL
 
-    Integer getDatabasePort() {
+    int getDatabasePort() {
         if (databasePort == null) databasePort = getDefaultPort()
         databasePort
     }
@@ -112,11 +112,10 @@ abstract class DatabaseDataModelImporterProviderServiceParameters<K extends Data
         databaseHost = properties.getProperty 'import.database.host'
         databaseUsername = properties.getProperty 'import.database.username'
         databasePassword = properties.getProperty 'import.database.password'
-
-        databaseSSL = Boolean.parseBoolean(properties.getProperty('import.database.ssl'))
+        databaseSSL = properties.getProperty('import.database.ssl') as boolean
 
         try {
-            databasePort = Integer.parseInt(properties.getProperty('import.database.port'))
+            databasePort = properties.getProperty('import.database.port') as int
         } catch (NumberFormatException ignored) {
             databasePort = getDefaultPort()
         }

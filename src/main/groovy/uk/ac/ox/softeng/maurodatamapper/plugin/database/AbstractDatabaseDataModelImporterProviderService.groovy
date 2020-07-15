@@ -16,33 +16,27 @@ import uk.ac.ox.softeng.maurodatamapper.datamodel.item.datatype.ReferenceTypeSer
 import uk.ac.ox.softeng.maurodatamapper.datamodel.provider.importer.DataModelImporterProviderService
 import uk.ac.ox.softeng.maurodatamapper.security.User
 
+import org.springframework.beans.factory.annotation.Autowired
+
 import groovy.transform.CompileStatic
 import groovy.util.logging.Slf4j
-import org.springframework.beans.factory.annotation.Autowired
 
 import java.sql.Connection
 import java.sql.PreparedStatement
 import java.sql.ResultSet
 import java.sql.ResultSetMetaData
 import java.sql.SQLException
-import javax.sql.DataSource
 
-/**
- * @since 23/08/2017
- * TODO adei please work through this file inside intellij
- * all "red" line needs to be fixed
- * this will/must compile with @CompileStatic in place
- * as a start the @Slf4j will allow you to replace getLogger(). with log.
- * Also make sure the correct methods are overriden for the importing
- * check the extended class for whats not yet implemented
- */
 @CompileStatic
 @Slf4j
 abstract class AbstractDatabaseDataModelImporterProviderService<T extends DatabaseDataModelImporterProviderServiceParameters>
-    extends DataModelImporterProviderService<T> {
+        extends DataModelImporterProviderService<T> {
 
-    public static final String DATABASE_NAMESPACE = 'uk.ac.ox.softeng.maurodatamapper.plugin.database'
-    public static final String IS_NOT_NULL_CONSTRAINT = 'IS NOT NULL'
+    private static final String DATABASE_NAMESPACE = 'uk.ac.ox.softeng.maurodatamapper.plugin.database'
+    private static final String IS_NOT_NULL_CONSTRAINT = 'IS NOT NULL'
+
+    final String displayName = 'Abstract Database Importer'
+    final String version = '2.0.0-SNAPSHOT'
 
     @Autowired
     DataModelService dataModelService
@@ -59,18 +53,14 @@ abstract class AbstractDatabaseDataModelImporterProviderService<T extends Databa
     @Autowired
     ReferenceTypeService referenceTypeService
 
-    abstract String getDatabaseStructureQueryString()
-
     /**
      * Must return a String which will be queryable by schema name,
      * and return a row with the following elements:
-     *
      *  * table_name
      *  * check_clause (the constraint information)
      * @return
      */
-    String getStandardConstraintInformationQueryString() {
-        '''
+    final String standardConstraintInformationQueryString = '''
 SELECT
   tc.table_name,
   cc.check_clause
@@ -78,12 +68,10 @@ FROM information_schema.table_constraints tc
   INNER JOIN information_schema.check_constraints cc ON tc.constraint_name = cc.constraint_name
 WHERE tc.constraint_schema = ?;
 '''
-    }
 
     /**
      * Must return a String which will be queryable by schema name,
      * and return a row with the following elements:
-     *
      *  * constraint_name
      *  * table_name
      *  * constraint_type (primary_key or unique)
@@ -91,8 +79,7 @@ WHERE tc.constraint_schema = ?;
      *  * ordinal_position
      * @return
      */
-    String getPrimaryKeyAndUniqueConstraintInformationQueryString() {
-        '''
+    final String primaryKeyAndUniqueConstraintInformationQueryString = '''
 SELECT
   tc.constraint_name,
   tc.table_name,
@@ -105,13 +92,11 @@ FROM
 WHERE
   tc.constraint_schema = ?
   AND constraint_type NOT IN ('FOREIGN KEY', 'CHECK');
-  '''
-    }
+'''
 
     /**
      * Must return a String which will be queryable by schema name,
      * and return a row with the following elements:
-     *
      *  * table_name
      *  * index_name
      *  * unique_index (boolean)
@@ -125,7 +110,6 @@ WHERE
     /**
      * Must return a String which will be queryable by schema name,
      * and return a row with the following elements:
-     *
      *  * constraint_name
      *  * table_name
      *  * column_name
@@ -135,174 +119,114 @@ WHERE
      */
     abstract String getForeignKeyInformationQueryString()
 
-    String getColumnNameColumnName() {
-        'column_name'
-    }
+    abstract String getDatabaseStructureQueryString()
 
-    String getDataTypeColumnName() {
-        'data_type'
-    }
+    final String schemaNameColumnName = 'table_schema'
+    final String dataTypeColumnName = 'data_type'
+    final String tableNameColumnName = 'table_name'
+    final String columnNameColumnName = 'column_name'
+    final String tableCatalogColumnName = 'table_catalog'
+    final String columnIsNullableColumnName = 'is_nullable'
 
-    String getSchemaNameColumnName() {
-        'table_schema'
-    }
-
-    String getTableCatalogColumnName() {
-        'table_catalog'
-    }
-
-    String getTableNameColumnName() {
-        'table_name'
-    }
-
-    String getColumnIsNullableColumnName() {
-        'is_nullable'
-    }
-
-    List<String> getCoreColumns() {
-        [getSchemaNameColumnName(),
-         getDataTypeColumnName(),
-         getTableNameColumnName(),
-         getColumnNameColumnName(),
-         getTableCatalogColumnName(),]
-    }
-
-    DataModel importDataModel(User currentUser, T params) {
-        importDataModels(currentUser, params.databaseNames, params).first()
-    }
-
-    List<DataModel> importDataModels(User currentUser, T params) {
-
-        List<String> databases = params.databaseNames.split(',').toList()
-        List<DataModel> dataModels = []
-
-        log.info('Importing {} DataModel/s', databases.size())
-
-        databases.each {name ->
-            dataModels.addAll(importDataModels(currentUser, name, params))
-        }
-
-        dataModels
-    }
+    final Collection<String> coreColumns = [
+            schemaNameColumnName,
+            dataTypeColumnName,
+            tableNameColumnName,
+            columnNameColumnName,
+            tableCatalogColumnName
+    ]
 
     @Override
     Boolean canImportMultipleDomains() {
         true
     }
 
-    List<DataModel> importDataModels(User currentUser, String databaseName, T params) {
-        String modelName = params.isMultipleDataModelImport() ? databaseName : params.getModelName() ?: databaseName
+    @Override
+    DataModel importDataModel(User currentUser, T params) throws ApiException, ApiBadRequestException {
+        importDataModelsFromParameters(currentUser, params.databaseNames, params).head()
+    }
+
+    @Override
+    List<DataModel> importDataModels(User currentUser, T params) throws ApiException, ApiBadRequestException {
+        final List<String> databaseNames = params.databaseNames.split(',').toList()
+        log.info 'Importing {} DataModel(s)', databaseNames.size()
+
+        final List<DataModel> dataModels = []
+        databaseNames.each { String databaseName -> dataModels.addAll importDataModelsFromParameters(currentUser, databaseName, params) }
+        dataModels
+    }
+
+    private List<DataModel> importDataModelsFromParameters(
+            User currentUser, String databaseName, T params) throws ApiException, ApiBadRequestException {
+        String modelName = databaseName
+        if (!params.isMultipleDataModelImport()) modelName = params.modelName ?: modelName
         modelName = params.dataModelNameSuffix ? "${modelName}_${params.dataModelNameSuffix}" : modelName
-        Folder folder = Folder.get(params.folderId)
 
         try {
-            Connection connection = getConnection(databaseName, params)
-            List<Map<String, Object>> results = executeCoreStatement(connection, params)
+            final Connection connection = getConnection(databaseName, params)
+            final PreparedStatement preparedStatement = prepareCoreStatement(connection, params)
+            final StatementExecutionResults results = executeStatement(preparedStatement)
+            preparedStatement.close()
 
-            log.debug('Size of results from statement {}', results.size())
-
-            if (results.size() == 0) {
-                log.warn('No results from database statement, therefore nothing to import for {}.', modelName)
+            log.debug 'Size of results from statement {}', results.size()
+            if (results.isEmpty()) {
+                log.warn 'No results from database statement, therefore nothing to import for {}.', modelName
                 return []
             }
 
-            List<DataModel> dataModels = importAndUpdateDataModelsFromResults(currentUser, databaseName, params,
-                                                                              folder, modelName, results, connection)
+            final List<DataModel> dataModels = importAndUpdateDataModelsFromResults(
+                    currentUser, databaseName, params, Folder.get(params.folderId), modelName, results, connection)
             connection.close()
             dataModels
-        } catch (SQLException ex) {
-            log.error('Something went wrong executing statement while importing {} : {}', modelName, ex.message)
-            throw new ApiBadRequestException('DIS03', 'Cannot execute statement', ex)
-        }
-    }
-
-    List<DataModel> importAndUpdateDataModelsFromResults(User currentUser, String databaseName, T params, Folder folder,
-                                                         String modelName, List<Map<String, Object>> results, Connection connection) {
-        DataModel dataModel = importDataModelFromResults(currentUser, folder, modelName, params.databaseDialect, results)
-        if (params.dataModelNameSuffix) dataModel.aliasesString = databaseName
-
-        updateDataModelWithDatabaseSpecificInformation(dataModel, connection)
-        [dataModel]
-    }
-
-    Connection getConnection(String databaseName, T params) throws ApiException {
-        DataSource dataSource
-        try {
-            dataSource = params.getDataSource(databaseName)
-            return dataSource.getConnection(params.getDatabaseUsername(), params.getDatabasePassword())
         } catch (SQLException e) {
-            log.error('Cannot connect to database [{}]: {}', params.getUrl(databaseName), e.getMessage())
-            throw new ApiBadRequestException('DIS02', "Cannot connect to database [${params.getUrl(databaseName)}]", e)
+            log.error 'Something went wrong executing statement while importing {} : {}', modelName, e.message
+            throw new ApiBadRequestException('DIS03', 'Cannot execute statement', e)
         }
     }
 
-    @SuppressWarnings(['unchecked', 'UnusedMethodParameter'])
-    List<Map<String, Object>> executeCoreStatement(Connection connection, T params) throws ApiException {
-        List<Map<String, Object>> results = []
-        PreparedStatement st = prepareCoreStatement(connection, params)
-        results = executeStatement(st)
-        st.close()
-        results
-    }
-
-    @SuppressWarnings(['unchecked', 'UnusedMethodParameter'])
-    PreparedStatement prepareCoreStatement(Connection connection, T params) {
-        connection.prepareStatement(getDatabaseStructureQueryString())
-    }
-
-    List<Map<String, Object>> executeStatement(PreparedStatement preparedStatement) throws ApiException {
-        List list = new ArrayList(50)
-        ResultSet rs = preparedStatement.executeQuery()
-        ResultSetMetaData md = rs.getMetaData()
-        int columns = md.getColumnCount()
-        while (rs.next()) {
-            Map row = new HashMap(columns)
-            for (int i = 1; i <= columns; ++i) {
-                row[md.getColumnName(i).toLowerCase()] = rs.getObject(i)
-            }
-            list.add(row)
-        }
-        rs.close()
-        list
-    }
-
-    Boolean isColumnNullable(String nullableColumnValue) {
+    boolean isColumnNullable(String nullableColumnValue) {
         nullableColumnValue.toLowerCase() == 'yes'
     }
 
-    DataModel importDataModelFromResults(User user, Folder folder, String modelName, String dialect,
-                                         List<Map<String, Object>> results, boolean importSchemaAsDataClass = true) throws ApiException {
+    DataModel importDataModelFromResults(
+            User user, Folder folder, String modelName, String dialect, StatementExecutionResults results, boolean importSchemaAsDataClass = true)
+            throws ApiException {
+        final DataModel dataModel = new DataModel(createdBy: user, label: modelName, type: DataModelType.DATA_ASSET, folder: folder)
+        dataModel.addCreatedEdit user
+        dataModel.addToMetadata namespace: DATABASE_NAMESPACE, key: 'dialect', value: dialect
 
-        final DataModel dataModel = createDatabase(user, modelName, dialect, folder)
+        results.each { StatementExecutionResultsRow row ->
+            final DataType dataType = primitiveTypeService.findOrCreateDataTypeForDataModel(dataModel, row(dataTypeColumnName), null, user)
 
-        for (Map<String, Object> row : results) {
-            String dataTypeName = (String) row[getDataTypeColumnName()]
-            DataType dataType = primitiveTypeService.findOrCreateDataTypeForDataModel(dataModel, dataTypeName, null, user)
-
-            String tableName = (String) row[getTableNameColumnName()]
-            DataClass tableDataClass
+            DataClass tableDataClass = null
             if (importSchemaAsDataClass) {
-                String schemaName = (String) row[getSchemaNameColumnName()]
-
-                DataClass schemaDataClass = dataClassService.findOrCreateDataClass(dataModel, schemaName, null, user)
-                tableDataClass = dataClassService.findOrCreateDataClass(schemaDataClass, tableName, null, user)
+                DataClass schemaDataClass = dataClassService.findOrCreateDataClass(dataModel, row(schemaNameColumnName), null, user)
+                tableDataClass = dataClassService.findOrCreateDataClass(schemaDataClass, row(tableNameColumnName), null, user)
             } else {
-                tableDataClass = dataClassService.findOrCreateDataClass(dataModel, tableName, null, user)
+                tableDataClass = dataClassService.findOrCreateDataClass(dataModel, row(tableNameColumnName), null, user)
             }
 
-            String columnName = (String) row[getColumnNameColumnName()]
-            String isNullable = (String) row[getColumnIsNullableColumnName()]
-            Integer min = isColumnNullable(isNullable) ? 0 : 1
-            DataElement de = dataElementService.findOrCreateDataElementForDataClass(tableDataClass, columnName, null, user, dataType,
-                                                                                    min, 1)
+            final int minMultiplicity = isColumnNullable(row(columnIsNullableColumnName)) ? 0 : 1
+            final DataElement dataElement = dataElementService.findOrCreateDataElementForDataClass(
+                    tableDataClass, row(columnNameColumnName), null, user, dataType, minMultiplicity, 1)
 
-            row.findAll {col, data ->
-                data && !(col in coreColumns)
-            }.each {col, data ->
-                de.addToMetadata(namespace, col, data.toString(), user)
+            row.findAll { String column, Object data ->
+                data && !(column in coreColumns)
+            }.each { String column, Object data ->
+                dataElement.addToMetadata(namespace, column, data.toString(), user)
             }
         }
+
         dataModel
+    }
+
+    List<DataModel> importAndUpdateDataModelsFromResults(
+            User currentUser, String databaseName, T params, Folder folder, String modelName, StatementExecutionResults results,
+            Connection connection) throws ApiException, SQLException {
+        final DataModel dataModel = importDataModelFromResults(currentUser, folder, modelName, params.databaseDialect, results)
+        if (params.dataModelNameSuffix) dataModel.aliasesString = databaseName
+        updateDataModelWithDatabaseSpecificInformation dataModel, connection
+        [dataModel]
     }
 
     /**
@@ -312,169 +236,165 @@ WHERE
      * @param connection Connection to database
      * @return
      */
-    void updateDataModelWithDatabaseSpecificInformation(DataModel dataModel, Connection connection) {
-
-        addStandardConstraintInformation(dataModel, connection)
-        addPrimaryKeyAndUniqueConstraintInformation(dataModel, connection)
-        addIndexInformation(dataModel, connection)
-        addForeignKeyInformation(dataModel, connection)
-
+    void updateDataModelWithDatabaseSpecificInformation(DataModel dataModel, Connection connection) throws ApiException, SQLException {
+        addStandardConstraintInformation dataModel, connection
+        addPrimaryKeyAndUniqueConstraintInformation dataModel, connection
+        addIndexInformation dataModel, connection
+        addForeignKeyInformation dataModel, connection
     }
 
-    void addStandardConstraintInformation(DataModel dataModel, Connection connection) {
+    void addStandardConstraintInformation(DataModel dataModel, Connection connection) throws ApiException, SQLException {
+        if (standardConstraintInformationQueryString == null) return
 
-        if (!getStandardConstraintInformationQueryString()) return
+        dataModel.childDataClasses.each { DataClass schemaClass ->
+            final StatementExecutionResults results = executePreparedStatement(
+                    dataModel, schemaClass, connection, standardConstraintInformationQueryString)
+            results.each { StatementExecutionResultsRow row ->
+                final DataClass tableClass = schemaClass.findDataClass(row.table_name as String)
+                if (tableClass == null) return
 
-        dataModel.childDataClasses.each {schemaClass ->
-            List<Map<String, Object>> results = []
-
-            try {
-                PreparedStatement st = connection.prepareStatement(getStandardConstraintInformationQueryString())
-                st.setString(1, schemaClass.label)
-                results = executeStatement(st)
-                st.close()
-            } catch (SQLException ex) {
-                if (ex.message.contains('Invalid object name \'information_schema.table_constraints\'')) {
-                    getLog().warn('No table_constraints available for {}', dataModel.label)
-                } else throw ex
+                final String constraint = row.check_clause && (row.check_clause as String).contains(IS_NOT_NULL_CONSTRAINT) ?
+                                          IS_NOT_NULL_CONSTRAINT : null
+                if (constraint && constraint != IS_NOT_NULL_CONSTRAINT) {
+                    log.warn 'Unhandled constraint {}', constraint
+                }
             }
+        }
+    }
 
-            results.each {row ->
+    void addPrimaryKeyAndUniqueConstraintInformation(DataModel dataModel, Connection connection) throws ApiException, SQLException {
+        if (primaryKeyAndUniqueConstraintInformationQueryString == null) return
 
-                DataClass tableClass = schemaClass.findDataClass(row.table_name as String)
+        dataModel.childDataClasses.each { DataClass schemaClass ->
+            final StatementExecutionResults results = executePreparedStatement(
+                    dataModel, schemaClass, connection, primaryKeyAndUniqueConstraintInformationQueryString)
+            results.groupBy { it.constraint_name }.each { _, List<StatementExecutionResultsRow> rows ->
+                final StatementExecutionResultsRow firstRow = rows.head()
+                final DataClass tableClass = schemaClass.findDataClass(firstRow.table_name as String)
+                if (tableClass == null) return
 
-                if (tableClass) {
-                    String checkClause = row.check_clause
-                    String constraint = extractConstraint(checkClause)
+                final String constraintTypeName = (firstRow.constraint_type as String).toLowerCase().replaceAll(/ /, '_')
+                final String constraintTypeValue = rows.size() == 1 ?
+                                                   firstRow.column_name : rows.sort { it.ordinal_position }.collect { it.column_name }.join(', ')
+                tableClass.addToMetadata namespace, "$constraintTypeName[${firstRow.constraint_name}]", constraintTypeValue, dataModel.createdBy
 
-                    if (constraint && constraint != IS_NOT_NULL_CONSTRAINT) {
-                        //                    String columnName = checkClause.replace(/ ${constraint}/, '')
-                        //                    DataElement columnElement = tableClass.findChildDataElement(columnName)
-                        log.warn('Unhandled constraint {}', constraint)
+                rows.each { StatementExecutionResultsRow row ->
+                    final DataElement columnElement = tableClass.findDataElement(row.column_name as String)
+                    if (columnElement) {
+                        columnElement.addToMetadata(
+                                namespace, (row.constraint_type as String).toLowerCase(), row.ordinal_position as String, dataModel.createdBy)
                     }
                 }
             }
         }
     }
 
-    @SuppressWarnings("UnnecessaryCollectCall")
-    void addPrimaryKeyAndUniqueConstraintInformation(DataModel dataModel, Connection connection) {
+    void addIndexInformation(DataModel dataModel, Connection connection) throws ApiException, SQLException {
+        if (indexInformationQueryString == null) return
 
-        if (!getPrimaryKeyAndUniqueConstraintInformationQueryString()) return
-
-        dataModel.childDataClasses.each {schemaClass ->
-            List<Map<String, Object>> results = []
-
-            try {
-                PreparedStatement st = connection.prepareStatement(getPrimaryKeyAndUniqueConstraintInformationQueryString())
-                st.setString(1, schemaClass.label)
-                results = executeStatement(st)
-                st.close()
-            } catch (SQLException ex) {
-                if (ex.message.contains('Invalid object name \'information_schema.table_constraints\'')) {
-                    getLog().warn('No table_constraints available for {}', dataModel.label)
-                } else throw ex
-            }
-
-            results.groupBy {it.constraint_name}.each {constraintName, rows ->
-                Map firstRow = rows.first()
-                String value = rows.size() == 1 ? firstRow.column_name : rows.sort {it.ordinal_position}.collect {it.column_name}.join(', ')
-                DataClass tableClass = schemaClass.findDataClass(firstRow.table_name as String)
-
-                if (tableClass) {
-
-                    String constraintTypeName = (firstRow.constraint_type as String).toLowerCase().replaceAll(/ /, '_')
-
-                    tableClass.addToMetadata(namespace,
-                                             "${constraintTypeName}[${firstRow.constraint_name}]",
-                                             value, dataModel.createdBy)
-
-                    rows.each {row ->
-                        DataElement columnElement = tableClass.findDataElement(row.column_name as String)
-                        if (columnElement) {
-                            columnElement.addToMetadata(namespace, (row.constraint_type as String).toLowerCase(),
-                                                        row.ordinal_position as String, dataModel.createdBy)
-                        }
-                    }
+        dataModel.childDataClasses.each { DataClass schemaClass ->
+            final StatementExecutionResults results = executePreparedStatement(dataModel, schemaClass, connection, indexInformationQueryString)
+            results.each { StatementExecutionResultsRow row ->
+                final DataClass tableClass = schemaClass.findDataClass(row.table_name as String)
+                if (tableClass == null) {
+                    log.warn 'Could not add {} as DataClass for table {} does not exist', row.index_name, row.table_name
+                    return
                 }
+
+                String indexType = row.primary_index ? 'primary_index' : row.unique_index ? 'unique_index' : 'index'
+                indexType = row.clustered ? "clustered_$indexType" : indexType
+                tableClass.addToMetadata namespace, "$indexType[${row.index_name}]", row.column_names as String, dataModel.createdBy
             }
         }
     }
 
-    void addForeignKeyInformation(DataModel dataModel, Connection connection) {
+    void addForeignKeyInformation(DataModel dataModel, Connection connection) throws ApiException, SQLException {
+        if (foreignKeyInformationQueryString == null) return
 
-        if (!getForeignKeyInformationQueryString()) return
+        dataModel.childDataClasses.each { DataClass schemaClass ->
+            final StatementExecutionResults results = executePreparedStatement(dataModel, schemaClass, connection, foreignKeyInformationQueryString)
+            results.each { StatementExecutionResultsRow row ->
+                final DataClass foreignTableClass = dataModel.dataClasses.find { DataClass dataClass -> dataClass.label == row.reference_table_name }
 
-        dataModel.childDataClasses.each {schemaClass ->
-            List<Map<String, Object>> results = []
-
-            PreparedStatement st = connection.prepareStatement(getForeignKeyInformationQueryString())
-            st.setString(1, schemaClass.label)
-            results = executeStatement(st)
-            st.close()
-
-            results.each {row ->
-
-                DataClass foreignTableClass = dataModel.dataClasses.find {it.label == row.reference_table_name}
-                DataType dataType
-
+                DataType dataType = null
                 if (foreignTableClass) {
                     dataType = referenceTypeService.findOrCreateDataTypeForDataModel(
-                        dataModel, "${foreignTableClass.label}Type", "Linked to DataElement [${row.reference_column_name}]",
-                        dataModel.createdBy as User, foreignTableClass)
-
-                    dataModel.addToDataTypes(dataType)
+                            dataModel, "${foreignTableClass.label}Type", "Linked to DataElement [${row.reference_column_name}]",
+                            dataModel.createdBy as User, foreignTableClass)
+                    dataModel.addToDataTypes dataType
                 } else {
                     dataType = primitiveTypeService.findOrCreateDataTypeForDataModel(
-                        dataModel, "${row.reference_table_name}Type",
-                        "Missing link to foreign key table [${row.reference_table_name}.${row.reference_column_name}]",
-                        dataModel.createdBy as User
+                            dataModel, "${row.reference_table_name}Type",
+                            "Missing link to foreign key table [${row.reference_table_name}.${row.reference_column_name}]",
+                            dataModel.createdBy as User
                     )
                 }
 
-                DataClass tableClass = schemaClass.findDataClass(row.table_name as String)
-                DataElement columnElement = tableClass.findDataElement(row.column_name as String)
+                final DataClass tableClass = schemaClass.findDataClass(row.table_name as String)
+                final DataElement columnElement = tableClass.findDataElement(row.column_name as String)
                 columnElement.dataType = dataType
-                columnElement.addToMetadata(namespace, "foreign_key[${row.constraint_name}]",
-                                            row.reference_column_name as String, dataModel.createdBy)
+                columnElement.addToMetadata(
+                        namespace, "foreign_key[${row.constraint_name}]", row.reference_column_name as String, dataModel.createdBy)
             }
         }
     }
 
-    void addIndexInformation(DataModel dataModel, Connection connection) {
+    PreparedStatement prepareCoreStatement(Connection connection, T params) {
+        connection.prepareStatement(databaseStructureQueryString)
+    }
 
-        if (!getIndexInformationQueryString()) return
-
-        dataModel.childDataClasses.each {schemaClass ->
-            List<Map<String, Object>> results = []
-
-            PreparedStatement st = connection.prepareStatement(getIndexInformationQueryString())
-            st.setString(1, schemaClass.label)
-            results = executeStatement(st)
-            st.close()
-
-            results.each {row ->
-                DataClass tableClass = schemaClass.findDataClass(row.table_name as String)
-
-                if (tableClass) {
-                    String indexType = row.primary_index ? 'primary_index' : row.unique_index ? 'unique_index' : 'index'
-                    indexType = row.clustered ? "clustered_${indexType}" : indexType
-
-                    tableClass.addToMetadata(namespace, "${indexType}[${row.index_name}]", row.column_names as String, dataModel.createdBy)
-                } else log.warn('Could not add {} as DataClass for table {} does not exist', row.index_name, row.table_name)
-            }
+    private Connection getConnection(String databaseName, T params) throws ApiException, ApiBadRequestException {
+        try {
+            params.getDataSource(databaseName).getConnection(params.databaseUsername, params.databasePassword)
+        } catch (SQLException e) {
+            log.error 'Cannot connect to database [{}]: {}', params.getUrl(databaseName), e.message
+            throw new ApiBadRequestException('DIS02', "Cannot connect to database [${params.getUrl(databaseName)}]", e)
         }
     }
 
-    private static DataModel createDatabase(User user, String modelName, String dialect, Folder folder) {
-        DataModel dataModel = new DataModel(createdBy: user, label: modelName, type: DataModelType.DATA_ASSET, folder: folder)
-        dataModel.addCreatedEdit(user)
-        dataModel.addToMetadata(namespace: DATABASE_NAMESPACE, key: 'dialect', value: dialect)
-        dataModel
+    private StatementExecutionResults executePreparedStatement(
+            DataModel dataModel, DataClass schemaClass, Connection connection, String queryString) throws ApiException, SQLException {
+        StatementExecutionResults results = null
+        try {
+            final PreparedStatement preparedStatement = connection.prepareStatement(queryString)
+            preparedStatement.setString(1, schemaClass.label)
+            results = executeStatement(preparedStatement)
+            preparedStatement.close()
+        } catch (SQLException e) {
+            if (e.message.contains('Invalid object name \'information_schema.table_constraints\'')) {
+                log.warn 'No table_constraints available for {}', dataModel.label
+            } else throw e
+        }
+        results as StatementExecutionResults
     }
 
-    private static String extractConstraint(String checkClause) {
-        if (checkClause && checkClause.contains(IS_NOT_NULL_CONSTRAINT)) return IS_NOT_NULL_CONSTRAINT
-        null
+    private static StatementExecutionResults executeStatement(PreparedStatement preparedStatement) throws ApiException, SQLException {
+        final StatementExecutionResults results = new ArrayList(50) as StatementExecutionResults
+
+        final ResultSet resultSet = preparedStatement.executeQuery()
+        final ResultSetMetaData resultSetMetaData = resultSet.metaData
+        final int columnCount = resultSetMetaData.columnCount
+
+        while (resultSet.next()) {
+            final StatementExecutionResultsRow row = new HashMap(columnCount) as StatementExecutionResultsRow
+            (1..columnCount).each { int i ->
+                row[resultSetMetaData.getColumnName(i).toLowerCase()] = resultSet.getObject(i)
+            }
+            results.add(row)
+        }
+        resultSet.close()
+
+        results as StatementExecutionResults
+    }
+
+    private static trait StatementExecutionResults implements List<StatementExecutionResultsRow> {
+        @Override
+        abstract boolean add(StatementExecutionResultsRow statementExecutionResultsRow)
+    }
+
+    private static trait StatementExecutionResultsRow implements Map<String, Object> {
+        String call(String columnName) {
+            this[columnName] as String
+        }
     }
 }

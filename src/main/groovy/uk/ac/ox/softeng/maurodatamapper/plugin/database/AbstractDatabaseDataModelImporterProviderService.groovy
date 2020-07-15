@@ -16,9 +16,10 @@ import uk.ac.ox.softeng.maurodatamapper.datamodel.item.datatype.ReferenceTypeSer
 import uk.ac.ox.softeng.maurodatamapper.datamodel.provider.importer.DataModelImporterProviderService
 import uk.ac.ox.softeng.maurodatamapper.security.User
 
+import org.springframework.beans.factory.annotation.Autowired
+
 import groovy.transform.CompileStatic
 import groovy.util.logging.Slf4j
-import org.springframework.beans.factory.annotation.Autowired
 
 import java.sql.Connection
 import java.sql.PreparedStatement
@@ -55,7 +56,6 @@ abstract class AbstractDatabaseDataModelImporterProviderService<T extends Databa
     /**
      * Must return a String which will be queryable by schema name,
      * and return a row with the following elements:
-     *
      *  * table_name
      *  * check_clause (the constraint information)
      * @return
@@ -74,7 +74,6 @@ WHERE tc.constraint_schema = ?;
     /**
      * Must return a String which will be queryable by schema name,
      * and return a row with the following elements:
-     *
      *  * constraint_name
      *  * table_name
      *  * constraint_type (primary_key or unique)
@@ -102,7 +101,6 @@ WHERE
     /**
      * Must return a String which will be queryable by schema name,
      * and return a row with the following elements:
-     *
      *  * table_name
      *  * index_name
      *  * unique_index (boolean)
@@ -116,7 +114,6 @@ WHERE
     /**
      * Must return a String which will be queryable by schema name,
      * and return a row with the following elements:
-     *
      *  * constraint_name
      *  * table_name
      *  * column_name
@@ -163,13 +160,12 @@ WHERE
     }
 
     List<DataModel> importDataModels(User currentUser, T params) {
-
         List<String> databases = params.databaseNames.split(',').toList()
         List<DataModel> dataModels = []
 
         log.info('Importing {} DataModel/s', databases.size())
 
-        databases.each {name ->
+        databases.each { name ->
             dataModels.addAll(importDataModels(currentUser, name, params))
         }
 
@@ -263,7 +259,6 @@ WHERE
 
     DataModel importDataModelFromResults(User user, Folder folder, String modelName, String dialect,
                                          List<Map<String, Object>> results, boolean importSchemaAsDataClass = true) throws ApiException {
-
         final DataModel dataModel = createDatabase(user, modelName, dialect, folder)
 
         for (Map<String, Object> row : results) {
@@ -287,9 +282,9 @@ WHERE
             DataElement de = dataElementService.findOrCreateDataElementForDataClass(tableDataClass, columnName, null, user, dataType,
                                                                                     min, 1)
 
-            row.findAll {col, data ->
+            row.findAll { col, data ->
                 data && !(col in coreColumns)
-            }.each {col, data ->
+            }.each { col, data ->
                 de.addToMetadata(namespace, col, data.toString(), user)
             }
         }
@@ -304,19 +299,16 @@ WHERE
      * @return
      */
     void updateDataModelWithDatabaseSpecificInformation(DataModel dataModel, Connection connection) {
-
         addStandardConstraintInformation(dataModel, connection)
         addPrimaryKeyAndUniqueConstraintInformation(dataModel, connection)
         addIndexInformation(dataModel, connection)
         addForeignKeyInformation(dataModel, connection)
-
     }
 
     void addStandardConstraintInformation(DataModel dataModel, Connection connection) {
-
         if (!getStandardConstraintInformationQueryString()) return
 
-        dataModel.childDataClasses.each {schemaClass ->
+        dataModel.childDataClasses.each { schemaClass ->
             List<Map<String, Object>> results = []
 
             try {
@@ -330,8 +322,7 @@ WHERE
                 } else throw ex
             }
 
-            results.each {row ->
-
+            results.each { row ->
                 DataClass tableClass = schemaClass.findDataClass(row.table_name as String)
 
                 if (tableClass) {
@@ -339,8 +330,8 @@ WHERE
                     String constraint = extractConstraint(checkClause)
 
                     if (constraint && constraint != IS_NOT_NULL_CONSTRAINT) {
-                        //                    String columnName = checkClause.replace(/ ${constraint}/, '')
-                        //                    DataElement columnElement = tableClass.findChildDataElement(columnName)
+                        // String columnName = checkClause.replace(/ ${constraint}/, '')
+                        // DataElement columnElement = tableClass.findChildDataElement(columnName)
                         log.warn('Unhandled constraint {}', constraint)
                     }
                 }
@@ -350,10 +341,9 @@ WHERE
 
     @SuppressWarnings("UnnecessaryCollectCall")
     void addPrimaryKeyAndUniqueConstraintInformation(DataModel dataModel, Connection connection) {
-
         if (!getPrimaryKeyAndUniqueConstraintInformationQueryString()) return
 
-        dataModel.childDataClasses.each {schemaClass ->
+        dataModel.childDataClasses.each { schemaClass ->
             List<Map<String, Object>> results = []
 
             try {
@@ -367,20 +357,19 @@ WHERE
                 } else throw ex
             }
 
-            results.groupBy {it.constraint_name}.each {constraintName, rows ->
+            results.groupBy { it.constraint_name }.each { constraintName, rows ->
                 Map firstRow = rows.first()
-                String value = rows.size() == 1 ? firstRow.column_name : rows.sort {it.ordinal_position}.collect {it.column_name}.join(', ')
+                String value = rows.size() == 1 ? firstRow.column_name : rows.sort { it.ordinal_position }.collect { it.column_name }.join(', ')
                 DataClass tableClass = schemaClass.findDataClass(firstRow.table_name as String)
 
                 if (tableClass) {
-
                     String constraintTypeName = (firstRow.constraint_type as String).toLowerCase().replaceAll(/ /, '_')
 
                     tableClass.addToMetadata(namespace,
                                              "${constraintTypeName}[${firstRow.constraint_name}]",
                                              value, dataModel.createdBy)
 
-                    rows.each {row ->
+                    rows.each { row ->
                         DataElement columnElement = tableClass.findDataElement(row.column_name as String)
                         if (columnElement) {
                             columnElement.addToMetadata(namespace, (row.constraint_type as String).toLowerCase(),
@@ -393,10 +382,9 @@ WHERE
     }
 
     void addForeignKeyInformation(DataModel dataModel, Connection connection) {
-
         if (!getForeignKeyInformationQueryString()) return
 
-        dataModel.childDataClasses.each {schemaClass ->
+        dataModel.childDataClasses.each { schemaClass ->
             List<Map<String, Object>> results = []
 
             PreparedStatement st = connection.prepareStatement(getForeignKeyInformationQueryString())
@@ -404,9 +392,8 @@ WHERE
             results = executeStatement(st)
             st.close()
 
-            results.each {row ->
-
-                DataClass foreignTableClass = dataModel.dataClasses.find {it.label == row.reference_table_name}
+            results.each { row ->
+                DataClass foreignTableClass = dataModel.dataClasses.find { it.label == row.reference_table_name }
                 DataType dataType
 
                 if (foreignTableClass) {
@@ -433,10 +420,9 @@ WHERE
     }
 
     void addIndexInformation(DataModel dataModel, Connection connection) {
-
         if (!getIndexInformationQueryString()) return
 
-        dataModel.childDataClasses.each {schemaClass ->
+        dataModel.childDataClasses.each { schemaClass ->
             List<Map<String, Object>> results = []
 
             PreparedStatement st = connection.prepareStatement(getIndexInformationQueryString())
@@ -444,7 +430,7 @@ WHERE
             results = executeStatement(st)
             st.close()
 
-            results.each {row ->
+            results.each { row ->
                 DataClass tableClass = schemaClass.findDataClass(row.table_name as String)
 
                 if (tableClass) {

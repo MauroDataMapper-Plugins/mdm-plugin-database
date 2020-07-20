@@ -5,7 +5,6 @@ import uk.ac.ox.softeng.maurodatamapper.core.provider.importer.parameter.config.
 import uk.ac.ox.softeng.maurodatamapper.datamodel.provider.importer.parameter.DataModelImporterProviderServiceParameters
 
 import groovy.transform.CompileStatic
-import groovy.transform.PackageScope
 
 import java.sql.SQLException
 import javax.sql.DataSource
@@ -95,7 +94,6 @@ abstract class DatabaseDataModelImporterProviderServiceParameters<K extends Data
             ))
     boolean databaseSSL
 
-    @PackageScope
     int getDatabasePort() {
         databasePort = databasePort ?: getDefaultPort()
         databasePort

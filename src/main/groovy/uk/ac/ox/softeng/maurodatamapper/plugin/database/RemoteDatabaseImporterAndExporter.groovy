@@ -115,19 +115,19 @@ class RemoteDatabaseImporterAndExporter {
         log.info 'Importing Databases using {} (v{})', dbImporter.class.simpleName, dbImporter.version
 
         final ImporterService importer = applicationContext.getBean(ImporterService)
-        final DatabaseDataModelImporterProviderServiceParameters dbImportParams = importer.createNewImporterProviderServiceParameters(dbImporter)
-        dbImportParams.populateFromProperties properties
+        final DatabaseDataModelImporterProviderServiceParameters dbImportParameters = importer.createNewImporterProviderServiceParameters(dbImporter)
+        dbImportParameters.populateFromProperties properties
 
         final Folder randomFolder = new Folder(label: 'random', createdBy: user, id: UUID.randomUUID())
-        dbImportParams.folderId = randomFolder.id
+        dbImportParameters.folderId = randomFolder.id
 
-        final Errors errors = importer.validateParameters(dbImportParams, dbImporter.importerProviderServiceParametersClass)
+        final Errors errors = importer.validateParameters(dbImportParameters, dbImporter.importerProviderServiceParametersClass)
         if (errors.hasErrors()) {
             outputErrors errors, applicationContext.getBean(MessageSource)
             return []
         }
 
-        final List<DataModel> dataModels = importer.importModels(user, dbImporter, dbImportParams)
+        final List<DataModel> dataModels = importer.importModels(user, dbImporter, dbImportParameters)
         dataModels.each { DataModel dataModel ->
             dataModel.folder = randomFolder
             dataModel.validate()

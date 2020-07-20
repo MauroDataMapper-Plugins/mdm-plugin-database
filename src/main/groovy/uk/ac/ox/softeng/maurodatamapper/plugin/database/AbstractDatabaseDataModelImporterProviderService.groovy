@@ -19,7 +19,6 @@ import uk.ac.ox.softeng.maurodatamapper.security.User
 import org.springframework.beans.factory.annotation.Autowired
 
 import groovy.transform.CompileStatic
-import groovy.transform.PackageScope
 import groovy.util.logging.Slf4j
 
 import java.sql.Connection
@@ -33,10 +32,9 @@ import java.sql.SQLException
 abstract class AbstractDatabaseDataModelImporterProviderService<T extends DatabaseDataModelImporterProviderServiceParameters>
         extends DataModelImporterProviderService<T> {
 
-    private static final String IS_NOT_NULL_CONSTRAINT = 'IS NOT NULL'
-
-    @PackageScope
     static final String DATABASE_NAMESPACE = 'uk.ac.ox.softeng.maurodatamapper.plugin.database'
+
+    private static final String IS_NOT_NULL_CONSTRAINT = 'IS NOT NULL'
 
     @Autowired
     DataModelService dataModelService
@@ -52,6 +50,21 @@ abstract class AbstractDatabaseDataModelImporterProviderService<T extends Databa
 
     @Autowired
     ReferenceTypeService referenceTypeService
+
+    final String schemaNameColumnName = 'table_schema'
+    final String dataTypeColumnName = 'data_type'
+    final String tableNameColumnName = 'table_name'
+    final String columnNameColumnName = 'column_name'
+    final String tableCatalogColumnName = 'table_catalog'
+    final String columnIsNullableColumnName = 'is_nullable'
+
+    final Collection<String> coreColumns = [
+            schemaNameColumnName,
+            dataTypeColumnName,
+            tableNameColumnName,
+            columnNameColumnName,
+            tableCatalogColumnName
+    ]
 
     /**
      * Must return a String which will be queryable by schema name,
@@ -121,67 +134,28 @@ abstract class AbstractDatabaseDataModelImporterProviderService<T extends Databa
 
     abstract String getDatabaseStructureQueryString()
 
-    final String schemaNameColumnName = 'table_schema'
-    final String dataTypeColumnName = 'data_type'
-    final String tableNameColumnName = 'table_name'
-    final String columnNameColumnName = 'column_name'
-    final String tableCatalogColumnName = 'table_catalog'
-    final String columnIsNullableColumnName = 'is_nullable'
-
-    final Collection<String> coreColumns = [
-            schemaNameColumnName,
-            dataTypeColumnName,
-            tableNameColumnName,
-            columnNameColumnName,
-            tableCatalogColumnName
-    ]
-
     @Override
     Boolean canImportMultipleDomains() {
         true
     }
 
     @Override
-    DataModel importDataModel(User currentUser, T params) throws ApiException, ApiBadRequestException {
-        importDataModelsFromParameters(currentUser, params.databaseNames, params).head()
+    DataModel importDataModel(User currentUser, T parameters) throws ApiException, ApiBadRequestException {
+        importDataModelsFromParameters(currentUser, parameters.databaseNames, parameters).head()
     }
 
     @Override
-    List<DataModel> importDataModels(User currentUser, T params) throws ApiException, ApiBadRequestException {
-        final List<String> databaseNames = params.databaseNames.split(',').toList()
+    List<DataModel> importDataModels(User currentUser, T parameters) throws ApiException, ApiBadRequestException {
+        final List<String> databaseNames = parameters.databaseNames.split(',').toList()
         log.info 'Importing {} DataModel(s)', databaseNames.size()
 
         final List<DataModel> dataModels = []
-        databaseNames.each { String databaseName -> dataModels.addAll importDataModelsFromParameters(currentUser, databaseName, params) }
+        databaseNames.each { String databaseName -> dataModels.addAll importDataModelsFromParameters(currentUser, databaseName, parameters) }
         dataModels
     }
 
-    private List<DataModel> importDataModelsFromParameters(
-            User currentUser, String databaseName, T params) throws ApiException, ApiBadRequestException {
-        String modelName = databaseName
-        if (!params.isMultipleDataModelImport()) modelName = params.modelName ?: modelName
-        modelName = params.dataModelNameSuffix ? "${modelName}_${params.dataModelNameSuffix}" : modelName
-
-        try {
-            final Connection connection = getConnection(databaseName, params)
-            final PreparedStatement preparedStatement = prepareCoreStatement(connection, params)
-            final StatementExecutionResults results = executeStatement(preparedStatement)
-            preparedStatement.close()
-
-            log.debug 'Size of results from statement {}', results.size()
-            if (results.isEmpty()) {
-                log.warn 'No results from database statement, therefore nothing to import for {}.', modelName
-                return []
-            }
-
-            final List<DataModel> dataModels = importAndUpdateDataModelsFromResults(
-                    currentUser, databaseName, params, Folder.get(params.folderId), modelName, results, connection)
-            connection.close()
-            dataModels
-        } catch (SQLException e) {
-            log.error 'Something went wrong executing statement while importing {}: {}', modelName, e.message
-            throw new ApiBadRequestException('DIS03', 'Cannot execute statement', e)
-        }
+    PreparedStatement prepareCoreStatement(Connection connection, T parameters) {
+        connection.prepareStatement(databaseStructureQueryString)
     }
 
     boolean isColumnNullable(String nullableColumnValue) {
@@ -222,10 +196,10 @@ abstract class AbstractDatabaseDataModelImporterProviderService<T extends Databa
     }
 
     List<DataModel> importAndUpdateDataModelsFromResults(
-            User currentUser, String databaseName, T params, Folder folder, String modelName, StatementExecutionResults results,
+            User currentUser, String databaseName, T parameters, Folder folder, String modelName, StatementExecutionResults results,
             Connection connection) throws ApiException, SQLException {
-        final DataModel dataModel = importDataModelFromResults(currentUser, folder, modelName, params.databaseDialect, results)
-        if (params.dataModelNameSuffix) dataModel.aliasesString = databaseName
+        final DataModel dataModel = importDataModelFromResults(currentUser, folder, modelName, parameters.databaseDialect, results)
+        if (parameters.dataModelNameSuffix) dataModel.aliasesString = databaseName
         updateDataModelWithDatabaseSpecificInformation dataModel, connection
         [dataModel]
     }
@@ -340,16 +314,40 @@ abstract class AbstractDatabaseDataModelImporterProviderService<T extends Databa
         }
     }
 
-    PreparedStatement prepareCoreStatement(Connection connection, T params) {
-        connection.prepareStatement(databaseStructureQueryString)
+    private List<DataModel> importDataModelsFromParameters(User currentUser, String databaseName, T parameters)
+            throws ApiException, ApiBadRequestException {
+        String modelName = databaseName
+        if (!parameters.isMultipleDataModelImport()) modelName = parameters.modelName ?: modelName
+        modelName = parameters.dataModelNameSuffix ? "${modelName}_${parameters.dataModelNameSuffix}" : modelName
+
+        try {
+            final Connection connection = getConnection(databaseName, parameters)
+            final PreparedStatement preparedStatement = prepareCoreStatement(connection, parameters)
+            final StatementExecutionResults results = executeStatement(preparedStatement)
+            preparedStatement.close()
+
+            log.debug 'Size of results from statement {}', results.size()
+            if (results.isEmpty()) {
+                log.warn 'No results from database statement, therefore nothing to import for {}.', modelName
+                return []
+            }
+
+            final List<DataModel> dataModels = importAndUpdateDataModelsFromResults(
+                    currentUser, databaseName, parameters, Folder.get(parameters.folderId), modelName, results, connection)
+            connection.close()
+            dataModels
+        } catch (SQLException e) {
+            log.error 'Something went wrong executing statement while importing {}: {}', modelName, e.message
+            throw new ApiBadRequestException('DIS03', 'Cannot execute statement', e)
+        }
     }
 
-    private Connection getConnection(String databaseName, T params) throws ApiException, ApiBadRequestException {
+    private Connection getConnection(String databaseName, T parameters) throws ApiException, ApiBadRequestException {
         try {
-            params.getDataSource(databaseName).getConnection(params.databaseUsername, params.databasePassword)
+            parameters.getDataSource(databaseName).getConnection(parameters.databaseUsername, parameters.databasePassword)
         } catch (SQLException e) {
-            log.error 'Cannot connect to database [{}]: {}', params.getUrl(databaseName), e.message
-            throw new ApiBadRequestException('DIS02', "Cannot connect to database [${params.getUrl(databaseName)}]", e)
+            log.error 'Cannot connect to database [{}]: {}', parameters.getUrl(databaseName), e.message
+            throw new ApiBadRequestException('DIS02', "Cannot connect to database [${parameters.getUrl(databaseName)}]", e)
         }
     }
 

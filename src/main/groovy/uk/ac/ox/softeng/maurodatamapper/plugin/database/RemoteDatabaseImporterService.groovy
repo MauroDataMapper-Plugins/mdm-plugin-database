@@ -48,6 +48,18 @@ class RemoteDatabaseImporterService extends AbstractDatabaseDataModelImporterPro
             LOGOUT             : '/authentication/logout',
             DATAMODEL_IMPORTERS: '/public/plugins/dataModelImporters'
     ]
+    private static final Map<String, String> gormProperties = [
+            'grails.bootstrap.skip'     : 'true',
+            'grails.env'                : 'custom',
+            'server.port'               : '9000',
+            'flyway.enabled'            : 'false',
+            'dataSource.driverClassName': 'org.h2.Driver',
+            'dataSource.dialect'        : 'org.hibernate.dialect.H2Dialect',
+            'dataSource.username'       : 'sa',
+            'dataSource.password'       : '',
+            'dataSource.dbCreate'       : 'create-drop',
+            'dataSource.url'            : 'jdbc:h2:mem:remoteDb;MVCC=TRUE;LOCK_TIMEOUT=10000;DB_CLOSE_ON_EXIT=TRUE'
+    ]
 
     private static ApplicationContext applicationContext
 
@@ -106,8 +118,8 @@ class RemoteDatabaseImporterService extends AbstractDatabaseDataModelImporterPro
     void performImportAndExport(Properties properties) {
         log.info 'Performing remote import and export of DataModel'
         try {
-            CatalogueUser user = setupGorm()
-            List<DataModel> importedModels = importDatabases(properties, user)
+            final CatalogueUser user = setupGorm()
+            final List<DataModel> importedModels = importDatabases(properties, user)
             if (!importedModels) {
                 log.error 'Cannot import databases due to errors'
                 return
@@ -122,25 +134,25 @@ class RemoteDatabaseImporterService extends AbstractDatabaseDataModelImporterPro
         }
     }
 
-    private List<DataModel> importDatabases(Properties properties, User user) {
-        AbstractDatabaseDataModelImporterProviderService dbImporter = applicationContext.getBean(AbstractDatabaseDataModelImporterProviderService)
+    List<DataModel> importDatabases(Properties properties, User user) {
+        final AbstractDatabaseDataModelImporterProviderService dbImporter =
+                applicationContext.getBean(AbstractDatabaseDataModelImporterProviderService)
         log.info 'Importing Databases using {} (v{})', dbImporter.class.simpleName, dbImporter.version
 
-        ImporterService importer = applicationContext.getBean(ImporterService)
-        DatabaseDataModelImporterProviderServiceParameters dbImportParams = importer.createNewImporterProviderServiceParameters(dbImporter)
+        final ImporterService importer = applicationContext.getBean(ImporterService)
+        final DatabaseDataModelImporterProviderServiceParameters dbImportParams = importer.createNewImporterProviderServiceParameters(dbImporter)
         dbImportParams.populateFromProperties properties
 
-        Folder randomFolder = new Folder(label: 'random', createdBy: user)
-        randomFolder.id = UUID.randomUUID()
+        final Folder randomFolder = new Folder(label: 'random', createdBy: user, id: UUID.randomUUID())
         dbImportParams.folderId = randomFolder.id
 
-        Errors errors = importer.validateParameters(dbImportParams, dbImporter.importerProviderServiceParametersClass)
+        final Errors errors = importer.validateParameters(dbImportParams, dbImporter.importerProviderServiceParametersClass)
         if (errors.hasErrors()) {
             outputErrors errors, applicationContext.getBean(MessageSource)
             return []
         }
 
-        List<DataModel> dataModels = importer.importModels(user, dbImporter, dbImportParams)
+        final List<DataModel> dataModels = importer.importModels(user, dbImporter, dbImportParams)
         dataModels.each { DataModel dataModel ->
             dataModel.folder = randomFolder
             dataModel.validate()
@@ -167,30 +179,30 @@ class RemoteDatabaseImporterService extends AbstractDatabaseDataModelImporterPro
         log.info 'Using Mauro Data Mapper server: {}', host
 
         log.info 'Logging into server as "{}"', properties.getProperty('server.username')
-        Closure logInRequest = { ->
+        final Closure logInRequest = { ->
             post host, endpoints.LOGIN, "{\"username\": \"${properties.getProperty('server.username')}\",\
                                           \"password\": \"${properties.getProperty('server.password')}\"}"
         }
-        if (!evalCheckNotNull(logInRequest, 'Could not log in', null, false)) return
+        if (!evaluateRequest(logInRequest, 'Could not log in', null, false)) return
         log.debug 'Logged in, now exporting DataModel'
 
         log.info 'Getting list of importers in server' // We need to do this to ensure we use the correct version of importer
-        Closure<List<Map>> importersRequest = { -> get(host, endpoints.DATAMODEL_IMPORTERS) as List<Map> }
-        List<Map> importers = evalCheckNotNull(importersRequest, 'No importers could be retrieved', host) as List<Map>
+        final List<Map> importers = evaluateRequest({ -> get(host, endpoints.DATAMODEL_IMPORTERS) },
+                                                    'No importers could be retrieved', host) as List<Map>
         if (!importers) return
 
         log.debug 'Getting Folder for DataModel'
-        Closure<String> folderPathRequest = { -> properties.getProperty 'export.folder.path' }
-        String folderPath = evalCheckNotNull(folderPathRequest, 'Property export.folder.path was not supplied', host)
+        final String folderPath = evaluateRequest({ -> properties.getProperty 'export.folder.path' },
+                                                  'Property export.folder.path was not supplied', host)
         if (!folderPath) return
 
-        Closure<JSONObject> folderJsonRequest = { -> get(host, "/folders/${URLEncoder.encode(folderPath, 'UTF-8')}") as JSONObject }
-        JSONObject folderJson = evalCheckNotNull(folderJsonRequest, "No folder could be found matching path '${folderPath}'", host) as JSONObject
+        final JSONObject folderJson = evaluateRequest({ -> get(host, "/folders/${URLEncoder.encode(folderPath, 'UTF-8')}") },
+                                                      "No folder could be found matching path '${folderPath}'", host) as JSONObject
         if (!folderJson) return
 
         log.debug 'Importing/exporting DataModels to JSON'
-        Map jsonImporter = importers.find { Map importer -> (importer as JSONObject).name == 'JsonImporterService' } as Map
-        JsonExporterService jsonExporter = applicationContext.getBean(JsonExporterService)
+        final Map jsonImporter = importers.find { Map importer -> importer.name == 'JsonImporterService' }
+        final JsonExporterService jsonExporter = applicationContext.getBean(JsonExporterService)
 
         dataModels.each { DataModel dataModel ->
             log.info 'Using JSON importer {}.{} (v{})', jsonImporter.namespace, jsonImporter.name, jsonImporter.version
@@ -208,8 +220,8 @@ class RemoteDatabaseImporterService extends AbstractDatabaseDataModelImporterPro
         log.info 'Successfully exported to remote server'
     }
 
-    private evalCheckNotNull(Closure closure, String errorMessage, String host, boolean logoutIfFailure = true) {
-        def value = closure()
+    private evaluateRequest(Closure closure, String errorMessage, String host, boolean logoutIfFailure = true) {
+        final value = closure()
         if (value) return value
         if (logoutIfFailure) logout host
         log.error 'Could not export to remote server: {}', errorMessage
@@ -219,20 +231,9 @@ class RemoteDatabaseImporterService extends AbstractDatabaseDataModelImporterPro
     private CatalogueUser setupGorm() {
         log.info 'Starting Grails Application to handle GORM'
 
-        ['grails.bootstrap.skip'     : 'true', // GORM properties
-         'grails.env'                : 'custom',
-         'server.port'               : '9000',
-         'flyway.enabled'            : 'false',
-         'dataSource.driverClassName': 'org.h2.Driver',
-         'dataSource.dialect'        : 'org.hibernate.dialect.H2Dialect',
-         'dataSource.username'       : 'sa',
-         'dataSource.password'       : '',
-         'dataSource.dbCreate'       : 'create-drop',
-         'dataSource.url'            : 'jdbc:h2:mem:remoteDb;MVCC=TRUE;LOCK_TIMEOUT=10000;DB_CLOSE_ON_EXIT=TRUE',
-        ].each { k, v -> System.setProperty(k, v) }
-
-        applicationContext = GrailsApp.run(Application) // NB(adjl)
-        HibernateDatastore hibernateDatastore = applicationContext.getBean(HibernateDatastore)
+        gormProperties.each { String property, String value -> System.setProperty(property, value) }
+        applicationContext = GrailsApp.run(Application)
+        final HibernateDatastore hibernateDatastore = applicationContext.getBean(HibernateDatastore)
         TransactionSynchronizationManager.bindResource(hibernateDatastore.getSessionFactory(), new SessionHolder(hibernateDatastore.openSession()))
 
         new CatalogueUser().tap {
@@ -252,8 +253,8 @@ class RemoteDatabaseImporterService extends AbstractDatabaseDataModelImporterPro
     private void outputErrors(Errors errors, MessageSource messageSource) {
         log.error 'Errors validating domain: {}', errors.objectName
         errors.allErrors.each { ObjectError error ->
-            StringBuilder message = new StringBuilder(messageSource ? messageSource.getMessage(error, Locale.default)
-                                                                    : "${error.defaultMessage} :: ${Arrays.asList(error.arguments)}")
+            final StringBuilder message = new StringBuilder(messageSource ? messageSource.getMessage(error, Locale.default)
+                                                                          : "${error.defaultMessage} :: ${Arrays.asList(error.arguments)}")
             if (error instanceof FieldError) message.append(" :: [${error.field}]")
             log.error message.toString()
         }
@@ -264,12 +265,12 @@ class RemoteDatabaseImporterService extends AbstractDatabaseDataModelImporterPro
         get host, endpoints.LOGOUT
     }
 
-    private Object connect(HttpURLConnection connection) {
+    private connect(HttpURLConnection connection) {
         log.debug 'Performing {} to {}', connection.requestMethod, connection.getURL()
 
-        HttpStatus response = HttpStatus.valueOf(connection.responseCode)
+        final HttpStatus response = HttpStatus.valueOf(connection.responseCode)
         if (response.is2xxSuccessful()) {
-            String body = connection.inputStream.text
+            final String body = connection.inputStream.text
             log.trace 'Success Response:\n{}', prettyPrint(body)
             try {
                 return jsonSlurper.parseText(body)
@@ -294,9 +295,10 @@ class RemoteDatabaseImporterService extends AbstractDatabaseDataModelImporterPro
     }
 
     private static String writeToJson(ImporterProviderServiceParameters parameters) {
-        StringWriter stringWriter = new StringWriter()
-        String domainName = parameters.class.simpleName.uncapitalize()
-        WritableScriptTemplate template = applicationContext.getBean(JsonViewTemplateEngine).resolveTemplate("/${domainName}/_${domainName}.gson")
+        final StringWriter stringWriter = new StringWriter()
+        final String domainName = parameters.class.simpleName.uncapitalize()
+        final WritableScriptTemplate template =
+                applicationContext.getBean(JsonViewTemplateEngine).resolveTemplate("/${domainName}/_${domainName}.gson")
         template.make([domainName: parameters]).writeTo(stringWriter)
         stringWriter.toString()
     }
@@ -310,8 +312,8 @@ class RemoteDatabaseImporterService extends AbstractDatabaseDataModelImporterPro
     }
 
     private static void enableSslConnection() {
-        SSLContext sslContext = SSLContext.getInstance('SSL')
-        def trustAll = [getAcceptedIssuers: {}, checkClientTrusted: { a, b -> }, checkServerTrusted: { a, b -> }]
+        final SSLContext sslContext = SSLContext.getInstance('SSL')
+        final trustAll = [getAcceptedIssuers: {}, checkClientTrusted: { a, b -> }, checkServerTrusted: { a, b -> }]
         sslContext.init(null, [trustAll as X509TrustManager] as TrustManager[], new SecureRandom())
         HttpsURLConnection.defaultSSLSocketFactory = sslContext.socketFactory
     }

@@ -21,7 +21,7 @@ import java.nio.file.Paths
 @CompileStatic
 trait RemoteDatabaseDataModelImporterProviderService {
 
-    private static Options options = null
+    private static Options options
 
     private static Options getOptions() {
         if (options) return options
@@ -31,7 +31,7 @@ trait RemoteDatabaseDataModelImporterProviderService {
                     longOpt 'config'
                     desc 'Config file defining the import configuration'
                     argName 'FILE'
-                    hasArg().required().build()
+                    required().hasArg().build()
                 },
                 Option.builder('v').longOpt('version').build(),
                 Option.builder('h').longOpt('help').build()
@@ -61,8 +61,7 @@ trait RemoteDatabaseDataModelImporterProviderService {
                 }
         ]
 
-        options = new Options()
-        options.addOptionGroup mainOptions
+        options = new Options().tap { addOptionGroup mainOptions }
         optionDefinitions.each { Option option -> options.addOption option }
         options
     }
@@ -72,12 +71,11 @@ trait RemoteDatabaseDataModelImporterProviderService {
         println "Starting Remote Database Import service\n${getVersionInfo()}\nConfig file: ${path.toAbsolutePath()}\n"
         Utils.outputRuntimeArgs(getClass())
         new RemoteDatabaseImporterService().performImportAndExport(
-                new Properties().with { Properties properties ->
+                new Properties().tap {
                     load Files.newInputStream(path)
                     setProperty 'server.username', commandLine.getOptionValue('u')
                     setProperty 'server.password', commandLine.getOptionValue('p')
                     setProperty 'import.database.password', commandLine.getOptionValue('w')
-                    properties
                 })
     }
 

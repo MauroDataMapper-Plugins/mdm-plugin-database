@@ -95,7 +95,7 @@ abstract class DatabaseDataModelImporterProviderServiceParameters<K extends Data
     boolean databaseSSL
 
     int getDatabasePort() {
-        if (databasePort == null) databasePort = getDefaultPort()
+        databasePort = databasePort ?: getDefaultPort()
         databasePort
     }
 
@@ -116,7 +116,7 @@ abstract class DatabaseDataModelImporterProviderServiceParameters<K extends Data
 
         try {
             databasePort = properties.getProperty('import.database.port') as int
-        } catch (NumberFormatException ignored) {
+        } catch (ignored) {
             databasePort = getDefaultPort()
         }
     }

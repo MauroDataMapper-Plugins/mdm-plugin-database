@@ -19,6 +19,7 @@ import uk.ac.ox.softeng.maurodatamapper.security.User
 import org.springframework.beans.factory.annotation.Autowired
 
 import groovy.transform.CompileStatic
+import groovy.transform.PackageScope
 import groovy.util.logging.Slf4j
 
 import java.sql.Connection
@@ -32,8 +33,10 @@ import java.sql.SQLException
 abstract class AbstractDatabaseDataModelImporterProviderService<T extends DatabaseDataModelImporterProviderServiceParameters>
         extends DataModelImporterProviderService<T> {
 
-    private static final String DATABASE_NAMESPACE = 'uk.ac.ox.softeng.maurodatamapper.plugin.database'
     private static final String IS_NOT_NULL_CONSTRAINT = 'IS NOT NULL'
+
+    @PackageScope
+    static final String DATABASE_NAMESPACE = 'uk.ac.ox.softeng.maurodatamapper.plugin.database'
 
     @Autowired
     DataModelService dataModelService
@@ -58,13 +61,13 @@ abstract class AbstractDatabaseDataModelImporterProviderService<T extends Databa
      * @return
      */
     final String standardConstraintInformationQueryString = '''
-SELECT
-  tc.table_name,
-  cc.check_clause
-FROM information_schema.table_constraints tc
-  INNER JOIN information_schema.check_constraints cc ON tc.constraint_name = cc.constraint_name
-WHERE tc.constraint_schema = ?;
-'''
+            SELECT
+              tc.table_name,
+              cc.check_clause
+            FROM information_schema.table_constraints tc
+              INNER JOIN information_schema.check_constraints cc ON tc.constraint_name = cc.constraint_name
+            WHERE tc.constraint_schema = ?;
+    '''.stripIndent()
 
     /**
      * Must return a String which will be queryable by schema name,
@@ -77,19 +80,19 @@ WHERE tc.constraint_schema = ?;
      * @return
      */
     final String primaryKeyAndUniqueConstraintInformationQueryString = '''
-SELECT
-  tc.constraint_name,
-  tc.table_name,
-  tc.constraint_type,
-  kcu.column_name,
-  kcu.ordinal_position
-FROM
-  information_schema.table_constraints AS tc
-  LEFT JOIN information_schema.key_column_usage AS kcu ON tc.constraint_name = kcu.constraint_name
-WHERE
-  tc.constraint_schema = ?
-  AND constraint_type NOT IN ('FOREIGN KEY', 'CHECK');
-'''
+            SELECT
+              tc.constraint_name,
+              tc.table_name,
+              tc.constraint_type,
+              kcu.column_name,
+              kcu.ordinal_position
+            FROM
+              information_schema.table_constraints AS tc
+              LEFT JOIN information_schema.key_column_usage AS kcu ON tc.constraint_name = kcu.constraint_name
+            WHERE
+              tc.constraint_schema = ?
+              AND constraint_type NOT IN ('FOREIGN KEY', 'CHECK');
+    '''.stripIndent()
 
     /**
      * Must return a String which will be queryable by schema name,
@@ -176,7 +179,7 @@ WHERE
             connection.close()
             dataModels
         } catch (SQLException e) {
-            log.error 'Something went wrong executing statement while importing {} : {}', modelName, e.message
+            log.error 'Something went wrong executing statement while importing {}: {}', modelName, e.message
             throw new ApiBadRequestException('DIS03', 'Cannot execute statement', e)
         }
     }
@@ -188,14 +191,15 @@ WHERE
     DataModel importDataModelFromResults(
             User user, Folder folder, String modelName, String dialect, StatementExecutionResults results, boolean importSchemaAsDataClass = true)
             throws ApiException {
-        final DataModel dataModel = new DataModel(createdBy: user, label: modelName, type: DataModelType.DATA_ASSET, folder: folder)
-        dataModel.addCreatedEdit user
-        dataModel.addToMetadata namespace: DATABASE_NAMESPACE, key: 'dialect', value: dialect
+        final DataModel dataModel = new DataModel(createdBy: user, label: modelName, type: DataModelType.DATA_ASSET, folder: folder).tap {
+            addCreatedEdit user
+            addToMetadata namespace: DATABASE_NAMESPACE, key: 'dialect', value: dialect
+        }
 
         results.each { StatementExecutionResultsRow row ->
             final DataType dataType = primitiveTypeService.findOrCreateDataTypeForDataModel(dataModel, row(dataTypeColumnName), null, user)
+            DataClass tableDataClass
 
-            DataClass tableDataClass = null
             if (importSchemaAsDataClass) {
                 DataClass schemaDataClass = dataClassService.findOrCreateDataClass(dataModel, row(schemaNameColumnName), null, user)
                 tableDataClass = dataClassService.findOrCreateDataClass(schemaDataClass, row(tableNameColumnName), null, user)
@@ -207,9 +211,9 @@ WHERE
             final DataElement dataElement = dataElementService.findOrCreateDataElementForDataClass(
                     tableDataClass, row(columnNameColumnName), null, user, dataType, minMultiplicity, 1)
 
-            row.findAll { String column, Object data ->
+            row.findAll { String column, data ->
                 data && !(column in coreColumns)
-            }.each { String column, Object data ->
+            }.each { String column, data ->
                 dataElement.addToMetadata(namespace, column, data.toString(), user)
             }
         }
@@ -241,14 +245,14 @@ WHERE
     }
 
     void addStandardConstraintInformation(DataModel dataModel, Connection connection) throws ApiException, SQLException {
-        if (standardConstraintInformationQueryString == null) return
+        if (!standardConstraintInformationQueryString) return
 
         dataModel.childDataClasses.each { DataClass schemaClass ->
             final StatementExecutionResults results = executePreparedStatement(
                     dataModel, schemaClass, connection, standardConstraintInformationQueryString)
             results.each { StatementExecutionResultsRow row ->
                 final DataClass tableClass = schemaClass.findDataClass(row.table_name as String)
-                if (tableClass == null) return
+                if (!tableClass) return
 
                 final String constraint = row.check_clause && (row.check_clause as String).contains(IS_NOT_NULL_CONSTRAINT) ?
                                           IS_NOT_NULL_CONSTRAINT : null
@@ -260,7 +264,7 @@ WHERE
     }
 
     void addPrimaryKeyAndUniqueConstraintInformation(DataModel dataModel, Connection connection) throws ApiException, SQLException {
-        if (primaryKeyAndUniqueConstraintInformationQueryString == null) return
+        if (!primaryKeyAndUniqueConstraintInformationQueryString) return
 
         dataModel.childDataClasses.each { DataClass schemaClass ->
             final StatementExecutionResults results = executePreparedStatement(
@@ -268,12 +272,12 @@ WHERE
             results.groupBy { it.constraint_name }.each { _, List<StatementExecutionResultsRow> rows ->
                 final StatementExecutionResultsRow firstRow = rows.head()
                 final DataClass tableClass = schemaClass.findDataClass(firstRow.table_name as String)
-                if (tableClass == null) return
+                if (!tableClass) return
 
                 final String constraintTypeName = (firstRow.constraint_type as String).toLowerCase().replaceAll(/ /, '_')
                 final String constraintTypeValue = rows.size() == 1 ?
                                                    firstRow.column_name : rows.sort { it.ordinal_position }.collect { it.column_name }.join(', ')
-                tableClass.addToMetadata namespace, "$constraintTypeName[${firstRow.constraint_name}]", constraintTypeValue, dataModel.createdBy
+                tableClass.addToMetadata namespace, "${constraintTypeName}[${firstRow.constraint_name}]", constraintTypeValue, dataModel.createdBy
 
                 rows.each { StatementExecutionResultsRow row ->
                     final DataElement columnElement = tableClass.findDataElement(row.column_name as String)
@@ -287,33 +291,33 @@ WHERE
     }
 
     void addIndexInformation(DataModel dataModel, Connection connection) throws ApiException, SQLException {
-        if (indexInformationQueryString == null) return
+        if (!indexInformationQueryString) return
 
         dataModel.childDataClasses.each { DataClass schemaClass ->
             final StatementExecutionResults results = executePreparedStatement(dataModel, schemaClass, connection, indexInformationQueryString)
             results.each { StatementExecutionResultsRow row ->
                 final DataClass tableClass = schemaClass.findDataClass(row.table_name as String)
-                if (tableClass == null) {
+                if (!tableClass) {
                     log.warn 'Could not add {} as DataClass for table {} does not exist', row.index_name, row.table_name
                     return
                 }
 
                 String indexType = row.primary_index ? 'primary_index' : row.unique_index ? 'unique_index' : 'index'
-                indexType = row.clustered ? "clustered_$indexType" : indexType
-                tableClass.addToMetadata namespace, "$indexType[${row.index_name}]", row.column_names as String, dataModel.createdBy
+                indexType = row.clustered ? "clustered_${indexType}" : indexType
+                tableClass.addToMetadata namespace, "${indexType}[${row.index_name}]", row.column_names as String, dataModel.createdBy
             }
         }
     }
 
     void addForeignKeyInformation(DataModel dataModel, Connection connection) throws ApiException, SQLException {
-        if (foreignKeyInformationQueryString == null) return
+        if (!foreignKeyInformationQueryString) return
 
         dataModel.childDataClasses.each { DataClass schemaClass ->
             final StatementExecutionResults results = executePreparedStatement(dataModel, schemaClass, connection, foreignKeyInformationQueryString)
             results.each { StatementExecutionResultsRow row ->
                 final DataClass foreignTableClass = dataModel.dataClasses.find { DataClass dataClass -> dataClass.label == row.reference_table_name }
+                DataType dataType
 
-                DataType dataType = null
                 if (foreignTableClass) {
                     dataType = referenceTypeService.findOrCreateDataTypeForDataModel(
                             dataModel, "${foreignTableClass.label}Type", "Linked to DataElement [${row.reference_column_name}]",
@@ -377,7 +381,7 @@ WHERE
             (1..columnCount).each { int i ->
                 row[resultSetMetaData.getColumnName(i).toLowerCase()] = resultSet.getObject(i)
             }
-            results.add(row)
+            results << row
         }
         resultSet.close()
 

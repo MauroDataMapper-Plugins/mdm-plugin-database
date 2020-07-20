@@ -40,7 +40,7 @@ import javax.net.ssl.X509TrustManager
 
 // @CompileStatic
 @Slf4j
-class RemoteDatabaseImporterService extends AbstractDatabaseDataModelImporterProviderService<DatabaseDataModelImporterProviderServiceParameters> {
+class RemoteDatabaseImporterAndExporter {
 
     private static final JsonSlurper jsonSlurper = new JsonSlurper()
     private static final Map<String, String> endpoints = [
@@ -62,31 +62,6 @@ class RemoteDatabaseImporterService extends AbstractDatabaseDataModelImporterPro
     ]
 
     private static ApplicationContext applicationContext
-
-    @Override
-    String getIndexInformationQueryString() {
-        ''
-    }
-
-    @Override
-    String getForeignKeyInformationQueryString() {
-        ''
-    }
-
-    @Override
-    String getDatabaseStructureQueryString() {
-        ''
-    }
-
-    @Override
-    String getDisplayName() {
-        'Remote Database Importer'
-    }
-
-    @Override
-    String getVersion() {
-        '2.0.0-SNAPSHOT'
-    }
 
     Object post(String url, byte[] bytes) {
         connect(openJsonConnection(url).tap {
@@ -228,7 +203,7 @@ class RemoteDatabaseImporterService extends AbstractDatabaseDataModelImporterPro
         null
     }
 
-    private CatalogueUser setupGorm() {
+    private static CatalogueUser setupGorm() {
         log.info 'Starting Grails Application to handle GORM'
 
         gormProperties.each { String property, String value -> System.setProperty(property, value) }
@@ -245,12 +220,12 @@ class RemoteDatabaseImporterService extends AbstractDatabaseDataModelImporterPro
         }
     }
 
-    private void shutdownGorm() {
+    private static void shutdownGorm() {
         log.debug 'Shutting down Grails Application'
         if (applicationContext) GrailsApp.exit(applicationContext)
     }
 
-    private void outputErrors(Errors errors, MessageSource messageSource) {
+    private static void outputErrors(Errors errors, MessageSource messageSource) {
         log.error 'Errors validating domain: {}', errors.objectName
         errors.allErrors.each { ObjectError error ->
             final StringBuilder message = new StringBuilder(messageSource ? messageSource.getMessage(error, Locale.default)
@@ -265,7 +240,7 @@ class RemoteDatabaseImporterService extends AbstractDatabaseDataModelImporterPro
         get host, endpoints.LOGOUT
     }
 
-    private connect(HttpURLConnection connection) {
+    private static connect(HttpURLConnection connection) {
         log.debug 'Performing {} to {}', connection.requestMethod, connection.getURL()
 
         final HttpStatus response = HttpStatus.valueOf(connection.responseCode)

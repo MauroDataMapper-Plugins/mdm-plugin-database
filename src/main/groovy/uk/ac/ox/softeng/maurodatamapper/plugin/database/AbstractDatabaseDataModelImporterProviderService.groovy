@@ -342,7 +342,7 @@ abstract class AbstractDatabaseDataModelImporterProviderService<T extends Databa
         }
     }
 
-    private Connection getConnection(String databaseName, T parameters) throws ApiException, ApiBadRequestException {
+    Connection getConnection(String databaseName, T parameters) throws ApiException, ApiBadRequestException {
         try {
             parameters.getDataSource(databaseName).getConnection(parameters.databaseUsername, parameters.databasePassword)
         } catch (SQLException e) {

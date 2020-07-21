@@ -19,6 +19,7 @@ import org.springframework.context.ApplicationContext
 import org.springframework.context.MessageSource
 import org.springframework.http.HttpStatus
 import org.springframework.orm.hibernate5.SessionHolder
+import org.springframework.transaction.PlatformTransactionManager
 import org.springframework.transaction.support.TransactionSynchronizationManager
 import org.springframework.validation.Errors
 import org.springframework.validation.FieldError
@@ -42,12 +43,10 @@ import javax.net.ssl.X509TrustManager
 @Slf4j
 class RemoteDatabaseImporterAndExporter {
 
+    private static ApplicationContext applicationContext
+    private static PlatformTransactionManager transactionManager
     private static final JsonSlurper jsonSlurper = new JsonSlurper()
-    private static final Map<String, String> endpoints = [
-            LOGIN              : '/authentication/login',
-            LOGOUT             : '/authentication/logout',
-            DATAMODEL_IMPORTERS: '/public/plugins/dataModelImporters'
-    ]
+
     private static final Map<String, String> gormProperties = [
             'grails.bootstrap.skip'     : 'true',
             'grails.env'                : 'custom',
@@ -60,8 +59,11 @@ class RemoteDatabaseImporterAndExporter {
             'dataSource.dbCreate'       : 'create-drop',
             'dataSource.url'            : 'jdbc:h2:mem:remoteDb;MVCC=TRUE;LOCK_TIMEOUT=10000;DB_CLOSE_ON_EXIT=TRUE'
     ]
-
-    private static ApplicationContext applicationContext
+    private static final Map<String, String> endpoints = [
+            LOGIN              : '/authentication/login',
+            LOGOUT             : '/authentication/logout',
+            DATAMODEL_IMPORTERS: '/public/plugins/dataModelImporters'
+    ]
 
     Object post(String url, byte[] bytes) {
         connect(openJsonConnection(url).tap {
@@ -210,6 +212,7 @@ class RemoteDatabaseImporterAndExporter {
         applicationContext = GrailsApp.run(Application)
         final HibernateDatastore hibernateDatastore = applicationContext.getBean(HibernateDatastore)
         TransactionSynchronizationManager.bindResource(hibernateDatastore.getSessionFactory(), new SessionHolder(hibernateDatastore.openSession()))
+        transactionManager = applicationContext.getBean(PlatformTransactionManager)
 
         new CatalogueUser().tap {
             emailAddress = 'databaseImporter@metadatacatalogue.com'

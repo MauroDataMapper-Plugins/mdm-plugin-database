@@ -9,7 +9,6 @@ import uk.ac.ox.softeng.maurodatamapper.datamodel.Application
 import uk.ac.ox.softeng.maurodatamapper.datamodel.DataModel
 import uk.ac.ox.softeng.maurodatamapper.datamodel.provider.exporter.JsonExporterService
 import uk.ac.ox.softeng.maurodatamapper.datamodel.provider.importer.parameter.DataModelFileImporterProviderServiceParameters
-import uk.ac.ox.softeng.maurodatamapper.security.CatalogueUser
 import uk.ac.ox.softeng.maurodatamapper.security.User
 import uk.ac.ox.softeng.maurodatamapper.util.Utils
 
@@ -95,7 +94,7 @@ class RemoteDatabaseImporterAndExporter {
     void performImportAndExport(Properties properties) {
         log.info 'Performing remote import and export of DataModel'
         try {
-            final CatalogueUser user = setupGorm()
+            final User user = setupGorm()
             final List<DataModel> importedModels = importDatabases(properties, user)
             if (!importedModels) {
                 log.error 'Cannot import databases due to errors'
@@ -205,22 +204,14 @@ class RemoteDatabaseImporterAndExporter {
         null
     }
 
-    private static CatalogueUser setupGorm() {
+    private static User setupGorm() {
         log.info 'Starting Grails Application to handle GORM'
-
         gormProperties.each { String property, String value -> System.setProperty(property, value) }
         applicationContext = GrailsApp.run(Application)
         final HibernateDatastore hibernateDatastore = applicationContext.getBean(HibernateDatastore)
         TransactionSynchronizationManager.bindResource(hibernateDatastore.getSessionFactory(), new SessionHolder(hibernateDatastore.openSession()))
         transactionManager = applicationContext.getBean(PlatformTransactionManager)
-
-        new CatalogueUser().tap {
-            emailAddress = 'databaseImporter@metadatacatalogue.com'
-            firstName = 'Database'
-            lastName = 'Importer'
-            organisation = 'Oxford BRC Informatics'
-            jobTitle = 'Worker'
-        }
+        DatabaseImporterUser.instance
     }
 
     private static void shutdownGorm() {

@@ -16,10 +16,9 @@ import uk.ac.ox.softeng.maurodatamapper.datamodel.item.datatype.ReferenceTypeSer
 import uk.ac.ox.softeng.maurodatamapper.datamodel.provider.importer.DataModelImporterProviderService
 import uk.ac.ox.softeng.maurodatamapper.security.User
 
-import org.springframework.beans.factory.annotation.Autowired
-
 import groovy.transform.CompileStatic
 import groovy.util.logging.Slf4j
+import org.springframework.beans.factory.annotation.Autowired
 
 import java.sql.Connection
 import java.sql.PreparedStatement
@@ -240,20 +239,22 @@ abstract class AbstractDatabaseDataModelImporterProviderService<T extends Databa
     void addPrimaryKeyAndUniqueConstraintInformation(DataModel dataModel, Connection connection) throws ApiException, SQLException {
         if (!primaryKeyAndUniqueConstraintInformationQueryString) return
 
-        dataModel.childDataClasses.each { DataClass schemaClass ->
+        dataModel.childDataClasses.each {DataClass schemaClass ->
             final StatementExecutionResults results = executePreparedStatement(
-                    dataModel, schemaClass, connection, primaryKeyAndUniqueConstraintInformationQueryString)
-            results.groupBy { it.constraint_name }.each { _, List<StatementExecutionResultsRow> rows ->
-                final StatementExecutionResultsRow firstRow = rows.head()
-                final DataClass tableClass = schemaClass.findDataClass(firstRow.table_name as String)
-                if (!tableClass) return
+                dataModel, schemaClass, connection, primaryKeyAndUniqueConstraintInformationQueryString)
+            results
+                .groupBy {it.constraint_name}
+                .each {constraint_name, List<StatementExecutionResultsRow> rows ->
+                    final StatementExecutionResultsRow firstRow = rows.head()
+                    final DataClass tableClass = schemaClass.findDataClass(firstRow.table_name as String)
+                    if (!tableClass) return
 
-                final String constraintTypeName = (firstRow.constraint_type as String).toLowerCase().replaceAll(/ /, '_')
-                final String constraintTypeValue = rows.size() == 1 ?
-                                                   firstRow.column_name : rows.sort { it.ordinal_position }.collect { it.column_name }.join(', ')
-                tableClass.addToMetadata namespace, "${constraintTypeName}[${firstRow.constraint_name}]", constraintTypeValue, dataModel.createdBy
+                    final String constraintTypeName = (firstRow.constraint_type as String).toLowerCase().replaceAll(/ /, '_')
+                    final String constraintTypeValue = rows.size() == 1 ?
+                                                       firstRow.column_name : rows.sort {it.ordinal_position}.collect {it.column_name}.join(', ')
+                    tableClass.addToMetadata namespace, "${constraintTypeName}[${firstRow.constraint_name}]", constraintTypeValue, dataModel.createdBy
 
-                rows.each { StatementExecutionResultsRow row ->
+                    rows.each {StatementExecutionResultsRow row ->
                     final DataElement columnElement = tableClass.findDataElement(row.column_name as String)
                     if (columnElement) {
                         columnElement.addToMetadata(

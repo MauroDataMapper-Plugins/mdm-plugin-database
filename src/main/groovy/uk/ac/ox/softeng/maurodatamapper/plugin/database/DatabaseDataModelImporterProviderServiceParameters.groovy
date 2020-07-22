@@ -116,7 +116,7 @@ abstract class DatabaseDataModelImporterProviderServiceParameters<K extends Data
 
         try {
             databasePort = properties.getProperty('import.database.port') as int
-        } catch (ignored) {
+        } catch (NumberFormatException ignored) {
             databasePort = getDefaultPort()
         }
     }

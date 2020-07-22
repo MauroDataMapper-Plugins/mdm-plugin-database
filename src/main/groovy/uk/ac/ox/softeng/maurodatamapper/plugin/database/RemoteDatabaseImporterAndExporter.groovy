@@ -29,6 +29,7 @@ import grails.plugin.json.view.JsonViewTemplateEngine
 import grails.views.WritableScriptTemplate
 import grails.web.mime.MimeType
 import groovy.json.JsonBuilder
+import groovy.json.JsonException
 import groovy.json.JsonSlurper
 import groovy.util.logging.Slf4j
 
@@ -243,7 +244,7 @@ class RemoteDatabaseImporterAndExporter {
             log.trace 'Success Response:\n{}', prettyPrint(body)
             try {
                 return jsonSlurper.parseText(body)
-            } catch (ignored) {
+            } catch (JsonException ignored) {
                 return body
             }
         }

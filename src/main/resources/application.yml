@@ -116,7 +116,7 @@ environments:
             username: sa
             password: ''
             dbCreate: update
-            url: 'jdbc:h2:mem:testDb;MVCC=TRUE;LOCK_TIMEOUT=10000;DB_CLOSE_ON_EXIT=FALSE;MODE=PostgreSQL'
+            url: 'jdbc:h2:mem:testDb;LOCK_TIMEOUT=10000;DB_CLOSE_ON_EXIT=FALSE;MODE=PostgreSQL'
     development:
 #        flyway.enabled: false
         dataSource:

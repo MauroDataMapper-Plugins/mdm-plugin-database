@@ -39,10 +39,18 @@ pipeline {
             post {
                 always {
                     checkstyle canComputeNew: false, defaultEncoding: '', healthy: '0', pattern: '**/build/reports/checkstyle/*.xml', unHealthy: ''
-                    findbugs canComputeNew: false, defaultEncoding: '', excludePattern: '', healthy: '0', includePattern: '', pattern: '**/build/reports/findbugs/*.xml', unHealthy: ''
+                    findbugs canComputeNew: false, defaultEncoding: '', excludePattern: '', healthy: '0', includePattern: '', pattern:'**/build/reports/spotbugs/*.xml', unHealthy: ''
                     pmd canComputeNew: false, defaultEncoding: '', healthy: '0', pattern: '**/build/reports/pmd/*.xml', unHealthy: ''
-                    dry canComputeNew: false, defaultEncoding: '', healthy: '0', pattern: 'reports/cpd/*.xml', unHealthy: ''
-                    archiveArtifacts allowEmptyArchive: true, artifacts: '**/build/reports/jdepend/*.txt' // No publisher available
+                    publishHTML(
+                        target: [
+                            allowMissing         : false,
+                            alwaysLinkToLastBuild: false,
+                            keepAll              : true,
+                            reportDir            : 'reports/codenarc',
+                            reportFiles          : 'main.html',
+                            reportName           : "Codenarc Report"
+                        ]
+                    )
                 }
             }
         }
@@ -67,7 +75,6 @@ pipeline {
 
     post {
         always {
-            archiveArtifacts allowEmptyArchive: true, artifacts: '**/*.log'
             slackNotification()
         }
     }

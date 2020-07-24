@@ -188,7 +188,7 @@ class RemoteDatabaseImporterAndExporter {
         }
     }
 
-    private static connect(HttpURLConnection connection) {
+    private static Object connect(HttpURLConnection connection) {
         log.debug 'Performing {} to {}', connection.requestMethod, connection.URL
 
         final HttpStatus response = HttpStatus.valueOf(connection.responseCode)
@@ -236,7 +236,7 @@ class RemoteDatabaseImporterAndExporter {
 
     private static void enableSslConnection() {
         final SSLContext sslContext = SSLContext.getInstance('SSL')
-        final trustAll = [getAcceptedIssuers: {}, checkClientTrusted: { a, b -> }, checkServerTrusted: { a, b -> }]
+        final Object trustAll = [getAcceptedIssuers: {}, checkClientTrusted: { a, b -> }, checkServerTrusted: { a, b -> }]
         sslContext.init(null, [trustAll as X509TrustManager] as TrustManager[], new SecureRandom())
         HttpsURLConnection.defaultSSLSocketFactory = sslContext.socketFactory
     }
@@ -294,8 +294,8 @@ class RemoteDatabaseImporterAndExporter {
         log.info 'Successfully exported to remote server'
     }
 
-    private evaluateRequest(Closure closure, String errorMessage, String host, boolean logoutIfFailure = true) {
-        final value = closure()
+    private Object evaluateRequest(Closure closure, String errorMessage, String host, boolean logoutIfFailure = true) {
+        final Object value = closure()
         if (value) return value
         if (logoutIfFailure) logout host
         log.error 'Could not export to remote server: {}', errorMessage

@@ -31,6 +31,7 @@ import grails.web.mime.MimeType
 import groovy.json.JsonBuilder
 import groovy.json.JsonException
 import groovy.json.JsonSlurper
+import groovy.transform.CompileDynamic
 import groovy.util.logging.Slf4j
 
 import java.security.SecureRandom
@@ -40,6 +41,7 @@ import javax.net.ssl.TrustManager
 import javax.net.ssl.X509TrustManager
 
 // @CompileStatic
+@CompileDynamic
 @Slf4j
 class RemoteDatabaseImporterAndExporter {
 

@@ -333,6 +333,34 @@ abstract class AbstractDatabaseDataModelImporterProviderService<T extends Databa
         }
     }
 
+    Connection getConnection(String databaseName, T parameters) throws ApiException, ApiBadRequestException {
+        try {
+            parameters.getDataSource(databaseName).getConnection(parameters.databaseUsername, parameters.databasePassword)
+        } catch (SQLException e) {
+            log.error 'Cannot connect to database [{}]: {}', parameters.getUrl(databaseName), e.message
+            throw new ApiBadRequestException('DIS02', "Cannot connect to database [${parameters.getUrl(databaseName)}]", e)
+        }
+    }
+
+    private static StatementExecutionResults executeStatement(PreparedStatement preparedStatement) throws ApiException, SQLException {
+        final StatementExecutionResults results = new ArrayList(50) as StatementExecutionResults
+
+        final ResultSet resultSet = preparedStatement.executeQuery()
+        final ResultSetMetaData resultSetMetaData = resultSet.metaData
+        final int columnCount = resultSetMetaData.columnCount
+
+        while (resultSet.next()) {
+            final StatementExecutionResultsRow row = new HashMap(columnCount) as StatementExecutionResultsRow
+            (1..columnCount).each { int i ->
+                row[resultSetMetaData.getColumnName(i).toLowerCase()] = resultSet.getObject(i)
+            }
+            results << row
+        }
+        resultSet.close()
+
+        results as StatementExecutionResults
+    }
+
     private List<DataModel> importDataModelsFromParameters(User currentUser, String databaseName, T parameters)
             throws ApiException, ApiBadRequestException {
         String modelName = databaseName
@@ -361,15 +389,6 @@ abstract class AbstractDatabaseDataModelImporterProviderService<T extends Databa
         }
     }
 
-    Connection getConnection(String databaseName, T parameters) throws ApiException, ApiBadRequestException {
-        try {
-            parameters.getDataSource(databaseName).getConnection(parameters.databaseUsername, parameters.databasePassword)
-        } catch (SQLException e) {
-            log.error 'Cannot connect to database [{}]: {}', parameters.getUrl(databaseName), e.message
-            throw new ApiBadRequestException('DIS02', "Cannot connect to database [${parameters.getUrl(databaseName)}]", e)
-        }
-    }
-
     private StatementExecutionResults executePreparedStatement(
             DataModel dataModel, DataClass schemaClass, Connection connection, String queryString) throws ApiException, SQLException {
         StatementExecutionResults results = null
@@ -383,25 +402,6 @@ abstract class AbstractDatabaseDataModelImporterProviderService<T extends Databa
                 log.warn 'No table_constraints available for {}', dataModel.label
             } else throw e
         }
-        results as StatementExecutionResults
-    }
-
-    private static StatementExecutionResults executeStatement(PreparedStatement preparedStatement) throws ApiException, SQLException {
-        final StatementExecutionResults results = new ArrayList(50) as StatementExecutionResults
-
-        final ResultSet resultSet = preparedStatement.executeQuery()
-        final ResultSetMetaData resultSetMetaData = resultSet.metaData
-        final int columnCount = resultSetMetaData.columnCount
-
-        while (resultSet.next()) {
-            final StatementExecutionResultsRow row = new HashMap(columnCount) as StatementExecutionResultsRow
-            (1..columnCount).each { int i ->
-                row[resultSetMetaData.getColumnName(i).toLowerCase()] = resultSet.getObject(i)
-            }
-            results << row
-        }
-        resultSet.close()
-
         results as StatementExecutionResults
     }
 

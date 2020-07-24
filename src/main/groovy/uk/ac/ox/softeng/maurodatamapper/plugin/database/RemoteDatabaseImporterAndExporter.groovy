@@ -69,7 +69,7 @@ class RemoteDatabaseImporterAndExporter {
 
     Object post(String url, byte[] bytes) {
         connect(openJsonConnection(url).tap {
-            setDoOutput true
+            doOutput = true
             outputStream.write bytes
         })
     }
@@ -212,7 +212,7 @@ class RemoteDatabaseImporterAndExporter {
         GORM_PROPERTIES.each { String property, String value -> System.setProperty(property, value) }
         applicationContext = GrailsApp.run(Application)
         final HibernateDatastore hibernateDatastore = applicationContext.getBean(HibernateDatastore)
-        TransactionSynchronizationManager.bindResource(hibernateDatastore.getSessionFactory(), new SessionHolder(hibernateDatastore.openSession()))
+        TransactionSynchronizationManager.bindResource(hibernateDatastore.sessionFactory, new SessionHolder(hibernateDatastore.openSession()))
         transactionManager = applicationContext.getBean(PlatformTransactionManager)
         DatabaseImporterUser.instance
     }
@@ -238,7 +238,7 @@ class RemoteDatabaseImporterAndExporter {
     }
 
     private static connect(HttpURLConnection connection) {
-        log.debug 'Performing {} to {}', connection.requestMethod, connection.getURL()
+        log.debug 'Performing {} to {}', connection.requestMethod, connection.URL
 
         final HttpStatus response = HttpStatus.valueOf(connection.responseCode)
         if (response.is2xxSuccessful()) {
@@ -252,7 +252,7 @@ class RemoteDatabaseImporterAndExporter {
         }
 
         log.error 'Could not {} to Mauro Data Mapper server at [{}]. Response: {} {}. Message: {}',
-                  connection.requestMethod, connection.getURL(), response.value(), response.reasonPhrase,
+                  connection.requestMethod, connection.URL, response.value(), response.reasonPhrase,
                   prettyPrint(connection.errorStream?.text)
 
         null

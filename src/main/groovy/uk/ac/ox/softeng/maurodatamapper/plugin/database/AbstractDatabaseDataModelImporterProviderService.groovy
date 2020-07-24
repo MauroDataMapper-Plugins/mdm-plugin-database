@@ -329,7 +329,7 @@ abstract class AbstractDatabaseDataModelImporterProviderService<T extends Databa
             preparedStatement.close()
 
             log.debug 'Size of results from statement {}', results.size()
-            if (results.isEmpty()) {
+            if (!results) {
                 log.warn 'No results from database statement, therefore nothing to import for {}.', modelName
                 return []
             }

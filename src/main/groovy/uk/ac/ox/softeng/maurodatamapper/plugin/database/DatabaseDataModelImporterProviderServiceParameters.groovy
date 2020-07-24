@@ -95,7 +95,7 @@ abstract class DatabaseDataModelImporterProviderServiceParameters<K extends Data
     boolean databaseSSL
 
     int getDatabasePort() {
-        databasePort = databasePort ?: getDefaultPort()
+        databasePort = databasePort ?: defaultPort
         databasePort
     }
 
@@ -104,9 +104,9 @@ abstract class DatabaseDataModelImporterProviderServiceParameters<K extends Data
     }
 
     void populateFromProperties(Properties properties) {
-        setFinalised true
-        setImportAsNewDocumentationVersion false
-        setFolderId UUID.randomUUID()
+        finalised = true
+        importAsNewDocumentationVersion = false
+        folderId = UUID.randomUUID()
 
         databaseNames = properties.getProperty(properties.containsKey('import.database.name') ? 'import.database.name' : 'import.database.names')
         databaseHost = properties.getProperty 'import.database.host'
@@ -117,7 +117,7 @@ abstract class DatabaseDataModelImporterProviderServiceParameters<K extends Data
         try {
             databasePort = properties.getProperty('import.database.port') as int
         } catch (NumberFormatException ignored) {
-            databasePort = getDefaultPort()
+            databasePort = defaultPort
         }
     }
 

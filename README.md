@@ -1,5 +1,7 @@
 # mdm-plugin-database
 
+[![Build Status](https://jenkins.cs.ox.ac.uk/job/Mauro%20Data%20Mapper%20Plugins/job/mdm-plugin-database/job/develop/badge/icon)](https://jenkins.cs.ox.ac.uk/job/Mauro%20Data%20Mapper%20Plugins/job/mdm-plugin-database/job/develop/)
+
 ## Requirements
 
 * Java 12 (Java.net)

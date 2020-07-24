@@ -79,7 +79,7 @@ abstract class AbstractDatabaseDataModelImporterProviderService<T extends Databa
             dataTypeColumnName,
             tableNameColumnName,
             columnNameColumnName,
-            tableCatalogColumnName
+            tableCatalogColumnName,
     ]
 
     /**

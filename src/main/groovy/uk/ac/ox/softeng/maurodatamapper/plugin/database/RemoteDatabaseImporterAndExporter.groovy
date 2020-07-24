@@ -45,9 +45,9 @@ class RemoteDatabaseImporterAndExporter {
 
     private static ApplicationContext applicationContext
     private static PlatformTransactionManager transactionManager
-    private static final JsonSlurper jsonSlurper = new JsonSlurper()
+    private static final JsonSlurper JSON_SLURPER = new JsonSlurper()
 
-    private static final Map<String, String> gormProperties = [
+    private static final Map<String, String> GORM_PROPERTIES = [
             'grails.bootstrap.skip'     : 'true',
             'grails.env'                : 'custom',
             'server.port'               : '9000',
@@ -59,7 +59,7 @@ class RemoteDatabaseImporterAndExporter {
             'dataSource.dbCreate'       : 'create-drop',
             'dataSource.url'            : 'jdbc:h2:mem:remoteDb;LOCK_TIMEOUT=10000;DB_CLOSE_ON_EXIT=TRUE'
     ]
-    private static final Map<String, String> endpoints = [
+    private static final Map<String, String> ENDPOINTS = [
             LOGIN              : '/authentication/login',
             LOGOUT             : '/authentication/logout',
             DATAMODEL_IMPORTERS: '/public/plugins/dataModelImporters'
@@ -157,14 +157,14 @@ class RemoteDatabaseImporterAndExporter {
 
         log.info 'Logging into server as "{}"', properties.getProperty('server.username')
         final Closure logInRequest = { ->
-            post host, endpoints.LOGIN, "{\"username\": \"${properties.getProperty('server.username')}\",\
+            post host, ENDPOINTS.LOGIN, "{\"username\": \"${properties.getProperty('server.username')}\",\
                                           \"password\": \"${properties.getProperty('server.password')}\"}"
         }
         if (!evaluateRequest(logInRequest, 'Could not log in', null, false)) return
         log.debug 'Logged in, now exporting DataModel'
 
         log.info 'Getting list of importers in server' // We need to do this to ensure we use the correct version of importer
-        final List<Map> importers = evaluateRequest({ -> get(host, endpoints.DATAMODEL_IMPORTERS) },
+        final List<Map> importers = evaluateRequest({ -> get(host, ENDPOINTS.DATAMODEL_IMPORTERS) },
                                                     'No importers could be retrieved', host) as List<Map>
         if (!importers) return
 
@@ -207,7 +207,7 @@ class RemoteDatabaseImporterAndExporter {
 
     private static User setupGorm() {
         log.info 'Starting Grails Application to handle GORM'
-        gormProperties.each { String property, String value -> System.setProperty(property, value) }
+        GORM_PROPERTIES.each { String property, String value -> System.setProperty(property, value) }
         applicationContext = GrailsApp.run(Application)
         final HibernateDatastore hibernateDatastore = applicationContext.getBean(HibernateDatastore)
         TransactionSynchronizationManager.bindResource(hibernateDatastore.getSessionFactory(), new SessionHolder(hibernateDatastore.openSession()))
@@ -232,7 +232,7 @@ class RemoteDatabaseImporterAndExporter {
 
     private void logout(String host) {
         log.info 'Logging out'
-        get host, endpoints.LOGOUT
+        get host, ENDPOINTS.LOGOUT
     }
 
     private static connect(HttpURLConnection connection) {
@@ -243,7 +243,7 @@ class RemoteDatabaseImporterAndExporter {
             final String body = connection.inputStream.text
             log.trace 'Success Response:\n{}', prettyPrint(body)
             try {
-                return jsonSlurper.parseText(body)
+                return JSON_SLURPER.parseText(body)
             } catch (JsonException ignored) {
                 return body
             }
@@ -275,7 +275,7 @@ class RemoteDatabaseImporterAndExporter {
 
     private static String prettyPrint(String json) {
         try {
-            new JsonBuilder(jsonSlurper.parseText(json)).toPrettyString()
+            new JsonBuilder(JSON_SLURPER.parseText(json)).toPrettyString()
         } catch (ignored) {
             json
         }

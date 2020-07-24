@@ -253,6 +253,7 @@ abstract class AbstractDatabaseDataModelImporterProviderService<T extends Databa
         }
     }
 
+    @SuppressWarnings('ParameterName')
     void addPrimaryKeyAndUniqueConstraintInformation(DataModel dataModel, Connection connection) throws ApiException, SQLException {
         if (!primaryKeyAndUniqueConstraintInformationQueryString) return
 

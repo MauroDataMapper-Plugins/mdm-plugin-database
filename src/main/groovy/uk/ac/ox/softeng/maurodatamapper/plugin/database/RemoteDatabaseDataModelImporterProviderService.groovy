@@ -34,7 +34,7 @@ trait RemoteDatabaseDataModelImporterProviderService {
                     required().hasArg().build()
                 },
                 Option.builder('v').longOpt('version').build(),
-                Option.builder('h').longOpt('help').build()
+                Option.builder('h').longOpt('help').build(),
         ]
 
         final OptionGroup mainOptions = new OptionGroup()
@@ -58,7 +58,7 @@ trait RemoteDatabaseDataModelImporterProviderService {
                     desc 'Password for the database to import (required)'
                     argName 'DATABASE_PASSWORD'
                     hasArg().build()
-                }
+                },
         ]
 
         options = new Options().tap { addOptionGroup mainOptions }

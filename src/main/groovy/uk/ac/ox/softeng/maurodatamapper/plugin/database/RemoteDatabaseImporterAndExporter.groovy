@@ -59,12 +59,12 @@ class RemoteDatabaseImporterAndExporter {
             'dataSource.username'       : 'sa',
             'dataSource.password'       : '',
             'dataSource.dbCreate'       : 'create-drop',
-            'dataSource.url'            : 'jdbc:h2:mem:remoteDb;LOCK_TIMEOUT=10000;DB_CLOSE_ON_EXIT=TRUE'
+            'dataSource.url'            : 'jdbc:h2:mem:remoteDb;LOCK_TIMEOUT=10000;DB_CLOSE_ON_EXIT=TRUE',
     ]
     private static final Map<String, String> ENDPOINTS = [
             LOGIN              : '/authentication/login',
             LOGOUT             : '/authentication/logout',
-            DATAMODEL_IMPORTERS: '/public/plugins/dataModelImporters'
+            DATAMODEL_IMPORTERS: '/public/plugins/dataModelImporters',
     ]
 
     Object post(String url, byte[] bytes) {

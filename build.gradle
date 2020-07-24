@@ -45,7 +45,9 @@ jar {
 }
 
 license {
-    header = file "$rootDir/NOTICE"
+    header file('NOTICE')
+    strictCheck true
+    excludes(['application.yml', 'application.groovy', 'logback.groovy']) // See https://github.com/hierynomus/license-gradle-plugin/issues/145
 }
 
 integrationTest {
@@ -60,8 +62,8 @@ integrationTest {
 }
 
 logger.quiet(
-    "Available processors: ${Runtime.runtime.availableProcessors()} | " +
-    "Max unit test parallel forks: ${Runtime.runtime.availableProcessors().intdiv(2) ?: 1}")
+        "Available processors: ${Runtime.runtime.availableProcessors()} | " +
+        "Max unit test parallel forks: ${Runtime.runtime.availableProcessors().intdiv(2) ?: 1}")
 
 afterEvaluate {
 

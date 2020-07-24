@@ -68,7 +68,7 @@ trait RemoteDatabaseDataModelImporterProviderService {
 
     private static void startService(CommandLine commandLine) {
         final Path path = Paths.get(commandLine.getOptionValue('c'))
-        println "Starting Remote Database Import service\n${getVersionInfo()}\nConfig file: ${path.toAbsolutePath()}\n"
+        print "Starting Remote Database Import service\n${getVersionInfo()}\nConfig file: ${path.toAbsolutePath()}\n"
         Utils.outputRuntimeArgs(getClass())
         new RemoteDatabaseImporterAndExporter().performImportAndExport(
                 new Properties().tap {
@@ -97,6 +97,11 @@ trait RemoteDatabaseDataModelImporterProviderService {
                 false)
     }
 
+    @SuppressWarnings('Println')
+    private static void print(String message) {
+        println message
+    }
+
     static void main(String[] args) {
         // Assume Slf4j is bound to Logback in the current environment
         final LoggerContext loggerContext = LoggerFactory.getILoggerFactory() as LoggerContext
@@ -107,7 +112,7 @@ trait RemoteDatabaseDataModelImporterProviderService {
         if ('cpu'.any { String option -> commandLine.hasOption option }) {
             startService commandLine
         } else if (commandLine.hasOption('v')) {
-            println getVersionInfo()
+            print getVersionInfo()
         } else {
             printHelp()
         }

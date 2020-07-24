@@ -153,6 +153,7 @@ abstract class AbstractDatabaseDataModelImporterProviderService<T extends Databa
         dataModels
     }
 
+    @SuppressWarnings('UnusedMethodParameter')
     PreparedStatement prepareCoreStatement(Connection connection, T parameters) {
         connection.prepareStatement(databaseStructureQueryString)
     }

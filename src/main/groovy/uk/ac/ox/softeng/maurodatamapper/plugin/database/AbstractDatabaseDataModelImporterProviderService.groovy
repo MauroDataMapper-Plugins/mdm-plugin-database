@@ -70,7 +70,7 @@ abstract class AbstractDatabaseDataModelImporterProviderService<T extends Databa
      * and return a row with the following elements:
      *  * table_name
      *  * check_clause (the constraint information)
-     * @return
+     * @return Query string for standard constraint information
      */
     final String standardConstraintInformationQueryString = '''
             SELECT
@@ -89,7 +89,7 @@ abstract class AbstractDatabaseDataModelImporterProviderService<T extends Databa
      *  * constraint_type (primary_key or unique)
      *  * column_name
      *  * ordinal_position
-     * @return
+     * @return Query string for primary key and unique constraint information
      */
     final String primaryKeyAndUniqueConstraintInformationQueryString = '''
             SELECT
@@ -115,7 +115,7 @@ abstract class AbstractDatabaseDataModelImporterProviderService<T extends Databa
      *  * primary_index (boolean)
      *  * clustered (boolean)
      *  * column_names
-     * @return
+     * @return Query string for index information
      */
     abstract String getIndexInformationQueryString()
 
@@ -127,7 +127,7 @@ abstract class AbstractDatabaseDataModelImporterProviderService<T extends Databa
      *  * column_name
      *  * reference_table_name
      *  * reference_column_name
-     * @return
+     * @return Query string for foreign key information
      */
     abstract String getForeignKeyInformationQueryString()
 
@@ -209,7 +209,6 @@ abstract class AbstractDatabaseDataModelImporterProviderService<T extends Databa
      * Default is to do nothing
      * @param dataModel DataModel to update
      * @param connection Connection to database
-     * @return
      */
     void updateDataModelWithDatabaseSpecificInformation(DataModel dataModel, Connection connection) throws ApiException, SQLException {
         addStandardConstraintInformation dataModel, connection

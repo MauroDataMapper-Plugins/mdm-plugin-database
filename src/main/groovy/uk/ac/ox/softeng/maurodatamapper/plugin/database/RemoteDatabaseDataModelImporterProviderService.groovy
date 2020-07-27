@@ -19,6 +19,9 @@ package uk.ac.ox.softeng.maurodatamapper.plugin.database
 
 import uk.ac.ox.softeng.maurodatamapper.util.Utils
 
+import ch.qos.logback.classic.LoggerContext
+import ch.qos.logback.core.util.StatusPrinter
+import groovy.transform.CompileStatic
 import org.apache.commons.cli.CommandLine
 import org.apache.commons.cli.DefaultParser
 import org.apache.commons.cli.HelpFormatter
@@ -26,10 +29,6 @@ import org.apache.commons.cli.Option
 import org.apache.commons.cli.OptionGroup
 import org.apache.commons.cli.Options
 import org.slf4j.LoggerFactory
-
-import ch.qos.logback.classic.LoggerContext
-import ch.qos.logback.core.util.StatusPrinter
-import groovy.transform.CompileStatic
 
 import java.nio.file.Files
 import java.nio.file.Path
@@ -89,9 +88,10 @@ trait RemoteDatabaseDataModelImporterProviderService {
         options
     }
 
+    @SuppressWarnings('Println')
     private static void startService(CommandLine commandLine) {
         final Path path = Paths.get(commandLine.getOptionValue('c'))
-        print "Starting Remote Database Import service\n${VERSION_INFO}\nConfig file: ${path.toAbsolutePath()}\n"
+        println "Starting Remote Database Import service\n${VERSION_INFO}\nConfig file: ${path.toAbsolutePath()}\n"
         Utils.outputRuntimeArgs(getClass())
         new RemoteDatabaseImporterAndExporter().performImportAndExport(
                 new Properties().tap {
@@ -113,10 +113,6 @@ trait RemoteDatabaseDataModelImporterProviderService {
     }
 
     @SuppressWarnings('Println')
-    private static void print(String message) {
-        println message
-    }
-
     static void main(String[] args) {
         // Assume Slf4j is bound to Logback in the current environment
         final LoggerContext loggerContext = LoggerFactory.getILoggerFactory() as LoggerContext
@@ -127,7 +123,7 @@ trait RemoteDatabaseDataModelImporterProviderService {
         if ('cpu'.any { String option -> commandLine.hasOption option }) {
             startService commandLine
         } else if (commandLine.hasOption('v')) {
-            print VERSION_INFO
+            println VERSION_INFO
         } else {
             printHelp()
         }

@@ -45,6 +45,7 @@ import java.sql.SQLException
 
 @CompileStatic
 @Slf4j
+@SuppressWarnings('UnusedMethodParameter')
 abstract class AbstractDatabaseDataModelImporterProviderService<T extends DatabaseDataModelImporterProviderServiceParameters>
         extends DataModelImporterProviderService<T> {
 
@@ -170,7 +171,6 @@ abstract class AbstractDatabaseDataModelImporterProviderService<T extends Databa
         dataModels
     }
 
-    @SuppressWarnings('UnusedMethodParameter')
     PreparedStatement prepareCoreStatement(Connection connection, T parameters) {
         connection.prepareStatement(databaseStructureQueryString)
     }
@@ -253,7 +253,6 @@ abstract class AbstractDatabaseDataModelImporterProviderService<T extends Databa
         }
     }
 
-    @SuppressWarnings('ParameterName')
     void addPrimaryKeyAndUniqueConstraintInformation(DataModel dataModel, Connection connection) throws ApiException, SQLException {
         if (!primaryKeyAndUniqueConstraintInformationQueryString) return
 
@@ -262,7 +261,7 @@ abstract class AbstractDatabaseDataModelImporterProviderService<T extends Databa
                 dataModel, schemaClass, connection, primaryKeyAndUniqueConstraintInformationQueryString)
             results
                 .groupBy {it.constraint_name}
-                .each {constraint_name, List<StatementExecutionResultsRow> rows ->
+                .each {constraintName, List<StatementExecutionResultsRow> rows ->
                     final StatementExecutionResultsRow firstRow = rows.head()
                     final DataClass tableClass = schemaClass.findDataClass(firstRow.table_name as String)
                     if (!tableClass) return

@@ -40,6 +40,12 @@ trait RemoteDatabaseDataModelImporterProviderService {
 
     private static Options options
 
+    private static final String VERSION_INFO = new StringBuilder().with {
+        append "remote-database-importer version: ${RemoteDatabaseDataModelImporterProviderService.package.specificationVersion}\n"
+        append "Java version: ${System.getProperty('java.version')}\n"
+        toString()
+    }
+
     private static Options getOptions() {
         if (options) return options
 
@@ -51,7 +57,7 @@ trait RemoteDatabaseDataModelImporterProviderService {
                     required().hasArg().build()
                 },
                 Option.builder('v').longOpt('version').build(),
-                Option.builder('h').longOpt('help').build()
+                Option.builder('h').longOpt('help').build(),
         ]
 
         final OptionGroup mainOptions = new OptionGroup()
@@ -75,7 +81,7 @@ trait RemoteDatabaseDataModelImporterProviderService {
                     desc 'Password for the database to import (required)'
                     argName 'DATABASE_PASSWORD'
                     hasArg().build()
-                }
+                },
         ]
 
         options = new Options().tap { addOptionGroup mainOptions }
@@ -85,7 +91,7 @@ trait RemoteDatabaseDataModelImporterProviderService {
 
     private static void startService(CommandLine commandLine) {
         final Path path = Paths.get(commandLine.getOptionValue('c'))
-        println "Starting Remote Database Import service\n${getVersionInfo()}\nConfig file: ${path.toAbsolutePath()}\n"
+        print "Starting Remote Database Import service\n${VERSION_INFO}\nConfig file: ${path.toAbsolutePath()}\n"
         Utils.outputRuntimeArgs(getClass())
         new RemoteDatabaseImporterAndExporter().performImportAndExport(
                 new Properties().tap {
@@ -96,22 +102,19 @@ trait RemoteDatabaseDataModelImporterProviderService {
                 })
     }
 
-    private static String getVersionInfo() {
-        new StringBuilder().with {
-            append "remote-database-importer version: ${RemoteDatabaseDataModelImporterProviderService.package.specificationVersion}\n"
-            append "Java version: ${System.getProperty('java.version')}\n"
-            toString()
-        }
-    }
-
     private static void printHelp() {
         new HelpFormatter().printHelp(
                 120,
                 'remote-database-importer -c <FILE> -u <USERNAME> -p <PASSWORD> -w <DATABASE_PASSWORD>',
                 'Import database to the Mauro Data Mapper\nConnect to a database, import to a DataModel and push to the Mauro server\n\n',
                 getOptions(),
-                "\n${getVersionInfo()}\nPlease report issues at https://metadatacatalogue.myjetbrains.com\n",
+                "\n${VERSION_INFO}\nPlease report issues at https://metadatacatalogue.myjetbrains.com\n",
                 false)
+    }
+
+    @SuppressWarnings('Println')
+    private static void print(String message) {
+        println message
     }
 
     static void main(String[] args) {
@@ -124,7 +127,7 @@ trait RemoteDatabaseDataModelImporterProviderService {
         if ('cpu'.any { String option -> commandLine.hasOption option }) {
             startService commandLine
         } else if (commandLine.hasOption('v')) {
-            println getVersionInfo()
+            print VERSION_INFO
         } else {
             printHelp()
         }

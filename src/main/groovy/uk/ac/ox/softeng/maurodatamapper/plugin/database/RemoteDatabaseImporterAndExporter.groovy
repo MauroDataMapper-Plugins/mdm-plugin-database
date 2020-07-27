@@ -48,6 +48,7 @@ import grails.web.mime.MimeType
 import groovy.json.JsonBuilder
 import groovy.json.JsonException
 import groovy.json.JsonSlurper
+import groovy.transform.CompileDynamic
 import groovy.util.logging.Slf4j
 
 import java.security.SecureRandom
@@ -57,14 +58,15 @@ import javax.net.ssl.TrustManager
 import javax.net.ssl.X509TrustManager
 
 // @CompileStatic
+@CompileDynamic
 @Slf4j
 class RemoteDatabaseImporterAndExporter {
 
     private static ApplicationContext applicationContext
     private static PlatformTransactionManager transactionManager
-    private static final JsonSlurper jsonSlurper = new JsonSlurper()
+    private static final JsonSlurper JSON_SLURPER = new JsonSlurper()
 
-    private static final Map<String, String> gormProperties = [
+    private static final Map<String, String> GORM_PROPERTIES = [
             'grails.bootstrap.skip'     : 'true',
             'grails.env'                : 'custom',
             'server.port'               : '9000',
@@ -74,17 +76,17 @@ class RemoteDatabaseImporterAndExporter {
             'dataSource.username'       : 'sa',
             'dataSource.password'       : '',
             'dataSource.dbCreate'       : 'create-drop',
-            'dataSource.url'            : 'jdbc:h2:mem:remoteDb;LOCK_TIMEOUT=10000;DB_CLOSE_ON_EXIT=TRUE'
+            'dataSource.url'            : 'jdbc:h2:mem:remoteDb;LOCK_TIMEOUT=10000;DB_CLOSE_ON_EXIT=TRUE',
     ]
-    private static final Map<String, String> endpoints = [
+    private static final Map<String, String> ENDPOINTS = [
             LOGIN              : '/authentication/login',
             LOGOUT             : '/authentication/logout',
-            DATAMODEL_IMPORTERS: '/public/plugins/dataModelImporters'
+            DATAMODEL_IMPORTERS: '/public/plugins/dataModelImporters',
     ]
 
     Object post(String url, byte[] bytes) {
         connect(openJsonConnection(url).tap {
-            setDoOutput true
+            doOutput = true
             outputStream.write bytes
         })
     }
@@ -161,6 +163,84 @@ class RemoteDatabaseImporterAndExporter {
         dataModels
     }
 
+    private static User setupGorm() {
+        log.info 'Starting Grails Application to handle GORM'
+        GORM_PROPERTIES.each { String property, String value -> System.setProperty(property, value) }
+        applicationContext = GrailsApp.run(Application)
+        final HibernateDatastore hibernateDatastore = applicationContext.getBean(HibernateDatastore)
+        TransactionSynchronizationManager.bindResource(hibernateDatastore.sessionFactory, new SessionHolder(hibernateDatastore.openSession()))
+        transactionManager = applicationContext.getBean(PlatformTransactionManager)
+        DatabaseImporterUser.instance
+    }
+
+    private static void shutdownGorm() {
+        log.debug 'Shutting down Grails Application'
+        if (applicationContext) GrailsApp.exit(applicationContext)
+    }
+
+    private static void outputErrors(Errors errors, MessageSource messageSource) {
+        log.error 'Errors validating domain: {}', errors.objectName
+        errors.allErrors.each { ObjectError error ->
+            final StringBuilder message = new StringBuilder(messageSource ? messageSource.getMessage(error, Locale.default)
+                                                                          : "${error.defaultMessage} :: ${Arrays.asList(error.arguments)}")
+            if (error instanceof FieldError) message.append(" :: [${error.field}]")
+            log.error message.toString()
+        }
+    }
+
+    private static Object connect(HttpURLConnection connection) {
+        log.debug 'Performing {} to {}', connection.requestMethod, connection.URL
+
+        final HttpStatus response = HttpStatus.valueOf(connection.responseCode)
+        if (response.is2xxSuccessful()) {
+            final String body = connection.inputStream.text
+            log.trace 'Success Response:\n{}', prettyPrint(body)
+            try {
+                return JSON_SLURPER.parseText(body)
+            } catch (JsonException ignored) {
+                return body
+            }
+        }
+
+        log.error 'Could not {} to Mauro Data Mapper server at [{}]. Response: {} {}. Message: {}',
+                  connection.requestMethod, connection.URL, response.value(), response.reasonPhrase,
+                  prettyPrint(connection.errorStream?.text)
+
+        null
+    }
+
+    private static HttpURLConnection openJsonConnection(String url) {
+        new URL(url).openConnection().with { URLConnection connection ->
+            setRequestProperty 'Accept', 'application/json'
+            setRequestProperty 'Content-Type', 'application/json'
+            connection as HttpURLConnection
+        }
+    }
+
+    private static String writeToJson(ImporterProviderServiceParameters parameters) {
+        final StringWriter stringWriter = new StringWriter()
+        final String domainName = parameters.class.simpleName.uncapitalize()
+        final WritableScriptTemplate template =
+                applicationContext.getBean(JsonViewTemplateEngine).resolveTemplate("/${domainName}/_${domainName}.gson")
+        template.make([domainName: parameters]).writeTo(stringWriter)
+        stringWriter.toString()
+    }
+
+    private static String prettyPrint(String json) {
+        try {
+            new JsonBuilder(JSON_SLURPER.parseText(json)).toPrettyString()
+        } catch (ignored) {
+            json
+        }
+    }
+
+    private static void enableSslConnection() {
+        final SSLContext sslContext = SSLContext.getInstance('SSL')
+        final Object trustAll = [getAcceptedIssuers: {}, checkClientTrusted: { a, b -> }, checkServerTrusted: { a, b -> }]
+        sslContext.init(null, [trustAll as X509TrustManager] as TrustManager[], new SecureRandom())
+        HttpsURLConnection.defaultSSLSocketFactory = sslContext.socketFactory
+    }
+
     private void sendModelsToMauroDataMapper(Properties properties, User user, List<DataModel> dataModels) {
         log.info 'Sending DataModel to Mauro Data Mapper server'
 
@@ -174,14 +254,14 @@ class RemoteDatabaseImporterAndExporter {
 
         log.info 'Logging into server as "{}"', properties.getProperty('server.username')
         final Closure logInRequest = { ->
-            post host, endpoints.LOGIN, "{\"username\": \"${properties.getProperty('server.username')}\",\
+            post host, ENDPOINTS.LOGIN, "{\"username\": \"${properties.getProperty('server.username')}\",\
                                           \"password\": \"${properties.getProperty('server.password')}\"}"
         }
         if (!evaluateRequest(logInRequest, 'Could not log in', null, false)) return
         log.debug 'Logged in, now exporting DataModel'
 
         log.info 'Getting list of importers in server' // We need to do this to ensure we use the correct version of importer
-        final List<Map> importers = evaluateRequest({ -> get(host, endpoints.DATAMODEL_IMPORTERS) },
+        final List<Map> importers = evaluateRequest({ -> get(host, ENDPOINTS.DATAMODEL_IMPORTERS) },
                                                     'No importers could be retrieved', host) as List<Map>
         if (!importers) return
 
@@ -214,94 +294,16 @@ class RemoteDatabaseImporterAndExporter {
         log.info 'Successfully exported to remote server'
     }
 
-    private evaluateRequest(Closure closure, String errorMessage, String host, boolean logoutIfFailure = true) {
-        final value = closure()
+    private Object evaluateRequest(Closure closure, String errorMessage, String host, boolean logoutIfFailure = true) {
+        final Object value = closure()
         if (value) return value
         if (logoutIfFailure) logout host
         log.error 'Could not export to remote server: {}', errorMessage
         null
     }
 
-    private static User setupGorm() {
-        log.info 'Starting Grails Application to handle GORM'
-        gormProperties.each { String property, String value -> System.setProperty(property, value) }
-        applicationContext = GrailsApp.run(Application)
-        final HibernateDatastore hibernateDatastore = applicationContext.getBean(HibernateDatastore)
-        TransactionSynchronizationManager.bindResource(hibernateDatastore.getSessionFactory(), new SessionHolder(hibernateDatastore.openSession()))
-        transactionManager = applicationContext.getBean(PlatformTransactionManager)
-        DatabaseImporterUser.instance
-    }
-
-    private static void shutdownGorm() {
-        log.debug 'Shutting down Grails Application'
-        if (applicationContext) GrailsApp.exit(applicationContext)
-    }
-
-    private static void outputErrors(Errors errors, MessageSource messageSource) {
-        log.error 'Errors validating domain: {}', errors.objectName
-        errors.allErrors.each { ObjectError error ->
-            final StringBuilder message = new StringBuilder(messageSource ? messageSource.getMessage(error, Locale.default)
-                                                                          : "${error.defaultMessage} :: ${Arrays.asList(error.arguments)}")
-            if (error instanceof FieldError) message.append(" :: [${error.field}]")
-            log.error message.toString()
-        }
-    }
-
     private void logout(String host) {
         log.info 'Logging out'
-        get host, endpoints.LOGOUT
-    }
-
-    private static connect(HttpURLConnection connection) {
-        log.debug 'Performing {} to {}', connection.requestMethod, connection.getURL()
-
-        final HttpStatus response = HttpStatus.valueOf(connection.responseCode)
-        if (response.is2xxSuccessful()) {
-            final String body = connection.inputStream.text
-            log.trace 'Success Response:\n{}', prettyPrint(body)
-            try {
-                return jsonSlurper.parseText(body)
-            } catch (JsonException ignored) {
-                return body
-            }
-        }
-
-        log.error 'Could not {} to Mauro Data Mapper server at [{}]. Response: {} {}. Message: {}',
-                  connection.requestMethod, connection.getURL(), response.value(), response.reasonPhrase,
-                  prettyPrint(connection.errorStream?.text)
-
-        null
-    }
-
-    private static HttpURLConnection openJsonConnection(String url) {
-        new URL(url).openConnection().with { URLConnection connection ->
-            setRequestProperty 'Accept', 'application/json'
-            setRequestProperty 'Content-Type', 'application/json'
-            connection as HttpURLConnection
-        }
-    }
-
-    private static String writeToJson(ImporterProviderServiceParameters parameters) {
-        final StringWriter stringWriter = new StringWriter()
-        final String domainName = parameters.class.simpleName.uncapitalize()
-        final WritableScriptTemplate template =
-                applicationContext.getBean(JsonViewTemplateEngine).resolveTemplate("/${domainName}/_${domainName}.gson")
-        template.make([domainName: parameters]).writeTo(stringWriter)
-        stringWriter.toString()
-    }
-
-    private static String prettyPrint(String json) {
-        try {
-            new JsonBuilder(jsonSlurper.parseText(json)).toPrettyString()
-        } catch (ignored) {
-            json
-        }
-    }
-
-    private static void enableSslConnection() {
-        final SSLContext sslContext = SSLContext.getInstance('SSL')
-        final trustAll = [getAcceptedIssuers: {}, checkClientTrusted: { a, b -> }, checkServerTrusted: { a, b -> }]
-        sslContext.init(null, [trustAll as X509TrustManager] as TrustManager[], new SecureRandom())
-        HttpsURLConnection.defaultSSLSocketFactory = sslContext.socketFactory
+        get host, ENDPOINTS.LOGOUT
     }
 }

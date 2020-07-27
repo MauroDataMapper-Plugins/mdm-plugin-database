@@ -79,7 +79,7 @@ abstract class AbstractDatabaseDataModelImporterProviderService<T extends Databa
             dataTypeColumnName,
             tableNameColumnName,
             columnNameColumnName,
-            tableCatalogColumnName
+            tableCatalogColumnName,
     ]
 
     /**
@@ -87,7 +87,7 @@ abstract class AbstractDatabaseDataModelImporterProviderService<T extends Databa
      * and return a row with the following elements:
      *  * table_name
      *  * check_clause (the constraint information)
-     * @return
+     * @return Query string for standard constraint information
      */
     final String standardConstraintInformationQueryString = '''
             SELECT
@@ -106,7 +106,7 @@ abstract class AbstractDatabaseDataModelImporterProviderService<T extends Databa
      *  * constraint_type (primary_key or unique)
      *  * column_name
      *  * ordinal_position
-     * @return
+     * @return Query string for primary key and unique constraint information
      */
     final String primaryKeyAndUniqueConstraintInformationQueryString = '''
             SELECT
@@ -132,7 +132,7 @@ abstract class AbstractDatabaseDataModelImporterProviderService<T extends Databa
      *  * primary_index (boolean)
      *  * clustered (boolean)
      *  * column_names
-     * @return
+     * @return Query string for index information
      */
     abstract String getIndexInformationQueryString()
 
@@ -144,7 +144,7 @@ abstract class AbstractDatabaseDataModelImporterProviderService<T extends Databa
      *  * column_name
      *  * reference_table_name
      *  * reference_column_name
-     * @return
+     * @return Query string for foreign key information
      */
     abstract String getForeignKeyInformationQueryString()
 
@@ -170,6 +170,7 @@ abstract class AbstractDatabaseDataModelImporterProviderService<T extends Databa
         dataModels
     }
 
+    @SuppressWarnings('UnusedMethodParameter')
     PreparedStatement prepareCoreStatement(Connection connection, T parameters) {
         connection.prepareStatement(databaseStructureQueryString)
     }
@@ -225,7 +226,6 @@ abstract class AbstractDatabaseDataModelImporterProviderService<T extends Databa
      * Default is to do nothing
      * @param dataModel DataModel to update
      * @param connection Connection to database
-     * @return
      */
     void updateDataModelWithDatabaseSpecificInformation(DataModel dataModel, Connection connection) throws ApiException, SQLException {
         addStandardConstraintInformation dataModel, connection
@@ -253,6 +253,7 @@ abstract class AbstractDatabaseDataModelImporterProviderService<T extends Databa
         }
     }
 
+    @SuppressWarnings('ParameterName')
     void addPrimaryKeyAndUniqueConstraintInformation(DataModel dataModel, Connection connection) throws ApiException, SQLException {
         if (!primaryKeyAndUniqueConstraintInformationQueryString) return
 
@@ -332,34 +333,6 @@ abstract class AbstractDatabaseDataModelImporterProviderService<T extends Databa
         }
     }
 
-    private List<DataModel> importDataModelsFromParameters(User currentUser, String databaseName, T parameters)
-            throws ApiException, ApiBadRequestException {
-        String modelName = databaseName
-        if (!parameters.isMultipleDataModelImport()) modelName = parameters.modelName ?: modelName
-        modelName = parameters.dataModelNameSuffix ? "${modelName}_${parameters.dataModelNameSuffix}" : modelName
-
-        try {
-            final Connection connection = getConnection(databaseName, parameters)
-            final PreparedStatement preparedStatement = prepareCoreStatement(connection, parameters)
-            final StatementExecutionResults results = executeStatement(preparedStatement)
-            preparedStatement.close()
-
-            log.debug 'Size of results from statement {}', results.size()
-            if (results.isEmpty()) {
-                log.warn 'No results from database statement, therefore nothing to import for {}.', modelName
-                return []
-            }
-
-            final List<DataModel> dataModels = importAndUpdateDataModelsFromResults(
-                    currentUser, databaseName, parameters, Folder.get(parameters.folderId), modelName, results, connection)
-            connection.close()
-            dataModels
-        } catch (SQLException e) {
-            log.error 'Something went wrong executing statement while importing {}: {}', modelName, e.message
-            throw new ApiBadRequestException('DIS03', 'Cannot execute statement', e)
-        }
-    }
-
     Connection getConnection(String databaseName, T parameters) throws ApiException, ApiBadRequestException {
         try {
             parameters.getDataSource(databaseName).getConnection(parameters.databaseUsername, parameters.databasePassword)
@@ -367,22 +340,6 @@ abstract class AbstractDatabaseDataModelImporterProviderService<T extends Databa
             log.error 'Cannot connect to database [{}]: {}', parameters.getUrl(databaseName), e.message
             throw new ApiBadRequestException('DIS02', "Cannot connect to database [${parameters.getUrl(databaseName)}]", e)
         }
-    }
-
-    private StatementExecutionResults executePreparedStatement(
-            DataModel dataModel, DataClass schemaClass, Connection connection, String queryString) throws ApiException, SQLException {
-        StatementExecutionResults results = null
-        try {
-            final PreparedStatement preparedStatement = connection.prepareStatement(queryString)
-            preparedStatement.setString(1, schemaClass.label)
-            results = executeStatement(preparedStatement)
-            preparedStatement.close()
-        } catch (SQLException e) {
-            if (e.message.contains('Invalid object name \'information_schema.table_constraints\'')) {
-                log.warn 'No table_constraints available for {}', dataModel.label
-            } else throw e
-        }
-        results as StatementExecutionResults
     }
 
     private static StatementExecutionResults executeStatement(PreparedStatement preparedStatement) throws ApiException, SQLException {
@@ -401,6 +358,50 @@ abstract class AbstractDatabaseDataModelImporterProviderService<T extends Databa
         }
         resultSet.close()
 
+        results as StatementExecutionResults
+    }
+
+    private List<DataModel> importDataModelsFromParameters(User currentUser, String databaseName, T parameters)
+            throws ApiException, ApiBadRequestException {
+        String modelName = databaseName
+        if (!parameters.isMultipleDataModelImport()) modelName = parameters.modelName ?: modelName
+        modelName = parameters.dataModelNameSuffix ? "${modelName}_${parameters.dataModelNameSuffix}" : modelName
+
+        try {
+            final Connection connection = getConnection(databaseName, parameters)
+            final PreparedStatement preparedStatement = prepareCoreStatement(connection, parameters)
+            final StatementExecutionResults results = executeStatement(preparedStatement)
+            preparedStatement.close()
+
+            log.debug 'Size of results from statement {}', results.size()
+            if (!results) {
+                log.warn 'No results from database statement, therefore nothing to import for {}.', modelName
+                return []
+            }
+
+            final List<DataModel> dataModels = importAndUpdateDataModelsFromResults(
+                    currentUser, databaseName, parameters, Folder.get(parameters.folderId), modelName, results, connection)
+            connection.close()
+            dataModels
+        } catch (SQLException e) {
+            log.error 'Something went wrong executing statement while importing {}: {}', modelName, e.message
+            throw new ApiBadRequestException('DIS03', 'Cannot execute statement', e)
+        }
+    }
+
+    private StatementExecutionResults executePreparedStatement(
+            DataModel dataModel, DataClass schemaClass, Connection connection, String queryString) throws ApiException, SQLException {
+        StatementExecutionResults results = null
+        try {
+            final PreparedStatement preparedStatement = connection.prepareStatement(queryString)
+            preparedStatement.setString(1, schemaClass.label)
+            results = executeStatement(preparedStatement)
+            preparedStatement.close()
+        } catch (SQLException e) {
+            if (e.message.contains('Invalid object name \'information_schema.table_constraints\'')) {
+                log.warn 'No table_constraints available for {}', dataModel.label
+            } else throw e
+        }
         results as StatementExecutionResults
     }
 

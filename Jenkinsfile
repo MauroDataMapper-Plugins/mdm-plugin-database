@@ -32,6 +32,12 @@ pipeline {
             }
         }
 
+        stage('License Header Check'){
+            steps{
+                sh './gradlew license'
+            }
+        }
+
         stage('Static Code Analysis') {
             steps {
                 sh "./gradlew -PciRun=true staticCodeAnalysis"
@@ -58,7 +64,10 @@ pipeline {
         stage('Deploy to Artifactory') {
             when {
                 allOf {
-                    branch 'master'
+                    anyOf {
+                        branch 'master'
+                        branch 'develop'
+                    }
                     expression {
                         currentBuild.currentResult == 'SUCCESS'
                     }

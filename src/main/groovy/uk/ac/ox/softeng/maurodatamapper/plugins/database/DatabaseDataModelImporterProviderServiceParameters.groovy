@@ -30,85 +30,85 @@ import javax.sql.DataSource
 abstract class DatabaseDataModelImporterProviderServiceParameters<K extends DataSource> extends DataModelImporterProviderServiceParameters {
 
     @ImportParameterConfig(
-            displayName = 'DataModel Name Suffix',
-            description = [
-                    'A suffix to attach to the end of the auto-imported DataModel name.',
-                    'This should only be used if the DataModel name property is not supplied.',
-                    'The suffix will be appended in the form ${modelName}_${suffix}.'],
-            order = 0,
-            optional = true,
-            group = @ImportGroupConfig(
-                    name = 'DataModel',
-                    order = 0
-            ))
+        displayName = 'DataModel Name Suffix',
+        description = [
+            'A suffix to attach to the end of the auto-imported DataModel name.',
+            'This should only be used if the DataModel name property is not supplied.',
+            'The suffix will be appended in the form ${modelName}_${suffix}.'],
+        order = 0,
+        optional = true,
+        group = @ImportGroupConfig(
+            name = 'DataModel',
+            order = 0
+        ))
     String dataModelNameSuffix
 
     @ImportParameterConfig(
-            displayName = 'Database Name(s)',
-            description = [
-                    'A comma separated list of names of the databases to connect to, the database name will be used as the DataModel name',
-                    'unless the DataModel name option is supplied.',
-                    'If multiple names supplied then DataModel name will be ignored and the database name will be used as the DataModel name,',
-                    'and the same username and password will be used for all named databases.'],
-            order = 1,
-            group = @ImportGroupConfig(
-                    name = 'Database Import Details',
-                    order = 0
-            ))
+        displayName = 'Database Name(s)',
+        description = [
+            'A comma separated list of names of the databases to connect to, the database name will be used as the DataModel name',
+            'unless the DataModel name option is supplied.',
+            'If multiple names supplied then DataModel name will be ignored and the database name will be used as the DataModel name,',
+            'and the same username and password will be used for all named databases.'],
+        order = 1,
+        group = @ImportGroupConfig(
+            name = 'Database Import Details',
+            order = 0
+        ))
     String databaseNames
 
     @ImportParameterConfig(
-            displayName = 'Database Host',
-            description = 'The hostname of the server that is running the database.',
-            order = 2,
-            group = @ImportGroupConfig(
-                    name = 'Database Connection Details',
-                    order = 0
-            ))
+        displayName = 'Database Host',
+        description = 'The hostname of the server that is running the database.',
+        order = 2,
+        group = @ImportGroupConfig(
+            name = 'Database Connection Details',
+            order = 0
+        ))
     String databaseHost
 
     @ImportParameterConfig(
-            displayName = 'Database Port',
-            description = [
-                    'The port that the database is accessed through.',
-                    'If not supplied then the default port for the specified type will be used.'],
-            order = 3,
-            optional = true,
-            group = @ImportGroupConfig(
-                    name = 'Database Connection Details',
-                    order = 1
-            ))
+        displayName = 'Database Port',
+        description = [
+            'The port that the database is accessed through.',
+            'If not supplied then the default port for the specified type will be used.'],
+        order = 3,
+        optional = true,
+        group = @ImportGroupConfig(
+            name = 'Database Connection Details',
+            order = 1
+        ))
     int databasePort
 
     @ImportParameterConfig(
-            displayName = 'Username',
-            description = 'The username used to connect to the database.',
-            order = 4,
-            group = @ImportGroupConfig(
-                    name = 'Database Connection Details',
-                    order = 2
-            ))
+        displayName = 'Username',
+        description = 'The username used to connect to the database.',
+        order = 4,
+        group = @ImportGroupConfig(
+            name = 'Database Connection Details',
+            order = 2
+        ))
     String databaseUsername
 
     @ImportParameterConfig(
-            displayName = 'Password',
-            description = 'The password used to connect to the database.',
-            order = 5,
-            password = true,
-            group = @ImportGroupConfig(
-                    name = 'Database Connection Details',
-                    order = 3
-            ))
+        displayName = 'Password',
+        description = 'The password used to connect to the database.',
+        order = 5,
+        password = true,
+        group = @ImportGroupConfig(
+            name = 'Database Connection Details',
+            order = 3
+        ))
     String databasePassword
 
     @ImportParameterConfig(
-            displayName = 'SSL',
-            description = 'Whether SSL should be used to connect to the database.',
-            order = 6,
-            group = @ImportGroupConfig(
-                    name = 'Database Connection Details',
-                    order = 4
-            ))
+        displayName = 'SSL',
+        description = 'Whether SSL should be used to connect to the database.',
+        order = 6,
+        group = @ImportGroupConfig(
+            name = 'Database Connection Details',
+            order = 4
+        ))
     boolean databaseSSL
 
     int getDatabasePort() {

@@ -47,7 +47,7 @@ import java.sql.SQLException
 @Slf4j
 @SuppressWarnings('UnusedMethodParameter')
 abstract class AbstractDatabaseDataModelImporterProviderService<T extends DatabaseDataModelImporterProviderServiceParameters>
-        extends DataModelImporterProviderService<T> {
+    extends DataModelImporterProviderService<T> {
 
     static final String DATABASE_NAMESPACE = 'uk.ac.ox.softeng.maurodatamapper.plugins.database'
 
@@ -76,11 +76,11 @@ abstract class AbstractDatabaseDataModelImporterProviderService<T extends Databa
     final String columnIsNullableColumnName = 'is_nullable'
 
     final Collection<String> coreColumns = [
-            schemaNameColumnName,
-            dataTypeColumnName,
-            tableNameColumnName,
-            columnNameColumnName,
-            tableCatalogColumnName,
+        schemaNameColumnName,
+        dataTypeColumnName,
+        tableNameColumnName,
+        columnNameColumnName,
+        tableCatalogColumnName,
     ]
 
     /**
@@ -167,7 +167,7 @@ abstract class AbstractDatabaseDataModelImporterProviderService<T extends Databa
         log.info 'Importing {} DataModel(s)', databaseNames.size()
 
         final List<DataModel> dataModels = []
-        databaseNames.each { String databaseName -> dataModels.addAll importDataModelsFromParameters(currentUser, databaseName, parameters) }
+        databaseNames.each {String databaseName -> dataModels.addAll importDataModelsFromParameters(currentUser, databaseName, parameters)}
         dataModels
     }
 
@@ -179,15 +179,15 @@ abstract class AbstractDatabaseDataModelImporterProviderService<T extends Databa
         nullableColumnValue.toLowerCase() == 'yes'
     }
 
-    DataModel importDataModelFromResults(
-            User user, Folder folder, String modelName, String dialect, StatementExecutionResults results, boolean importSchemaAsDataClass = true)
-            throws ApiException {
-        final DataModel dataModel = new DataModel(createdBy: user, label: modelName, type: DataModelType.DATA_ASSET, folder: folder).tap {
-            addCreatedEdit user
-            addToMetadata namespace: DATABASE_NAMESPACE, key: 'dialect', value: dialect
+    DataModel importDataModelFromResults(User user, Folder folder, String modelName, String dialect, StatementExecutionResults results,
+                                         boolean importSchemaAsDataClass = true)
+        throws ApiException {
+        final DataModel dataModel = dataModelService.createAndSaveDataModel(user, folder, DataModelType.DATA_ASSET, modelName,
+                                                                            null, null, null).tap {
+            addToMetadata(namespace: DATABASE_NAMESPACE, key: 'dialect', value: dialect, createdBy: user.emailAddress)
         }
 
-        results.each { StatementExecutionResultsRow row ->
+        results.each {StatementExecutionResultsRow row ->
             final DataType dataType = primitiveTypeService.findOrCreateDataTypeForDataModel(dataModel, row(dataTypeColumnName), null, user)
             DataClass tableDataClass
 
@@ -200,11 +200,11 @@ abstract class AbstractDatabaseDataModelImporterProviderService<T extends Databa
 
             final int minMultiplicity = isColumnNullable(row(columnIsNullableColumnName)) ? 0 : 1
             final DataElement dataElement = dataElementService.findOrCreateDataElementForDataClass(
-                    tableDataClass, row(columnNameColumnName), null, user, dataType, minMultiplicity, 1)
+                tableDataClass, row(columnNameColumnName), null, user, dataType, minMultiplicity, 1)
 
-            row.findAll { String column, data ->
+            row.findAll {String column, data ->
                 data && !(column in coreColumns)
-            }.each { String column, data ->
+            }.each {String column, data ->
                 dataElement.addToMetadata(namespace, column, data.toString(), user)
             }
         }
@@ -213,8 +213,8 @@ abstract class AbstractDatabaseDataModelImporterProviderService<T extends Databa
     }
 
     List<DataModel> importAndUpdateDataModelsFromResults(
-            User currentUser, String databaseName, T parameters, Folder folder, String modelName, StatementExecutionResults results,
-            Connection connection) throws ApiException, SQLException {
+        User currentUser, String databaseName, T parameters, Folder folder, String modelName, StatementExecutionResults results,
+        Connection connection) throws ApiException, SQLException {
         final DataModel dataModel = importDataModelFromResults(currentUser, folder, modelName, parameters.databaseDialect, results)
         if (parameters.dataModelNameSuffix) dataModel.aliasesString = databaseName
         updateDataModelWithDatabaseSpecificInformation dataModel, connection
@@ -237,10 +237,10 @@ abstract class AbstractDatabaseDataModelImporterProviderService<T extends Databa
     void addStandardConstraintInformation(DataModel dataModel, Connection connection) throws ApiException, SQLException {
         if (!standardConstraintInformationQueryString) return
 
-        dataModel.childDataClasses.each { DataClass schemaClass ->
+        dataModel.childDataClasses.each {DataClass schemaClass ->
             final StatementExecutionResults results = executePreparedStatement(
-                    dataModel, schemaClass, connection, standardConstraintInformationQueryString)
-            results.each { StatementExecutionResultsRow row ->
+                dataModel, schemaClass, connection, standardConstraintInformationQueryString)
+            results.each {StatementExecutionResultsRow row ->
                 final DataClass tableClass = schemaClass.findDataClass(row.table_name as String)
                 if (!tableClass) return
 
@@ -272,22 +272,22 @@ abstract class AbstractDatabaseDataModelImporterProviderService<T extends Databa
                     tableClass.addToMetadata namespace, "${constraintTypeName}[${firstRow.constraint_name}]", constraintTypeValue, dataModel.createdBy
 
                     rows.each {StatementExecutionResultsRow row ->
-                    final DataElement columnElement = tableClass.findDataElement(row.column_name as String)
-                    if (columnElement) {
-                        columnElement.addToMetadata(
+                        final DataElement columnElement = tableClass.findDataElement(row.column_name as String)
+                        if (columnElement) {
+                            columnElement.addToMetadata(
                                 namespace, (row.constraint_type as String).toLowerCase(), row.ordinal_position as String, dataModel.createdBy)
+                        }
                     }
                 }
-            }
         }
     }
 
     void addIndexInformation(DataModel dataModel, Connection connection) throws ApiException, SQLException {
         if (!indexInformationQueryString) return
 
-        dataModel.childDataClasses.each { DataClass schemaClass ->
+        dataModel.childDataClasses.each {DataClass schemaClass ->
             final StatementExecutionResults results = executePreparedStatement(dataModel, schemaClass, connection, indexInformationQueryString)
-            results.each { StatementExecutionResultsRow row ->
+            results.each {StatementExecutionResultsRow row ->
                 final DataClass tableClass = schemaClass.findDataClass(row.table_name as String)
                 if (!tableClass) {
                     log.warn 'Could not add {} as DataClass for table {} does not exist', row.index_name, row.table_name
@@ -304,22 +304,22 @@ abstract class AbstractDatabaseDataModelImporterProviderService<T extends Databa
     void addForeignKeyInformation(DataModel dataModel, Connection connection) throws ApiException, SQLException {
         if (!foreignKeyInformationQueryString) return
 
-        dataModel.childDataClasses.each { DataClass schemaClass ->
+        dataModel.childDataClasses.each {DataClass schemaClass ->
             final StatementExecutionResults results = executePreparedStatement(dataModel, schemaClass, connection, foreignKeyInformationQueryString)
-            results.each { StatementExecutionResultsRow row ->
-                final DataClass foreignTableClass = dataModel.dataClasses.find { DataClass dataClass -> dataClass.label == row.reference_table_name }
+            results.each {StatementExecutionResultsRow row ->
+                final DataClass foreignTableClass = dataModel.dataClasses.find {DataClass dataClass -> dataClass.label == row.reference_table_name}
                 DataType dataType
 
                 if (foreignTableClass) {
                     dataType = referenceTypeService.findOrCreateDataTypeForDataModel(
-                            dataModel, "${foreignTableClass.label}Type", "Linked to DataElement [${row.reference_column_name}]",
-                            dataModel.createdBy as User, foreignTableClass)
+                        dataModel, "${foreignTableClass.label}Type", "Linked to DataElement [${row.reference_column_name}]",
+                        dataModel.createdBy, foreignTableClass)
                     dataModel.addToDataTypes dataType
                 } else {
                     dataType = primitiveTypeService.findOrCreateDataTypeForDataModel(
-                            dataModel, "${row.reference_table_name}Type",
-                            "Missing link to foreign key table [${row.reference_table_name}.${row.reference_column_name}]",
-                            dataModel.createdBy as User
+                        dataModel, "${row.reference_table_name}Type",
+                        "Missing link to foreign key table [${row.reference_table_name}.${row.reference_column_name}]",
+                        dataModel.createdBy
                     )
                 }
 
@@ -327,7 +327,7 @@ abstract class AbstractDatabaseDataModelImporterProviderService<T extends Databa
                 final DataElement columnElement = tableClass.findDataElement(row.column_name as String)
                 columnElement.dataType = dataType
                 columnElement.addToMetadata(
-                        namespace, "foreign_key[${row.constraint_name}]", row.reference_column_name as String, dataModel.createdBy)
+                    namespace, "foreign_key[${row.constraint_name}]", row.reference_column_name as String, dataModel.createdBy)
             }
         }
     }
@@ -350,7 +350,7 @@ abstract class AbstractDatabaseDataModelImporterProviderService<T extends Databa
 
         while (resultSet.next()) {
             final StatementExecutionResultsRow row = new HashMap(columnCount) as StatementExecutionResultsRow
-            (1..columnCount).each { int i ->
+            (1..columnCount).each {int i ->
                 row[resultSetMetaData.getColumnName(i).toLowerCase()] = resultSet.getObject(i)
             }
             results << row
@@ -361,10 +361,12 @@ abstract class AbstractDatabaseDataModelImporterProviderService<T extends Databa
     }
 
     private List<DataModel> importDataModelsFromParameters(User currentUser, String databaseName, T parameters)
-            throws ApiException, ApiBadRequestException {
+        throws ApiException, ApiBadRequestException {
         String modelName = databaseName
         if (!parameters.isMultipleDataModelImport()) modelName = parameters.modelName ?: modelName
         modelName = parameters.dataModelNameSuffix ? "${modelName}_${parameters.dataModelNameSuffix}" : modelName
+
+        log.info('Importing DataModel with from database {} with name {}', databaseName, modelName)
 
         try {
             final Connection connection = getConnection(databaseName, parameters)
@@ -379,7 +381,7 @@ abstract class AbstractDatabaseDataModelImporterProviderService<T extends Databa
             }
 
             final List<DataModel> dataModels = importAndUpdateDataModelsFromResults(
-                    currentUser, databaseName, parameters, Folder.get(parameters.folderId), modelName, results, connection)
+                currentUser, databaseName, parameters, Folder.get(parameters.folderId), modelName, results, connection)
             connection.close()
             dataModels
         } catch (SQLException e) {
@@ -389,7 +391,7 @@ abstract class AbstractDatabaseDataModelImporterProviderService<T extends Databa
     }
 
     private StatementExecutionResults executePreparedStatement(
-            DataModel dataModel, DataClass schemaClass, Connection connection, String queryString) throws ApiException, SQLException {
+        DataModel dataModel, DataClass schemaClass, Connection connection, String queryString) throws ApiException, SQLException {
         StatementExecutionResults results = null
         try {
             final PreparedStatement preparedStatement = connection.prepareStatement(queryString)

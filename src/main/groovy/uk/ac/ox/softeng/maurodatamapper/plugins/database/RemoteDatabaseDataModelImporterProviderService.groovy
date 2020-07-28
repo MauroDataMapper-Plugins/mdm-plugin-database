@@ -49,42 +49,42 @@ trait RemoteDatabaseDataModelImporterProviderService {
         if (options) return options
 
         Collection<Option> optionDefinitions = [
-                Option.builder('c').with {
-                    longOpt 'config'
-                    desc 'Config file defining the import configuration'
-                    argName 'FILE'
-                    required().hasArg().build()
-                },
-                Option.builder('v').longOpt('version').build(),
-                Option.builder('h').longOpt('help').build(),
+            Option.builder('c').with {
+                longOpt 'config'
+                desc 'Config file defining the import configuration'
+                argName 'FILE'
+                required().hasArg().build()
+            },
+            Option.builder('v').longOpt('version').build(),
+            Option.builder('h').longOpt('help').build(),
         ]
 
         final OptionGroup mainOptions = new OptionGroup()
-        optionDefinitions.each { Option option -> mainOptions.addOption option }
+        optionDefinitions.each {Option option -> mainOptions.addOption option}
 
         optionDefinitions = [
-                Option.builder('u').with {
-                    longOpt 'username'
-                    desc 'Username for the Mauro Data Mapper (required)'
-                    argName 'USERNAME'
-                    hasArg().build()
-                },
-                Option.builder('p').with {
-                    longOpt 'password'
-                    desc 'Password for the Mauro Data Mapper (required)'
-                    argName 'PASSWORD'
-                    hasArg().build()
-                },
-                Option.builder('w').with {
-                    longOpt 'databasePassword'
-                    desc 'Password for the database to import (required)'
-                    argName 'DATABASE_PASSWORD'
-                    hasArg().build()
-                },
+            Option.builder('u').with {
+                longOpt 'username'
+                desc 'Username for the Mauro Data Mapper (required)'
+                argName 'USERNAME'
+                hasArg().build()
+            },
+            Option.builder('p').with {
+                longOpt 'password'
+                desc 'Password for the Mauro Data Mapper (required)'
+                argName 'PASSWORD'
+                hasArg().build()
+            },
+            Option.builder('w').with {
+                longOpt 'databasePassword'
+                desc 'Password for the database to import (required)'
+                argName 'DATABASE_PASSWORD'
+                hasArg().build()
+            },
         ]
 
-        options = new Options().tap { addOptionGroup mainOptions }
-        optionDefinitions.each { Option option -> options.addOption option }
+        options = new Options().tap {addOptionGroup mainOptions}
+        optionDefinitions.each {Option option -> options.addOption option}
         options
     }
 
@@ -94,22 +94,22 @@ trait RemoteDatabaseDataModelImporterProviderService {
         println "Starting Remote Database Import service\n${VERSION_INFO}\nConfig file: ${path.toAbsolutePath()}\n"
         Utils.outputRuntimeArgs(getClass())
         new RemoteDatabaseImporterAndExporter().performImportAndExport(
-                new Properties().tap {
-                    load Files.newInputStream(path)
-                    setProperty 'server.username', commandLine.getOptionValue('u')
-                    setProperty 'server.password', commandLine.getOptionValue('p')
-                    setProperty 'import.database.password', commandLine.getOptionValue('w')
-                })
+            new Properties().tap {
+                load Files.newInputStream(path)
+                setProperty 'server.username', commandLine.getOptionValue('u')
+                setProperty 'server.password', commandLine.getOptionValue('p')
+                setProperty 'import.database.password', commandLine.getOptionValue('w')
+            })
     }
 
     private static void printHelp() {
         new HelpFormatter().printHelp(
-                120,
-                'remote-database-importer -c <FILE> -u <USERNAME> -p <PASSWORD> -w <DATABASE_PASSWORD>',
-                'Import database to the Mauro Data Mapper\nConnect to a database, import to a DataModel and push to the Mauro server\n\n',
-                getOptions(),
-                "\n${VERSION_INFO}\nPlease report issues at https://metadatacatalogue.myjetbrains.com\n",
-                false)
+            120,
+            'remote-database-importer -c <FILE> -u <USERNAME> -p <PASSWORD> -w <DATABASE_PASSWORD>',
+            'Import database to the Mauro Data Mapper\nConnect to a database, import to a DataModel and push to the Mauro server\n\n',
+            getOptions(),
+            "\n${VERSION_INFO}\nPlease report issues at https://metadatacatalogue.myjetbrains.com\n",
+            false)
     }
 
     @SuppressWarnings('Println')
@@ -120,7 +120,7 @@ trait RemoteDatabaseDataModelImporterProviderService {
 
         // Parse command line arguments
         final CommandLine commandLine = new DefaultParser().parse(getOptions(), args)
-        if ('cpu'.any { String option -> commandLine.hasOption option }) {
+        if ('cpu'.any {String option -> commandLine.hasOption option}) {
             startService commandLine
         } else if (commandLine.hasOption('v')) {
             println VERSION_INFO

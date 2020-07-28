@@ -158,7 +158,8 @@ abstract class AbstractDatabaseDataModelImporterProviderService<T extends Databa
 
     @Override
     DataModel importDataModel(User currentUser, T parameters) throws ApiException, ApiBadRequestException {
-        importDataModelsFromParameters(currentUser, parameters.databaseNames, parameters).head()
+        List<DataModel> imported = importDataModels(currentUser, parameters)
+        imported ? imported.first() : null
     }
 
     @Override
@@ -167,7 +168,9 @@ abstract class AbstractDatabaseDataModelImporterProviderService<T extends Databa
         log.info 'Importing {} DataModel(s)', databaseNames.size()
 
         final List<DataModel> dataModels = []
-        databaseNames.each {String databaseName -> dataModels.addAll importDataModelsFromParameters(currentUser, databaseName, parameters)}
+        databaseNames.each {String databaseName ->
+            dataModels.addAll importDataModelsFromParameters(currentUser, databaseName, parameters)
+        }
         dataModels
     }
 

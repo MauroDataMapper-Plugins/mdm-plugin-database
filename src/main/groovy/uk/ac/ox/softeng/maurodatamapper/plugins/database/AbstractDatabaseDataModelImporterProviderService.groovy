@@ -49,8 +49,7 @@ abstract class AbstractDatabaseDataModelImporterProviderService<T extends Databa
     extends DataModelImporterProviderService<T> {
 
     static final String DATABASE_NAMESPACE = 'uk.ac.ox.softeng.maurodatamapper.plugins.database'
-
-    private static final String IS_NOT_NULL_CONSTRAINT = 'IS NOT NULL'
+    static final String IS_NOT_NULL_CONSTRAINT = 'IS NOT NULL'
 
     @Autowired
     DataModelService dataModelService

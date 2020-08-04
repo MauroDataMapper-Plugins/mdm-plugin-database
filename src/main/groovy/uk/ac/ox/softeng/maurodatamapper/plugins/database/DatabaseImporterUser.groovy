@@ -19,10 +19,8 @@ package uk.ac.ox.softeng.maurodatamapper.plugins.database
 
 import uk.ac.ox.softeng.maurodatamapper.security.User
 
-import groovy.transform.CompileStatic
-
 @Singleton
-@CompileStatic
+// @CompileStatic
 class DatabaseImporterUser implements User {
 
     String emailAddress = 'databaseImporter@maurodatamapper.com'

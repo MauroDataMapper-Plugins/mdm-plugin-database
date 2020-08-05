@@ -33,7 +33,6 @@ import uk.ac.ox.softeng.maurodatamapper.datamodel.item.datatype.ReferenceTypeSer
 import uk.ac.ox.softeng.maurodatamapper.datamodel.provider.importer.DataModelImporterProviderService
 import uk.ac.ox.softeng.maurodatamapper.security.User
 
-import groovy.transform.CompileStatic
 import groovy.util.logging.Slf4j
 import org.springframework.beans.factory.annotation.Autowired
 
@@ -43,15 +42,14 @@ import java.sql.ResultSet
 import java.sql.ResultSetMetaData
 import java.sql.SQLException
 
-@CompileStatic
 @Slf4j
+// @CompileStatic
 @SuppressWarnings('UnusedMethodParameter')
 abstract class AbstractDatabaseDataModelImporterProviderService<T extends DatabaseDataModelImporterProviderServiceParameters>
     extends DataModelImporterProviderService<T> {
 
     static final String DATABASE_NAMESPACE = 'uk.ac.ox.softeng.maurodatamapper.plugins.database'
-
-    private static final String IS_NOT_NULL_CONSTRAINT = 'IS NOT NULL'
+    static final String IS_NOT_NULL_CONSTRAINT = 'IS NOT NULL'
 
     @Autowired
     DataModelService dataModelService

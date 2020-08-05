@@ -7,7 +7,7 @@
 
 ## Requirements
 
-* Java 12 (Java.net)
+* Java 12 (AdoptOpenJDK)
 * Grails 4.0.3+
 * Gradle 6.5+
 

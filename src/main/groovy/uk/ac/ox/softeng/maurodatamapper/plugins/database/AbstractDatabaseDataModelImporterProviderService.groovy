@@ -67,14 +67,14 @@ abstract class AbstractDatabaseDataModelImporterProviderService<T extends Databa
     @Autowired
     ReferenceTypeService referenceTypeService
 
-    final String schemaNameColumnName = 'table_schema'
-    final String dataTypeColumnName = 'data_type'
-    final String tableNameColumnName = 'table_name'
-    final String columnNameColumnName = 'column_name'
-    final String tableCatalogColumnName = 'table_catalog'
-    final String columnIsNullableColumnName = 'is_nullable'
+    String schemaNameColumnName = 'table_schema'
+    String dataTypeColumnName = 'data_type'
+    String tableNameColumnName = 'table_name'
+    String columnNameColumnName = 'column_name'
+    String tableCatalogColumnName = 'table_catalog'
+    String columnIsNullableColumnName = 'is_nullable'
 
-    final Collection<String> coreColumns = [
+    Collection<String> coreColumns = [
         schemaNameColumnName,
         dataTypeColumnName,
         tableNameColumnName,
@@ -89,7 +89,7 @@ abstract class AbstractDatabaseDataModelImporterProviderService<T extends Databa
      *  * check_clause (the constraint information)
      * @return Query string for standard constraint information
      */
-    final String standardConstraintInformationQueryString = '''
+    String standardConstraintInformationQueryString = '''
             SELECT
               tc.table_name,
               cc.check_clause
@@ -108,7 +108,7 @@ abstract class AbstractDatabaseDataModelImporterProviderService<T extends Databa
      *  * ordinal_position
      * @return Query string for primary key and unique constraint information
      */
-    final String primaryKeyAndUniqueConstraintInformationQueryString = '''
+    String primaryKeyAndUniqueConstraintInformationQueryString = '''
             SELECT
               tc.constraint_name,
               tc.table_name,

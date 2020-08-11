@@ -48,7 +48,6 @@ def clazz = Environment.current == Environment.PRODUCTION ? RollingFileAppender 
 File logDir = new File(baseDir, 'logs').canonicalFile
 String logFilename = System.getProperty('mdm.logFileName') ?: Environment.current == Environment.PRODUCTION ? baseDir.name : baseDir.parentFile.name
 
-
 // See http://logback.qos.ch/manual/groovy.html for details on configuration
 appender('STDOUT', ConsoleAppender) {
     encoder(PatternLayoutEncoder) {

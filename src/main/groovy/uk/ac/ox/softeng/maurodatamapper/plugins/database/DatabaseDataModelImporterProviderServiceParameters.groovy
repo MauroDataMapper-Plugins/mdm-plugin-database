@@ -21,8 +21,8 @@ import uk.ac.ox.softeng.maurodatamapper.core.provider.importer.parameter.config.
 import uk.ac.ox.softeng.maurodatamapper.core.provider.importer.parameter.config.ImportParameterConfig
 import uk.ac.ox.softeng.maurodatamapper.datamodel.provider.importer.parameter.DataModelImporterProviderServiceParameters
 
-import java.sql.SQLException
 import javax.sql.DataSource
+import java.sql.SQLException
 
 // @CompileStatic
 abstract class DatabaseDataModelImporterProviderServiceParameters<K extends DataSource> extends DataModelImporterProviderServiceParameters {
@@ -51,7 +51,7 @@ abstract class DatabaseDataModelImporterProviderServiceParameters<K extends Data
         order = 1,
         group = @ImportGroupConfig(
             name = 'Database Import Details',
-            order = 0
+            order = 2
         ))
     String databaseNames
 
@@ -61,7 +61,7 @@ abstract class DatabaseDataModelImporterProviderServiceParameters<K extends Data
         order = 2,
         group = @ImportGroupConfig(
             name = 'Database Connection Details',
-            order = 0
+            order = 1
         ))
     String databaseHost
 
@@ -70,7 +70,7 @@ abstract class DatabaseDataModelImporterProviderServiceParameters<K extends Data
         description = [
             'The port that the database is accessed through.',
             'If not supplied then the default port for the specified type will be used.'],
-        order = 3,
+        order = 2,
         optional = true,
         group = @ImportGroupConfig(
             name = 'Database Connection Details',
@@ -81,31 +81,31 @@ abstract class DatabaseDataModelImporterProviderServiceParameters<K extends Data
     @ImportParameterConfig(
         displayName = 'Username',
         description = 'The username used to connect to the database.',
-        order = 4,
+        order = 3,
         group = @ImportGroupConfig(
             name = 'Database Connection Details',
-            order = 2
+            order = 1
         ))
     String databaseUsername
 
     @ImportParameterConfig(
         displayName = 'Password',
         description = 'The password used to connect to the database.',
-        order = 5,
+        order = 4,
         password = true,
         group = @ImportGroupConfig(
             name = 'Database Connection Details',
-            order = 3
+            order = 1
         ))
     String databasePassword
 
     @ImportParameterConfig(
         displayName = 'SSL',
         description = 'Whether SSL should be used to connect to the database.',
-        order = 6,
+        order = 2,
         group = @ImportGroupConfig(
             name = 'Database Connection Details',
-            order = 4
+            order = 1
         ))
     Boolean databaseSSL
 

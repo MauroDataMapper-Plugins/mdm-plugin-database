@@ -345,7 +345,7 @@ abstract class AbstractDatabaseDataModelImporterProviderService<T extends Databa
         while (resultSet.next()) {
             final Map<String, Object> row = new HashMap(columnCount)
             (1..columnCount).each {int i ->
-                row[resultSetMetaData.getColumnName(i).toLowerCase()] = resultSet.getObject(i)
+                row[resultSetMetaData.getColumnLabel(i).toLowerCase()] = resultSet.getObject(i)
             }
             results << row
         }

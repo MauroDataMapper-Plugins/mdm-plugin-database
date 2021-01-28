@@ -1,5 +1,5 @@
 /*
- * Copyright 2020 University of Oxford
+ * Copyright 2020 University of Oxford and Health and Social Care Information Centre, also known as NHS Digital
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -33,6 +33,10 @@ import grails.boot.GrailsApp
 import grails.plugin.json.view.JsonViewTemplateEngine
 import grails.views.WritableScriptTemplate
 import grails.web.mime.MimeType
+import groovy.json.JsonBuilder
+import groovy.json.JsonException
+import groovy.json.JsonSlurper
+import groovy.util.logging.Slf4j
 import org.grails.orm.hibernate.HibernateDatastore
 import org.grails.web.json.JSONObject
 import org.springframework.context.ApplicationContext
@@ -45,16 +49,11 @@ import org.springframework.validation.Errors
 import org.springframework.validation.FieldError
 import org.springframework.validation.ObjectError
 
-import groovy.json.JsonBuilder
-import groovy.json.JsonException
-import groovy.json.JsonSlurper
-import groovy.util.logging.Slf4j
-
+import java.security.SecureRandom
 import javax.net.ssl.HttpsURLConnection
 import javax.net.ssl.SSLContext
 import javax.net.ssl.TrustManager
 import javax.net.ssl.X509TrustManager
-import java.security.SecureRandom
 
 @Slf4j
 class RemoteDatabaseImporterAndExporter {

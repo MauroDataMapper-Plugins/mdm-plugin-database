@@ -143,4 +143,8 @@ abstract class DatabaseDataModelImporterProviderServiceParameters<K extends Data
     abstract String getDatabaseDialect()
 
     abstract int getDefaultPort()
+
+    boolean shouldImportSchemasAsDataClasses() {
+        true
+    }
 }

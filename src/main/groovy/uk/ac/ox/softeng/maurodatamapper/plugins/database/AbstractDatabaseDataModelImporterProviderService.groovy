@@ -183,7 +183,7 @@ abstract class AbstractDatabaseDataModelImporterProviderService<T extends Databa
     }
 
     DataModel importDataModelFromResults(User user, Folder folder, String modelName, String dialect, List<Map<String, Object>> results,
-                                         boolean importSchemaAsDataClass = true) throws ApiException {
+                                         boolean importSchemaAsDataClass) throws ApiException {
         final DataModel dataModel = dataModelService.createAndSaveDataModel(user, folder, DataModelType.DATA_ASSET, modelName, null, null, null).tap {
             addToMetadata(namespace: DATABASE_NAMESPACE, key: 'dialect', value: dialect, createdBy: user.emailAddress)
         }
@@ -215,7 +215,8 @@ abstract class AbstractDatabaseDataModelImporterProviderService<T extends Databa
 
     List<DataModel> importAndUpdateDataModelsFromResults(User currentUser, String databaseName, T parameters, Folder folder, String modelName,
                                                          List<Map<String, Object>> results, Connection connection) throws ApiException, SQLException {
-        final DataModel dataModel = importDataModelFromResults(currentUser, folder, modelName, parameters.databaseDialect, results)
+        final DataModel dataModel = importDataModelFromResults(currentUser, folder, modelName, parameters.databaseDialect, results,
+                                                               parameters.shouldImportSchemasAsDataClasses())
         if (parameters.dataModelNameSuffix) dataModel.aliasesString = databaseName
         updateDataModelWithDatabaseSpecificInformation(dataModel, connection)
         [dataModel]
@@ -337,7 +338,7 @@ abstract class AbstractDatabaseDataModelImporterProviderService<T extends Databa
         }
     }
 
-    private static List<Map<String, Object>> executeStatement(PreparedStatement preparedStatement) throws ApiException, SQLException {
+    static List<Map<String, Object>> executeStatement(PreparedStatement preparedStatement) throws ApiException, SQLException {
         final List<Map<String, Object>> results = new ArrayList(50)
         final ResultSet resultSet = preparedStatement.executeQuery()
         final ResultSetMetaData resultSetMetaData = resultSet.metaData

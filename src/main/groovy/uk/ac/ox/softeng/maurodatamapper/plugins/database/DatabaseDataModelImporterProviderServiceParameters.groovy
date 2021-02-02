@@ -1,5 +1,5 @@
 /*
- * Copyright 2020 University of Oxford
+ * Copyright 2020 University of Oxford and Health and Social Care Information Centre, also known as NHS Digital
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -21,12 +21,10 @@ import uk.ac.ox.softeng.maurodatamapper.core.provider.importer.parameter.config.
 import uk.ac.ox.softeng.maurodatamapper.core.provider.importer.parameter.config.ImportParameterConfig
 import uk.ac.ox.softeng.maurodatamapper.datamodel.provider.importer.parameter.DataModelImporterProviderServiceParameters
 
-import groovy.transform.CompileStatic
-
 import java.sql.SQLException
 import javax.sql.DataSource
 
-@CompileStatic
+// @CompileStatic
 abstract class DatabaseDataModelImporterProviderServiceParameters<K extends DataSource> extends DataModelImporterProviderServiceParameters {
 
     @ImportParameterConfig(
@@ -53,7 +51,7 @@ abstract class DatabaseDataModelImporterProviderServiceParameters<K extends Data
         order = 1,
         group = @ImportGroupConfig(
             name = 'Database Import Details',
-            order = 0
+            order = 2
         ))
     String databaseNames
 
@@ -63,7 +61,7 @@ abstract class DatabaseDataModelImporterProviderServiceParameters<K extends Data
         order = 2,
         group = @ImportGroupConfig(
             name = 'Database Connection Details',
-            order = 0
+            order = 1
         ))
     String databaseHost
 
@@ -72,46 +70,46 @@ abstract class DatabaseDataModelImporterProviderServiceParameters<K extends Data
         description = [
             'The port that the database is accessed through.',
             'If not supplied then the default port for the specified type will be used.'],
-        order = 3,
+        order = 2,
         optional = true,
         group = @ImportGroupConfig(
             name = 'Database Connection Details',
             order = 1
         ))
-    int databasePort
+    Integer databasePort
 
     @ImportParameterConfig(
         displayName = 'Username',
         description = 'The username used to connect to the database.',
-        order = 4,
+        order = 3,
         group = @ImportGroupConfig(
             name = 'Database Connection Details',
-            order = 2
+            order = 1
         ))
     String databaseUsername
 
     @ImportParameterConfig(
         displayName = 'Password',
         description = 'The password used to connect to the database.',
-        order = 5,
+        order = 4,
         password = true,
         group = @ImportGroupConfig(
             name = 'Database Connection Details',
-            order = 3
+            order = 1
         ))
     String databasePassword
 
     @ImportParameterConfig(
         displayName = 'SSL',
         description = 'Whether SSL should be used to connect to the database.',
-        order = 6,
+        order = 2,
         group = @ImportGroupConfig(
             name = 'Database Connection Details',
-            order = 4
+            order = 1
         ))
-    boolean databaseSSL
+    Boolean databaseSSL
 
-    int getDatabasePort() {
+    Integer getDatabasePort() {
         databasePort = databasePort ?: defaultPort
         databasePort
     }
@@ -129,10 +127,10 @@ abstract class DatabaseDataModelImporterProviderServiceParameters<K extends Data
         databaseHost = properties.getProperty 'import.database.host'
         databaseUsername = properties.getProperty 'import.database.username'
         databasePassword = properties.getProperty 'import.database.password'
-        databaseSSL = properties.getProperty('import.database.ssl') as boolean
+        databaseSSL = properties.getProperty('import.database.ssl') as Boolean
 
         try {
-            databasePort = properties.getProperty('import.database.port') as int
+            databasePort = properties.getProperty('import.database.port') as Integer
         } catch (NumberFormatException ignored) {
             databasePort = defaultPort
         }
@@ -145,4 +143,8 @@ abstract class DatabaseDataModelImporterProviderServiceParameters<K extends Data
     abstract String getDatabaseDialect()
 
     abstract int getDefaultPort()
+
+    boolean shouldImportSchemasAsDataClasses() {
+        true
+    }
 }

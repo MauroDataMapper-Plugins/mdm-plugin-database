@@ -1,5 +1,6 @@
 /*
- * Copyright 2020 University of Oxford
+ * Copyright 2020 University of Oxford and Health and Social Care Information Centre, also known as NHS Digital and Health and Social Care
+ * Information Centre, also known as NHS Digital
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -47,7 +48,6 @@ def clazz = Environment.current == Environment.PRODUCTION ? RollingFileAppender 
 
 File logDir = new File(baseDir, 'logs').canonicalFile
 String logFilename = System.getProperty('mdm.logFileName') ?: Environment.current == Environment.PRODUCTION ? baseDir.name : baseDir.parentFile.name
-
 
 // See http://logback.qos.ch/manual/groovy.html for details on configuration
 appender('STDOUT', ConsoleAppender) {

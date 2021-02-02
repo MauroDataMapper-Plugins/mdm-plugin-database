@@ -1,12 +1,15 @@
 # mdm-plugin-database
 
-[![Build Status](https://jenkins.cs.ox.ac.uk/job/Mauro%20Data%20Mapper%20Plugins/job/mdm-plugin-database/job/develop/badge/icon)](https://jenkins.cs.ox.ac.uk/job/Mauro%20Data%20Mapper%20Plugins/job/mdm-plugin-database/job/develop/)
+| Branch | Build Status |
+| ------ | ------------ |
+| main | [![Build Status](https://jenkins.cs.ox.ac.uk/buildStatus/icon?job=Mauro+Data+Mapper+Plugins%2Fmdm-plugin-database%2Fmain)](https://jenkins.cs.ox.ac.uk/blue/organizations/jenkins/Mauro%20Data%20Mapper%20Plugins%2Fmdm-plugin-database/branches) |
+| develop | [![Build Status](https://jenkins.cs.ox.ac.uk/buildStatus/icon?job=Mauro+Data+Mapper+Plugins%2Fmdm-plugin-database%2Fdevelop)](https://jenkins.cs.ox.ac.uk/blue/organizations/jenkins/Mauro%20Data%20Mapper%20Plugins%2Fmdm-plugin-database/branches) |
 
 ## Requirements
 
-* Java 12 (Java.net)
-* Grails 4.0.3+
-* Gradle 6.5+
+* Java 12 (AdoptOpenJDK)
+* Grails 4.0.6+
+* Gradle 6.7.1+
 
 All of the above can be installed and easily maintained by using [SDKMAN!](https://sdkman.io/install).
 

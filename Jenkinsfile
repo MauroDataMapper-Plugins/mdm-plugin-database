@@ -1,12 +1,17 @@
 pipeline {
     agent any
 
+    environment {
+        JENKINS = 'true'
+    }
+
     tools {
         jdk 'jdk-12'
     }
 
     options {
         timestamps()
+        timeout(time: 30, unit: 'MINUTES')
         skipStagesAfterUnstable()
         buildDiscarder(logRotator(numToKeepStr: '30'))
     }
@@ -25,41 +30,69 @@ pipeline {
             }
         }
 
-        stage('Compile') {
+        stage('Info') {
             steps {
                 sh './gradlew -v' // Output gradle version for verification checks
-                sh "./gradlew jenkinsClean compile"
+                sh './gradlew jvmArgs sysProps'
+                sh './grailsw -v' // Output grails version for verification checks
             }
         }
 
-        stage('License Header Check'){
-            steps{
-                sh './gradlew license'
+        stage('Test cleanup & Compile') {
+            steps {
+                sh "./gradlew jenkinsClean"
+                sh './gradlew compile'
             }
         }
 
-//        stage('Static Code Analysis') {
-//            steps {
-//                sh "./gradlew -PciRun=true staticCodeAnalysis"
-//            }
-//            post {
-//                always {
-//                    checkstyle canComputeNew: false, defaultEncoding: '', healthy: '0', pattern: '**/build/reports/checkstyle/*.xml', unHealthy: ''
-//                    findbugs canComputeNew: false, defaultEncoding: '', excludePattern: '', healthy: '0', includePattern: '', pattern:'**/build/reports/spotbugs/*.xml', unHealthy: ''
-//                    pmd canComputeNew: false, defaultEncoding: '', healthy: '0', pattern: '**/build/reports/pmd/*.xml', unHealthy: ''
-//                    publishHTML(
-//                        target: [
-//                            allowMissing         : false,
-//                            alwaysLinkToLastBuild: false,
-//                            keepAll              : true,
-//                            reportDir            : 'build/reports/codenarc',
-//                            reportFiles          : 'main.html',
-//                            reportName           : "Codenarc Report"
-//                        ]
-//                    )
-//                }
-//            }
-//        }
+        stage('License Header Check') {
+            steps {
+                warnError('Missing License Headers') {
+                    sh './gradlew --build-cache license'
+                }
+            }
+        }
+
+        stage('Unit Test') {
+
+            steps {
+                sh "./gradlew --build-cache test"
+            }
+            post {
+                always {
+                    junit allowEmptyResults: true, testResults: 'build/test-results/test/*.xml'
+                }
+            }
+        }
+
+        stage('Integration Test') {
+
+            steps {
+                sh "./gradlew --build-cache integrationTest"
+            }
+            post {
+                always {
+                    junit allowEmptyResults: true, testResults: 'build/test-results/integrationTest/*.xml'
+                }
+            }
+        }
+
+        stage('Static Code Analysis') {
+            steps {
+                sh "./gradlew -PciRun=true staticCodeAnalysis jacocoTestReport"
+            }
+        }
+
+        stage('Sonarqube') {
+            when {
+                branch 'develop'
+            }
+            steps {
+                withSonarQubeEnv('JenkinsQube') {
+                    sh "./gradlew sonarqube"
+                }
+            }
+        }
 
         stage('Deploy to Artifactory') {
             when {
@@ -84,6 +117,26 @@ pipeline {
 
     post {
         always {
+            publishHTML([
+                allowMissing         : false,
+                alwaysLinkToLastBuild: true,
+                keepAll              : true,
+                reportDir            : 'build/reports/tests',
+                reportFiles          : 'index.html',
+                reportName           : 'Test Report',
+                reportTitles         : 'Test'
+            ])
+
+            recordIssues enabledForFailure: true, tools: [java(), javaDoc()]
+            recordIssues enabledForFailure: true, tool: checkStyle(pattern: '**/reports/checkstyle/*.xml')
+            recordIssues enabledForFailure: true, tool: codeNarc(pattern: '**/reports/codenarc/*.xml')
+            recordIssues enabledForFailure: true, tool: spotBugs(pattern: '**/reports/spotbugs/*.xml', useRankAsPriority: true)
+            recordIssues enabledForFailure: true, tool: pmdParser(pattern: '**/reports/pmd/*.xml')
+
+            publishCoverage adapters: [jacocoAdapter('**/reports/jacoco/jacocoTestReport.xml')]
+            outputTestResults()
+            jacoco classPattern: '**/build/classes', execPattern: '**/build/jacoco/*.exec', sourceInclusionPattern: '**/*.java,**/*.groovy', sourcePattern: '**/src/main/groovy,**/grails-app/controllers,**/grails-app/domain,**/grails-app/services,**/grails-app/utils'
+            archiveArtifacts allowEmptyArchive: true, artifacts: '**/*.log'
             slackNotification()
         }
     }

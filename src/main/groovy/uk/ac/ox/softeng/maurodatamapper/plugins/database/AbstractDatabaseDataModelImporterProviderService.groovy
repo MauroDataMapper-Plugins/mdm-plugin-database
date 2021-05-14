@@ -21,7 +21,6 @@ import uk.ac.ox.softeng.maurodatamapper.api.exception.ApiBadRequestException
 import uk.ac.ox.softeng.maurodatamapper.api.exception.ApiException
 import uk.ac.ox.softeng.maurodatamapper.core.container.Folder
 import uk.ac.ox.softeng.maurodatamapper.datamodel.DataModel
-import uk.ac.ox.softeng.maurodatamapper.datamodel.DataModelService
 import uk.ac.ox.softeng.maurodatamapper.datamodel.DataModelType
 import uk.ac.ox.softeng.maurodatamapper.datamodel.item.DataClass
 import uk.ac.ox.softeng.maurodatamapper.datamodel.item.DataClassService
@@ -33,6 +32,7 @@ import uk.ac.ox.softeng.maurodatamapper.datamodel.item.datatype.ReferenceTypeSer
 import uk.ac.ox.softeng.maurodatamapper.datamodel.provider.importer.DataModelImporterProviderService
 import uk.ac.ox.softeng.maurodatamapper.security.User
 
+import groovy.transform.CompileStatic
 import groovy.util.logging.Slf4j
 import org.springframework.beans.factory.annotation.Autowired
 
@@ -43,16 +43,12 @@ import java.sql.ResultSetMetaData
 import java.sql.SQLException
 
 @Slf4j
-// @CompileStatic
-@SuppressWarnings('UnusedMethodParameter')
-abstract class AbstractDatabaseDataModelImporterProviderService<T extends DatabaseDataModelImporterProviderServiceParameters>
-    extends DataModelImporterProviderService<T> {
+@CompileStatic
+abstract class AbstractDatabaseDataModelImporterProviderService<S extends DatabaseDataModelImporterProviderServiceParameters>
+    extends DataModelImporterProviderService<S> {
 
     static final String DATABASE_NAMESPACE = 'uk.ac.ox.softeng.maurodatamapper.plugins.database'
     static final String IS_NOT_NULL_CONSTRAINT = 'IS NOT NULL'
-
-    @Autowired
-    DataModelService dataModelService
 
     @Autowired
     DataClassService dataClassService
@@ -173,12 +169,14 @@ abstract class AbstractDatabaseDataModelImporterProviderService<T extends Databa
 
         final List<DataModel> dataModels = []
         databaseNames.each {String databaseName ->
-            dataModels.addAll importDataModelsFromParameters(currentUser, databaseName, parameters as T)
+            List<DataModel> importedModels = importDataModelsFromParameters(currentUser, databaseName, parameters as S)
+            dataModels.addAll(importedModels)
         }
         dataModels
     }
 
-    PreparedStatement prepareCoreStatement(Connection connection, T parameters) {
+    @SuppressWarnings('unused')
+    PreparedStatement prepareCoreStatement(Connection connection, S parameters) {
         connection.prepareStatement(databaseStructureQueryString)
     }
 
@@ -213,7 +211,7 @@ abstract class AbstractDatabaseDataModelImporterProviderService<T extends Databa
         dataModel
     }
 
-    List<DataModel> importAndUpdateDataModelsFromResults(User currentUser, String databaseName, T parameters, Folder folder, String modelName,
+    List<DataModel> importAndUpdateDataModelsFromResults(User currentUser, String databaseName, S parameters, Folder folder, String modelName,
                                                          List<Map<String, Object>> results, Connection connection) throws ApiException, SQLException {
         final DataModel dataModel = importDataModelFromResults(currentUser, folder, modelName, parameters.databaseDialect, results,
                                                                parameters.shouldImportSchemasAsDataClasses())
@@ -329,7 +327,7 @@ abstract class AbstractDatabaseDataModelImporterProviderService<T extends Databa
         }
     }
 
-    Connection getConnection(String databaseName, T parameters) throws ApiException, ApiBadRequestException {
+    Connection getConnection(String databaseName, S parameters) throws ApiException, ApiBadRequestException {
         try {
             parameters.getDataSource(databaseName).getConnection(parameters.databaseUsername, parameters.databasePassword)
         } catch (SQLException e) {
@@ -355,7 +353,7 @@ abstract class AbstractDatabaseDataModelImporterProviderService<T extends Databa
         results
     }
 
-    private List<DataModel> importDataModelsFromParameters(User currentUser, String databaseName, T parameters)
+    private List<DataModel> importDataModelsFromParameters(User currentUser, String databaseName, S parameters)
         throws ApiException, ApiBadRequestException {
         String modelName = databaseName
         if (!parameters.isMultipleDataModelImport()) modelName = parameters.modelName ?: modelName

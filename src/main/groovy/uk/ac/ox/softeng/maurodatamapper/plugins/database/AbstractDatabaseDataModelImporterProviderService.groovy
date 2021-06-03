@@ -264,16 +264,18 @@ abstract class AbstractDatabaseDataModelImporterProviderService<S extends Databa
                     if (!tableClass) return
 
                     final String constraintTypeName = (firstRow.constraint_type as String).toLowerCase().replaceAll(/ /, '_')
-                    final String constraintTypeValue = rows.size() == 1 ?
-                                                       firstRow.column_name : rows.sort {it.ordinal_position}.collect {it.column_name}.join(', ')
-                    tableClass.addToMetadata(
-                        namespace, "${constraintTypeName}[${firstRow.constraint_name}]", constraintTypeValue, dataModel.createdBy)
+                    final String constraintTypeColumns = rows.size() == 1 ?
+                                                         firstRow.column_name :
+                                                         rows.sort {it.ordinal_position}.collect {it.column_name}.join(', ')
+                    final String constraintKeyName = firstRow.constraint_name.toString()
+
+                    tableClass.addToMetadata(namespace, "${constraintTypeName}_name", constraintKeyName, dataModel.createdBy)
+                    tableClass.addToMetadata(namespace, "${constraintTypeName}_columns", constraintTypeColumns, dataModel.createdBy)
 
                     rows.each {Map<String, Object> row ->
                         final DataElement columnElement = tableClass.findDataElement(row.column_name as String)
                         if (columnElement) {
-                            columnElement.addToMetadata(
-                                namespace, (row.constraint_type as String).toLowerCase(), row.ordinal_position as String, dataModel.createdBy)
+                            columnElement.addToMetadata(namespace, (row.constraint_type as String).toLowerCase(), row.ordinal_position as String, dataModel.createdBy)
                         }
                     }
                 }
@@ -293,7 +295,8 @@ abstract class AbstractDatabaseDataModelImporterProviderService<S extends Databa
 
                 String indexType = row.primary_index ? 'primary_index' : row.unique_index ? 'unique_index' : 'index'
                 indexType = row.clustered ? "clustered_${indexType}" : indexType
-                tableClass.addToMetadata(namespace, "${indexType}[${row.index_name}]", row.column_names as String, dataModel.createdBy)
+                tableClass.addToMetadata(namespace, "${indexType}_name", row.index_name as String, dataModel.createdBy)
+                tableClass.addToMetadata(namespace, "${indexType}_columns", row.column_names as String, dataModel.createdBy)
             }
         }
     }
@@ -321,8 +324,8 @@ abstract class AbstractDatabaseDataModelImporterProviderService<S extends Databa
                 final DataClass tableClass = schemaClass.findDataClass(row.table_name as String)
                 final DataElement columnElement = tableClass.findDataElement(row.column_name as String)
                 columnElement.dataType = dataType
-                columnElement.addToMetadata(
-                    namespace, "foreign_key[${row.constraint_name}]", row.reference_column_name as String, dataModel.createdBy)
+                columnElement.addToMetadata(namespace, "foreign_key_name", row.constraint_name as String, dataModel.createdBy)
+                columnElement.addToMetadata(namespace, "foreign_key_columns", row.reference_column_name as String, dataModel.createdBy)
             }
         }
     }

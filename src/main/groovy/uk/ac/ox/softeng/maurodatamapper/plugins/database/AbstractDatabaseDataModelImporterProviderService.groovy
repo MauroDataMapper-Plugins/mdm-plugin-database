@@ -32,6 +32,7 @@ import uk.ac.ox.softeng.maurodatamapper.datamodel.item.datatype.ReferenceTypeSer
 import uk.ac.ox.softeng.maurodatamapper.datamodel.provider.importer.DataModelImporterProviderService
 import uk.ac.ox.softeng.maurodatamapper.security.User
 
+import groovy.json.JsonOutput
 import groovy.transform.CompileStatic
 import groovy.util.logging.Slf4j
 import org.springframework.beans.factory.annotation.Autowired
@@ -286,17 +287,24 @@ abstract class AbstractDatabaseDataModelImporterProviderService<S extends Databa
         if (!indexInformationQueryString) return
         dataModel.childDataClasses.each {DataClass schemaClass ->
             final List<Map<String, Object>> results = executePreparedStatement(dataModel, schemaClass, connection, indexInformationQueryString)
-            results.each {Map<String, Object> row ->
-                final DataClass tableClass = schemaClass.findDataClass(row.table_name as String)
+
+            results.groupBy {it.table_name}.each {tableName, rows ->
+                final DataClass tableClass = schemaClass.findDataClass(tableName as String)
                 if (!tableClass) {
-                    log.warn 'Could not add {} as DataClass for table {} does not exist', row.index_name, row.table_name
+                    log.warn 'Could not add indexes as DataClass for table {} does not exist', tableName
                     return
                 }
 
-                String indexType = row.primary_index ? 'primary_index' : row.unique_index ? 'unique_index' : 'index'
-                indexType = row.clustered ? "clustered_${indexType}" : indexType
-                tableClass.addToMetadata(namespace, "${indexType}_name", row.index_name as String, dataModel.createdBy)
-                tableClass.addToMetadata(namespace, "${indexType}_columns", row.column_names as String, dataModel.createdBy)
+                List<LinkedHashMap<String, Object>> indexes = rows.collect {row ->
+                    [name          : (row.index_name as String).trim(),
+                     columns       : (row.column_names as String).trim(),
+                     primaryIndex  : row.primary_index ?: false,
+                     uniqueIndex   : row.unique_index ?: false,
+                     clusteredIndex: row.clustered ?: false,
+                    ]
+                }
+
+                tableClass.addToMetadata(namespace, 'indexes', JsonOutput.prettyPrint(JsonOutput.toJson(indexes)), dataModel.createdBy)
             }
         }
     }

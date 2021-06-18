@@ -1,5 +1,5 @@
 /*
- * Copyright 2020 University of Oxford and Health and Social Care Information Centre, also known as NHS Digital
+ * Copyright 2020-2021 University of Oxford and Health and Social Care Information Centre, also known as NHS Digital
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -32,6 +32,7 @@ import uk.ac.ox.softeng.maurodatamapper.datamodel.item.datatype.ReferenceTypeSer
 import uk.ac.ox.softeng.maurodatamapper.datamodel.provider.importer.DataModelImporterProviderService
 import uk.ac.ox.softeng.maurodatamapper.security.User
 
+import groovy.json.JsonOutput
 import groovy.transform.CompileStatic
 import groovy.util.logging.Slf4j
 import org.springframework.beans.factory.annotation.Autowired
@@ -264,16 +265,18 @@ abstract class AbstractDatabaseDataModelImporterProviderService<S extends Databa
                     if (!tableClass) return
 
                     final String constraintTypeName = (firstRow.constraint_type as String).toLowerCase().replaceAll(/ /, '_')
-                    final String constraintTypeValue = rows.size() == 1 ?
-                                                       firstRow.column_name : rows.sort {it.ordinal_position}.collect {it.column_name}.join(', ')
-                    tableClass.addToMetadata(
-                        namespace, "${constraintTypeName}[${firstRow.constraint_name}]", constraintTypeValue, dataModel.createdBy)
+                    final String constraintTypeColumns = rows.size() == 1 ?
+                                                         firstRow.column_name :
+                                                         rows.sort {it.ordinal_position}.collect {it.column_name}.join(', ')
+                    final String constraintKeyName = firstRow.constraint_name.toString()
+
+                    tableClass.addToMetadata(namespace, "${constraintTypeName}_name", constraintKeyName, dataModel.createdBy)
+                    tableClass.addToMetadata(namespace, "${constraintTypeName}_columns", constraintTypeColumns, dataModel.createdBy)
 
                     rows.each {Map<String, Object> row ->
                         final DataElement columnElement = tableClass.findDataElement(row.column_name as String)
                         if (columnElement) {
-                            columnElement.addToMetadata(
-                                namespace, (row.constraint_type as String).toLowerCase(), row.ordinal_position as String, dataModel.createdBy)
+                            columnElement.addToMetadata(namespace, (row.constraint_type as String).toLowerCase(), row.ordinal_position as String, dataModel.createdBy)
                         }
                     }
                 }
@@ -284,16 +287,24 @@ abstract class AbstractDatabaseDataModelImporterProviderService<S extends Databa
         if (!indexInformationQueryString) return
         dataModel.childDataClasses.each {DataClass schemaClass ->
             final List<Map<String, Object>> results = executePreparedStatement(dataModel, schemaClass, connection, indexInformationQueryString)
-            results.each {Map<String, Object> row ->
-                final DataClass tableClass = schemaClass.findDataClass(row.table_name as String)
+
+            results.groupBy {it.table_name}.each {tableName, rows ->
+                final DataClass tableClass = schemaClass.findDataClass(tableName as String)
                 if (!tableClass) {
-                    log.warn 'Could not add {} as DataClass for table {} does not exist', row.index_name, row.table_name
+                    log.warn 'Could not add indexes as DataClass for table {} does not exist', tableName
                     return
                 }
 
-                String indexType = row.primary_index ? 'primary_index' : row.unique_index ? 'unique_index' : 'index'
-                indexType = row.clustered ? "clustered_${indexType}" : indexType
-                tableClass.addToMetadata(namespace, "${indexType}[${row.index_name}]", row.column_names as String, dataModel.createdBy)
+                List<Map> indexes = rows.collect {row ->
+                    [name          : (row.index_name as String).trim(),
+                     columns       : (row.column_names as String).trim(),
+                     primaryIndex  : getBooleanValue(row.primary_index),
+                     uniqueIndex   : getBooleanValue(row.unique_index ),
+                     clusteredIndex: getBooleanValue(row.clustered),
+                    ]
+                } as List<Map>
+
+                tableClass.addToMetadata(namespace, 'indexes', JsonOutput.prettyPrint(JsonOutput.toJson(indexes)), dataModel.createdBy)
             }
         }
     }
@@ -321,8 +332,8 @@ abstract class AbstractDatabaseDataModelImporterProviderService<S extends Databa
                 final DataClass tableClass = schemaClass.findDataClass(row.table_name as String)
                 final DataElement columnElement = tableClass.findDataElement(row.column_name as String)
                 columnElement.dataType = dataType
-                columnElement.addToMetadata(
-                    namespace, "foreign_key[${row.constraint_name}]", row.reference_column_name as String, dataModel.createdBy)
+                columnElement.addToMetadata(namespace, "foreign_key_name", row.constraint_name as String, dataModel.createdBy)
+                columnElement.addToMetadata(namespace, "foreign_key_columns", row.reference_column_name as String, dataModel.createdBy)
             }
         }
     }
@@ -396,5 +407,9 @@ abstract class AbstractDatabaseDataModelImporterProviderService<S extends Databa
             } else throw e
         }
         results
+    }
+
+    static boolean getBooleanValue(def value){
+        value.toString().toBoolean()
     }
 }

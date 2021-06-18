@@ -295,14 +295,14 @@ abstract class AbstractDatabaseDataModelImporterProviderService<S extends Databa
                     return
                 }
 
-                List<LinkedHashMap<String, Object>> indexes = rows.collect {row ->
+                List<Map> indexes = rows.collect {row ->
                     [name          : (row.index_name as String).trim(),
                      columns       : (row.column_names as String).trim(),
-                     primaryIndex  : row.primary_index ?: false,
-                     uniqueIndex   : row.unique_index ?: false,
-                     clusteredIndex: row.clustered ?: false,
+                     primaryIndex  : getBooleanValue(row.primary_index),
+                     uniqueIndex   : getBooleanValue(row.unique_index ),
+                     clusteredIndex: getBooleanValue(row.clustered),
                     ]
-                }
+                } as List<Map>
 
                 tableClass.addToMetadata(namespace, 'indexes', JsonOutput.prettyPrint(JsonOutput.toJson(indexes)), dataModel.createdBy)
             }
@@ -407,5 +407,9 @@ abstract class AbstractDatabaseDataModelImporterProviderService<S extends Databa
             } else throw e
         }
         results
+    }
+
+    static boolean getBooleanValue(def value){
+        value.toString().toBoolean()
     }
 }

@@ -19,6 +19,7 @@ package uk.ac.ox.softeng.maurodatamapper.plugins.database
 
 import uk.ac.ox.softeng.maurodatamapper.api.exception.ApiBadRequestException
 import uk.ac.ox.softeng.maurodatamapper.api.exception.ApiException
+import uk.ac.ox.softeng.maurodatamapper.core.authority.AuthorityService
 import uk.ac.ox.softeng.maurodatamapper.core.container.Folder
 import uk.ac.ox.softeng.maurodatamapper.datamodel.DataModel
 import uk.ac.ox.softeng.maurodatamapper.datamodel.DataModelType
@@ -62,6 +63,9 @@ abstract class AbstractDatabaseDataModelImporterProviderService<S extends Databa
 
     @Autowired
     ReferenceTypeService referenceTypeService
+
+    @Autowired
+    AuthorityService authorityService
 
     String schemaNameColumnName = 'table_schema'
     String dataTypeColumnName = 'data_type'
@@ -183,9 +187,9 @@ abstract class AbstractDatabaseDataModelImporterProviderService<S extends Databa
 
     DataModel importDataModelFromResults(User user, Folder folder, String modelName, String dialect, List<Map<String, Object>> results,
                                          boolean importSchemaAsDataClass) throws ApiException {
-        final DataModel dataModel = dataModelService.createAndSaveDataModel(user, folder, DataModelType.DATA_ASSET, modelName, null, null, null).tap {
-            addToMetadata(namespace: DATABASE_NAMESPACE, key: 'dialect', value: dialect, createdBy: user.emailAddress)
-        }
+        final DataModel dataModel = new DataModel(createdBy: user.emailAddress, label: modelName, type: DataModelType.DATA_ASSET, folder: folder,
+                                                  authority: authorityService.getDefaultAuthority())
+        dataModel.addToMetadata(namespace: DATABASE_NAMESPACE, key: 'dialect', value: dialect, createdBy: user.emailAddress)
 
         results.each {Map<String, Object> row ->
             final DataType dataType = primitiveTypeService.findOrCreateDataTypeForDataModel(dataModel, row[dataTypeColumnName] as String, null, user)
@@ -205,7 +209,7 @@ abstract class AbstractDatabaseDataModelImporterProviderService<S extends Databa
             row.findAll {String column, data ->
                 data && !(column in coreColumns)
             }.each {String column, data ->
-                dataElement.addToMetadata(namespace, column, data.toString(), user)
+                dataElement.addToMetadata(namespace: namespace, key: column, value: data.toString(), createdBy: user.emailAddress)
             }
         }
 
@@ -299,7 +303,7 @@ abstract class AbstractDatabaseDataModelImporterProviderService<S extends Databa
                     [name          : (row.index_name as String).trim(),
                      columns       : (row.column_names as String).trim(),
                      primaryIndex  : getBooleanValue(row.primary_index),
-                     uniqueIndex   : getBooleanValue(row.unique_index ),
+                     uniqueIndex   : getBooleanValue(row.unique_index),
                      clusteredIndex: getBooleanValue(row.clustered),
                     ]
                 } as List<Map>
@@ -409,7 +413,7 @@ abstract class AbstractDatabaseDataModelImporterProviderService<S extends Databa
         results
     }
 
-    static boolean getBooleanValue(def value){
+    static boolean getBooleanValue(def value) {
         value.toString().toBoolean()
     }
 }

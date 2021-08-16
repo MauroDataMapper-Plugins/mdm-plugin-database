@@ -28,6 +28,9 @@ import uk.ac.ox.softeng.maurodatamapper.datamodel.item.DataClassService
 import uk.ac.ox.softeng.maurodatamapper.datamodel.item.DataElement
 import uk.ac.ox.softeng.maurodatamapper.datamodel.item.DataElementService
 import uk.ac.ox.softeng.maurodatamapper.datamodel.item.datatype.DataType
+import uk.ac.ox.softeng.maurodatamapper.datamodel.item.datatype.EnumerationType
+import uk.ac.ox.softeng.maurodatamapper.datamodel.item.datatype.EnumerationTypeService
+import uk.ac.ox.softeng.maurodatamapper.datamodel.item.datatype.enumeration.EnumerationValue
 import uk.ac.ox.softeng.maurodatamapper.datamodel.item.datatype.PrimitiveTypeService
 import uk.ac.ox.softeng.maurodatamapper.datamodel.item.datatype.ReferenceTypeService
 import uk.ac.ox.softeng.maurodatamapper.datamodel.provider.importer.DataModelImporterProviderService
@@ -57,6 +60,9 @@ abstract class AbstractDatabaseDataModelImporterProviderService<S extends Databa
 
     @Autowired
     DataElementService dataElementService
+
+    @Autowired
+    EnumerationTypeService enumerationTypeService
 
     @Autowired
     PrimitiveTypeService primitiveTypeService
@@ -150,6 +156,45 @@ abstract class AbstractDatabaseDataModelImporterProviderService<S extends Databa
 
     abstract String getDatabaseStructureQueryString()
 
+    /**
+     * Must return a String which will be queryable by table name
+     * and column name, and return a row with the following elements:
+     *  * count
+     *
+     *  Identifiers such as table name and column name cannot be added as variables
+     *  in PreparedStatement, so extending classes may wish to override this
+     *  method and use database specific escaping.
+     * @return Query string for count of distinct values in a column
+     */
+    String countDistinctColumnValuesQueryString(String tableName, String columnName) {
+        "SELECT COUNT(DISTINCT(${columnName})) AS count FROM ${tableName};"
+    }
+
+    /**
+     * Must return a String which will be queryable by table name
+     * and column name, and return rows with the following elements:
+     *  * distinct_value
+     *
+     *  Identifiers such as table name and column name cannot be added as variables
+     *  in PreparedStatement, so extending classes may wish to override this
+     *  method and use database specific escaping.
+     * @return Query string for distinct values in a column
+     */
+    String distinctColumnValuesQueryString(String tableName, String columnName) {
+        "SELECT DISTINCT(${columnName}) AS distinct_value FROM ${tableName};"
+    }
+
+    /**
+     * Does the dataType represent a column that should be checked as a possible enumeration?
+     * Extending classes must override and use database specific types e.g char/varchar or
+     * character/character varying
+     * @param dataType
+     * @return boolean
+     */
+    boolean isColumnPossibleEnumeration(DataType dataType) {
+        false
+    }
+
     boolean isColumnNullable(String nullableColumnValue) {
         nullableColumnValue.toLowerCase() == 'yes'
     }
@@ -221,8 +266,44 @@ abstract class AbstractDatabaseDataModelImporterProviderService<S extends Databa
         final DataModel dataModel = importDataModelFromResults(currentUser, folder, modelName, parameters.databaseDialect, results,
                                                                parameters.shouldImportSchemasAsDataClasses())
         if (parameters.dataModelNameSuffix) dataModel.aliasesString = databaseName
+
+        if (parameters.detectEnumerations) {
+            updateDataModelWithEnumerations(currentUser, parameters.maxEnumerations, dataModel, connection)
+        }
+
         updateDataModelWithDatabaseSpecificInformation(dataModel, connection)
         [dataModel]
+    }
+
+    void updateDataModelWithEnumerations(User user, int maxEnumerations, DataModel dataModel, Connection connection) {
+        dataModel.childDataClasses.each { DataClass schemaClass ->
+            schemaClass.dataClasses.each { DataClass tableClass ->
+                tableClass.dataElements.each {DataElement de ->
+                    DataType primitiveType = de.dataType
+                    if (isColumnPossibleEnumeration(primitiveType)) {
+                        int countDistinct = getCountDistinctColumnValues(connection, tableClass.label, de.label)
+                        if (countDistinct > 0 && countDistinct <= maxEnumerations) {
+                            EnumerationType enumerationType = enumerationTypeService.findOrCreateDataTypeForDataModel(dataModel, de.label, de.label, user)
+
+                            final List<Map<String, Object>> results = getDistinctColumnValues(connection, tableClass.label, de.label)
+
+                            results.each {
+                                enumerationType.addToEnumerationValues(new EnumerationValue(key: it.distinct_value, value: it.distinct_value))
+                            }
+
+                            primitiveType.removeFromDataElements(de)
+
+                            de.dataType = enumerationType
+
+                            if (primitiveType.dataElements.size() == 0 ) {
+                                dataModel.removeFromPrimitiveTypes(primitiveType)
+                            }
+
+                        }
+                    }
+                }
+            }
+        }
     }
 
     /**
@@ -415,5 +496,19 @@ abstract class AbstractDatabaseDataModelImporterProviderService<S extends Databa
 
     static boolean getBooleanValue(def value) {
         value.toString().toBoolean()
+    }
+
+    private int getCountDistinctColumnValues(Connection connection, String tableName, String columnName) {
+        String queryString = countDistinctColumnValuesQueryString(tableName, columnName)
+        final PreparedStatement preparedStatement = connection.prepareStatement(queryString)
+        final List<Map<String, Object>> results = executeStatement(preparedStatement)
+        (int) results[0].count
+    }
+
+    private List<Map<String, Object>> getDistinctColumnValues(Connection connection, String tableName, String columnName) {
+        String queryString = distinctColumnValuesQueryString(tableName, columnName)
+        final PreparedStatement preparedStatement = connection.prepareStatement(queryString)
+        final List<Map<String, Object>> results = executeStatement(preparedStatement)
+        results
     }
 }

@@ -109,6 +109,30 @@ abstract class DatabaseDataModelImporterProviderServiceParameters<K extends Data
         ))
     Boolean databaseSSL
 
+    @ImportParameterConfig(
+        displayName = 'Detect Enumerations',
+        description = 'Whether to treat columns with small numbers of unique values as enumerations',
+        order = 1,
+        optional = true,
+        group = @ImportGroupConfig(
+                name = 'Configuration',
+                order = 2
+        )
+    )
+    Boolean detectEnumerations = false
+
+    @ImportParameterConfig(
+        displayName = 'Maximum Enumerations',
+        description = 'The maximum number of unique values to be interpreted as a defined enumeration',
+        order = 2,
+        optional = true,
+        group = @ImportGroupConfig(
+                name = 'Configuration',
+                order = 2
+        )
+    )
+    Integer maxEnumerations = 20
+
     Integer getDatabasePort() {
         databasePort = databasePort ?: defaultPort
         databasePort
@@ -128,6 +152,10 @@ abstract class DatabaseDataModelImporterProviderServiceParameters<K extends Data
         databaseUsername = properties.getProperty 'import.database.username'
         databasePassword = properties.getProperty 'import.database.password'
         databaseSSL = properties.getProperty('import.database.ssl') as Boolean
+
+        if (!maxEnumerations) {
+            maxEnumerations = 20
+        }
 
         try {
             databasePort = properties.getProperty('import.database.port') as Integer

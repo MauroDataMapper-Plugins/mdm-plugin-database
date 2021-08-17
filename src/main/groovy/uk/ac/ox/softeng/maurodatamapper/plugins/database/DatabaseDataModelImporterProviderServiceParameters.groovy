@@ -33,10 +33,10 @@ abstract class DatabaseDataModelImporterProviderServiceParameters<K extends Data
             'A suffix to attach to the end of the auto-imported DataModel name.',
             'This should only be used if the DataModel name property is not supplied.',
             'The suffix will be appended in the form ${modelName}_${suffix}.'],
-        order = 0,
+        order = 4,
         optional = true,
         group = @ImportGroupConfig(
-            name = 'DataModel',
+            name = 'Model',
             order = 0
         ))
     String dataModelNameSuffix
@@ -54,6 +54,30 @@ abstract class DatabaseDataModelImporterProviderServiceParameters<K extends Data
             order = 2
         ))
     String databaseNames
+
+    @ImportParameterConfig(
+        displayName = 'Detect Enumerations',
+        description = 'Whether to treat columns with small numbers of unique values as enumerations',
+        order = 5,
+        optional = true,
+        group = @ImportGroupConfig(
+                name = 'Database Import Details',
+                order = 2
+        )
+    )
+    Boolean detectEnumerations = false
+
+    @ImportParameterConfig(
+        displayName = 'Maximum Enumerations',
+        description = 'The maximum number of unique values to be interpreted as a defined enumeration',
+        order = 6,
+        optional = true,
+        group = @ImportGroupConfig(
+                name = 'Database Import Details',
+                order = 2
+        )
+    )
+    Integer maxEnumerations = 20
 
     @ImportParameterConfig(
         displayName = 'Database Host',
@@ -108,30 +132,6 @@ abstract class DatabaseDataModelImporterProviderServiceParameters<K extends Data
             order = 1
         ))
     Boolean databaseSSL
-
-    @ImportParameterConfig(
-        displayName = 'Detect Enumerations',
-        description = 'Whether to treat columns with small numbers of unique values as enumerations',
-        order = 1,
-        optional = true,
-        group = @ImportGroupConfig(
-                name = 'Configuration',
-                order = 2
-        )
-    )
-    Boolean detectEnumerations = false
-
-    @ImportParameterConfig(
-        displayName = 'Maximum Enumerations',
-        description = 'The maximum number of unique values to be interpreted as a defined enumeration',
-        order = 2,
-        optional = true,
-        group = @ImportGroupConfig(
-                name = 'Configuration',
-                order = 2
-        )
-    )
-    Integer maxEnumerations = 20
 
     Integer getDatabasePort() {
         databasePort = databasePort ?: defaultPort

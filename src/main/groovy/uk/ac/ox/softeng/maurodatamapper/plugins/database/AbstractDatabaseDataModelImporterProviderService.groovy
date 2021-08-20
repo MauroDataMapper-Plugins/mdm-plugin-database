@@ -17,12 +17,14 @@
  */
 package uk.ac.ox.softeng.maurodatamapper.plugins.database
 
+import grails.util.Pair
 import uk.ac.ox.softeng.maurodatamapper.api.exception.ApiBadRequestException
 import uk.ac.ox.softeng.maurodatamapper.api.exception.ApiException
 import uk.ac.ox.softeng.maurodatamapper.core.authority.AuthorityService
 import uk.ac.ox.softeng.maurodatamapper.core.container.Folder
 import uk.ac.ox.softeng.maurodatamapper.datamodel.DataModel
 import uk.ac.ox.softeng.maurodatamapper.datamodel.DataModelType
+import uk.ac.ox.softeng.maurodatamapper.datamodel.facet.SummaryMetadata
 import uk.ac.ox.softeng.maurodatamapper.datamodel.item.DataClass
 import uk.ac.ox.softeng.maurodatamapper.datamodel.item.DataClassService
 import uk.ac.ox.softeng.maurodatamapper.datamodel.item.DataElement
@@ -34,6 +36,8 @@ import uk.ac.ox.softeng.maurodatamapper.datamodel.item.datatype.enumeration.Enum
 import uk.ac.ox.softeng.maurodatamapper.datamodel.item.datatype.PrimitiveTypeService
 import uk.ac.ox.softeng.maurodatamapper.datamodel.item.datatype.ReferenceTypeService
 import uk.ac.ox.softeng.maurodatamapper.datamodel.provider.importer.DataModelImporterProviderService
+import uk.ac.ox.softeng.maurodatamapper.plugins.database.summarymetadata.IntegerIntervalHelper
+import uk.ac.ox.softeng.maurodatamapper.plugins.database.summarymetadata.SummaryMetadataHelper
 import uk.ac.ox.softeng.maurodatamapper.security.User
 
 import groovy.json.JsonOutput
@@ -195,6 +199,47 @@ abstract class AbstractDatabaseDataModelImporterProviderService<S extends Databa
         false
     }
 
+    /**
+     * Does the dataType represent a column that should be summarised as an integer?
+     * Extending classes must override and use database specific types.
+     * @param dataType
+     * @return boolean
+     */
+    boolean isColumnForIntegerSummary(DataType dataType) {
+        false
+    }
+
+    /**
+     * Must return a String which will be queryable by table name
+     * and column name, and return rows with the following elements:
+     *  * min_value
+     *  * max_value
+     *
+     *  Identifiers such as table name and column name cannot be added as variables
+     *  in PreparedStatement, so extending classes may wish to override this
+     *  method and use database specific escaping.
+     * @return Query string for distinct values in a column
+     */
+    String minMaxColumnValuesQueryString(String tableName, String columnName) {
+        "SELECT MIN(${columnName}) AS min_value, MAX(${columnName}) AS max_value FROM ${tableName};"
+    }
+
+    /**
+     * Must return a String which will be queryable by table name
+     * and column name, and return rows with the following elements:
+     *  * interval_start
+     *  * interval_end
+     *  * count_interval
+     *
+     *  interval_start is inclusive. interval_end is exclusive. count_interval is the
+     *  count of values in the interval. Rows must be ordered by interval_start ascending.
+     *
+     * @return Query string for count by interval
+     */
+    String integerRangeDistributionQueryString(String tableName, String columnName) {
+        ""
+    }
+
     boolean isColumnNullable(String nullableColumnValue) {
         nullableColumnValue.toLowerCase() == 'yes'
     }
@@ -271,6 +316,10 @@ abstract class AbstractDatabaseDataModelImporterProviderService<S extends Databa
             updateDataModelWithEnumerations(currentUser, parameters.maxEnumerations, dataModel, connection)
         }
 
+        if (parameters.calculateSummaryMetadata) {
+            updateDataModelWithSummaryMetadata(currentUser, dataModel, connection)
+        }
+
         updateDataModelWithDatabaseSpecificInformation(dataModel, connection)
         [dataModel]
     }
@@ -305,6 +354,62 @@ abstract class AbstractDatabaseDataModelImporterProviderService<S extends Databa
             }
         }
     }
+
+    void updateDataModelWithSummaryMetadata(User user, DataModel dataModel, Connection connection) {
+        dataModel.childDataClasses.each { DataClass schemaClass ->
+            schemaClass.dataClasses.each { DataClass tableClass ->
+                tableClass.dataElements.each { DataElement de ->
+                    DataType dt = de.dataType
+                    if (isColumnForIntegerSummary(dt)) {
+                        Pair minMax = getMinMaxColumnValues(connection, tableClass.label, de.label)
+                        //aValue is the MIN, bValue is the MAX. If they are not null then calculate the range etc...
+                        if (minMax.aValue && minMax.bValue) {
+                            IntegerIntervalHelper integerIntervalHelper = new IntegerIntervalHelper((Integer) minMax.aValue, (Integer) minMax.bValue)
+
+                            //get the value distribution
+                            List<Map<String, Object>> valueDistribution = getIntegerRangeDistribution(connection, tableClass.label, de.label, integerIntervalHelper)
+                            if (valueDistribution) {
+                                //SummaryMetadata summaryMetadata = SummaryMetadataHelper.createSummaryMetadataFromMap(de.label, 'Value Distribution', valueDistribution)
+                                //de.addToSummaryMetadata(summaryMetadata);
+                            }
+
+                        }
+
+                        /*buildNumericValueDistribution(integerIntervalHelper.getIntervals())
+
+                        SummaryMetadata summaryMetadata = column.calculateSummaryMetadata()
+                        if (summaryMetadata) {
+                            SummaryMetadata dcSummaryMetadata = column.calculateSummaryMetadata()
+                            dataElement.addToSummaryMetadata(summaryMetadata)
+                            topLevelClass.addToSummaryMetadata(dcSummaryMetadata)
+                        }*/
+                    }
+                }
+            }
+        }
+    }
+
+    /*void buildNumericValueDistribution(Map<String, Pair<String, Number>> intervals) {
+        initialiseValueDistribution(intervals)
+        typedValues.each {typedValue ->
+            if (typedValue == null) {
+                valueDistribution[NULL_VALUE_KEY] = valueDistribution[NULL_VALUE_KEY] + 1
+            } else {
+                intervals.each {interval ->
+                    if (typedValue >= interval.value.aValue && typedValue < interval.value.bValue) {
+                        valueDistribution[interval.key] = valueDistribution[interval.key] + 1
+                    }
+                }
+            }
+        }
+    }
+
+    void initialiseValueDistribution(Map<String, Pair> intervals) {
+        valueDistribution = intervals.keySet().collectEntries {intervalName ->
+            [intervalName, 0]
+        }
+        if (optional) valueDistribution[NULL_VALUE_KEY] = 0
+    }*/
 
     /**
      * Updates DataModel with custom information which is Database specific.
@@ -509,6 +614,31 @@ abstract class AbstractDatabaseDataModelImporterProviderService<S extends Databa
         String queryString = distinctColumnValuesQueryString(tableName, columnName)
         final PreparedStatement preparedStatement = connection.prepareStatement(queryString)
         final List<Map<String, Object>> results = executeStatement(preparedStatement)
+        results
+    }
+
+    private Pair getMinMaxColumnValues(Connection connection, String tableName, String columnName) {
+        String queryString = minMaxColumnValuesQueryString(tableName, columnName)
+        final PreparedStatement preparedStatement = connection.prepareStatement(queryString)
+        final List<Map<String, Object>> results = executeStatement(preparedStatement)
+
+        new Pair(results[0].min_value, results[0].max_value)
+    }
+
+    private List<Map<String, Object>> getIntegerRangeDistribution(Connection connection, String tableName, String columnName, IntegerIntervalHelper integerIntervalHelper) {
+        String queryString = integerRangeDistributionQueryString(tableName, columnName)
+
+        List<Map<String, Object>> results = null
+
+        final PreparedStatement preparedStatement = connection.prepareStatement(queryString)
+        preparedStatement.setInt(1, integerIntervalHelper.firstIntervalStart)
+        preparedStatement.setInt(2, integerIntervalHelper.intervalLength)
+        preparedStatement.setInt(3, integerIntervalHelper.lastIntervalStart)
+        preparedStatement.setInt(4, integerIntervalHelper.intervalLength)
+        preparedStatement.setInt(5, integerIntervalHelper.intervalLength)
+        results = executeStatement(preparedStatement)
+        preparedStatement.close()
+
         results
     }
 }

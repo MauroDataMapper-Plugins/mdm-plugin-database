@@ -19,6 +19,7 @@ package uk.ac.ox.softeng.maurodatamapper.plugins.database
 
 import uk.ac.ox.softeng.maurodatamapper.api.exception.ApiBadRequestException
 import uk.ac.ox.softeng.maurodatamapper.api.exception.ApiException
+import uk.ac.ox.softeng.maurodatamapper.core.authority.AuthorityService
 import uk.ac.ox.softeng.maurodatamapper.core.container.Folder
 import uk.ac.ox.softeng.maurodatamapper.datamodel.DataModel
 import uk.ac.ox.softeng.maurodatamapper.datamodel.DataModelType
@@ -27,6 +28,9 @@ import uk.ac.ox.softeng.maurodatamapper.datamodel.item.DataClassService
 import uk.ac.ox.softeng.maurodatamapper.datamodel.item.DataElement
 import uk.ac.ox.softeng.maurodatamapper.datamodel.item.DataElementService
 import uk.ac.ox.softeng.maurodatamapper.datamodel.item.datatype.DataType
+import uk.ac.ox.softeng.maurodatamapper.datamodel.item.datatype.EnumerationType
+import uk.ac.ox.softeng.maurodatamapper.datamodel.item.datatype.EnumerationTypeService
+import uk.ac.ox.softeng.maurodatamapper.datamodel.item.datatype.enumeration.EnumerationValue
 import uk.ac.ox.softeng.maurodatamapper.datamodel.item.datatype.PrimitiveTypeService
 import uk.ac.ox.softeng.maurodatamapper.datamodel.item.datatype.ReferenceTypeService
 import uk.ac.ox.softeng.maurodatamapper.datamodel.provider.importer.DataModelImporterProviderService
@@ -58,10 +62,16 @@ abstract class AbstractDatabaseDataModelImporterProviderService<S extends Databa
     DataElementService dataElementService
 
     @Autowired
+    EnumerationTypeService enumerationTypeService
+
+    @Autowired
     PrimitiveTypeService primitiveTypeService
 
     @Autowired
     ReferenceTypeService referenceTypeService
+
+    @Autowired
+    AuthorityService authorityService
 
     String schemaNameColumnName = 'table_schema'
     String dataTypeColumnName = 'data_type'
@@ -146,6 +156,45 @@ abstract class AbstractDatabaseDataModelImporterProviderService<S extends Databa
 
     abstract String getDatabaseStructureQueryString()
 
+    /**
+     * Must return a String which will be queryable by table name
+     * and column name, and return a row with the following elements:
+     *  * count
+     *
+     *  Identifiers such as table name and column name cannot be added as variables
+     *  in PreparedStatement, so extending classes may wish to override this
+     *  method and use database specific escaping.
+     * @return Query string for count of distinct values in a column
+     */
+    String countDistinctColumnValuesQueryString(String tableName, String columnName) {
+        "SELECT COUNT(DISTINCT(${columnName})) AS count FROM ${tableName};"
+    }
+
+    /**
+     * Must return a String which will be queryable by table name
+     * and column name, and return rows with the following elements:
+     *  * distinct_value
+     *
+     *  Identifiers such as table name and column name cannot be added as variables
+     *  in PreparedStatement, so extending classes may wish to override this
+     *  method and use database specific escaping.
+     * @return Query string for distinct values in a column
+     */
+    String distinctColumnValuesQueryString(String tableName, String columnName) {
+        "SELECT DISTINCT(${columnName}) AS distinct_value FROM ${tableName};"
+    }
+
+    /**
+     * Does the dataType represent a column that should be checked as a possible enumeration?
+     * Extending classes must override and use database specific types e.g char/varchar or
+     * character/character varying
+     * @param dataType
+     * @return boolean
+     */
+    boolean isColumnPossibleEnumeration(DataType dataType) {
+        false
+    }
+
     boolean isColumnNullable(String nullableColumnValue) {
         nullableColumnValue.toLowerCase() == 'yes'
     }
@@ -183,9 +232,9 @@ abstract class AbstractDatabaseDataModelImporterProviderService<S extends Databa
 
     DataModel importDataModelFromResults(User user, Folder folder, String modelName, String dialect, List<Map<String, Object>> results,
                                          boolean importSchemaAsDataClass) throws ApiException {
-        final DataModel dataModel = dataModelService.createAndSaveDataModel(user, folder, DataModelType.DATA_ASSET, modelName, null, null, null).tap {
-            addToMetadata(namespace: DATABASE_NAMESPACE, key: 'dialect', value: dialect, createdBy: user.emailAddress)
-        }
+        final DataModel dataModel = new DataModel(createdBy: user.emailAddress, label: modelName, type: DataModelType.DATA_ASSET, folder: folder,
+                                                  authority: authorityService.getDefaultAuthority())
+        dataModel.addToMetadata(namespace: DATABASE_NAMESPACE, key: 'dialect', value: dialect, createdBy: user.emailAddress)
 
         results.each {Map<String, Object> row ->
             final DataType dataType = primitiveTypeService.findOrCreateDataTypeForDataModel(dataModel, row[dataTypeColumnName] as String, null, user)
@@ -205,7 +254,7 @@ abstract class AbstractDatabaseDataModelImporterProviderService<S extends Databa
             row.findAll {String column, data ->
                 data && !(column in coreColumns)
             }.each {String column, data ->
-                dataElement.addToMetadata(namespace, column, data.toString(), user)
+                dataElement.addToMetadata(namespace: namespace, key: column, value: data.toString(), createdBy: user.emailAddress)
             }
         }
 
@@ -217,8 +266,44 @@ abstract class AbstractDatabaseDataModelImporterProviderService<S extends Databa
         final DataModel dataModel = importDataModelFromResults(currentUser, folder, modelName, parameters.databaseDialect, results,
                                                                parameters.shouldImportSchemasAsDataClasses())
         if (parameters.dataModelNameSuffix) dataModel.aliasesString = databaseName
+
+        if (parameters.detectEnumerations) {
+            updateDataModelWithEnumerations(currentUser, parameters.maxEnumerations, dataModel, connection)
+        }
+
         updateDataModelWithDatabaseSpecificInformation(dataModel, connection)
         [dataModel]
+    }
+
+    void updateDataModelWithEnumerations(User user, int maxEnumerations, DataModel dataModel, Connection connection) {
+        dataModel.childDataClasses.each { DataClass schemaClass ->
+            schemaClass.dataClasses.each { DataClass tableClass ->
+                tableClass.dataElements.each {DataElement de ->
+                    DataType primitiveType = de.dataType
+                    if (isColumnPossibleEnumeration(primitiveType)) {
+                        int countDistinct = getCountDistinctColumnValues(connection, tableClass.label, de.label)
+                        if (countDistinct > 0 && countDistinct <= maxEnumerations) {
+                            EnumerationType enumerationType = enumerationTypeService.findOrCreateDataTypeForDataModel(dataModel, de.label, de.label, user)
+
+                            final List<Map<String, Object>> results = getDistinctColumnValues(connection, tableClass.label, de.label)
+
+                            results.each {
+                                enumerationType.addToEnumerationValues(new EnumerationValue(key: it.distinct_value, value: it.distinct_value))
+                            }
+
+                            primitiveType.removeFromDataElements(de)
+
+                            de.dataType = enumerationType
+
+                            if (primitiveType.dataElements.size() == 0 ) {
+                                dataModel.removeFromPrimitiveTypes(primitiveType)
+                            }
+
+                        }
+                    }
+                }
+            }
+        }
     }
 
     /**
@@ -299,7 +384,7 @@ abstract class AbstractDatabaseDataModelImporterProviderService<S extends Databa
                     [name          : (row.index_name as String).trim(),
                      columns       : (row.column_names as String).trim(),
                      primaryIndex  : getBooleanValue(row.primary_index),
-                     uniqueIndex   : getBooleanValue(row.unique_index ),
+                     uniqueIndex   : getBooleanValue(row.unique_index),
                      clusteredIndex: getBooleanValue(row.clustered),
                     ]
                 } as List<Map>
@@ -409,7 +494,21 @@ abstract class AbstractDatabaseDataModelImporterProviderService<S extends Databa
         results
     }
 
-    static boolean getBooleanValue(def value){
+    static boolean getBooleanValue(def value) {
         value.toString().toBoolean()
+    }
+
+    private int getCountDistinctColumnValues(Connection connection, String tableName, String columnName) {
+        String queryString = countDistinctColumnValuesQueryString(tableName, columnName)
+        final PreparedStatement preparedStatement = connection.prepareStatement(queryString)
+        final List<Map<String, Object>> results = executeStatement(preparedStatement)
+        (int) results[0].count
+    }
+
+    private List<Map<String, Object>> getDistinctColumnValues(Connection connection, String tableName, String columnName) {
+        String queryString = distinctColumnValuesQueryString(tableName, columnName)
+        final PreparedStatement preparedStatement = connection.prepareStatement(queryString)
+        final List<Map<String, Object>> results = executeStatement(preparedStatement)
+        results
     }
 }

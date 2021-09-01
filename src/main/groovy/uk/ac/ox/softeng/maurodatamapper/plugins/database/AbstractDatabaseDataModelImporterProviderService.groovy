@@ -36,6 +36,9 @@ import uk.ac.ox.softeng.maurodatamapper.datamodel.item.datatype.enumeration.Enum
 import uk.ac.ox.softeng.maurodatamapper.datamodel.item.datatype.PrimitiveTypeService
 import uk.ac.ox.softeng.maurodatamapper.datamodel.item.datatype.ReferenceTypeService
 import uk.ac.ox.softeng.maurodatamapper.datamodel.provider.importer.DataModelImporterProviderService
+import uk.ac.ox.softeng.maurodatamapper.plugins.database.summarymetadata.AbstractIntervalHelper
+import uk.ac.ox.softeng.maurodatamapper.plugins.database.summarymetadata.DateIntervalHelper
+import uk.ac.ox.softeng.maurodatamapper.plugins.database.summarymetadata.DecimalIntervalHelper
 import uk.ac.ox.softeng.maurodatamapper.plugins.database.summarymetadata.IntegerIntervalHelper
 import uk.ac.ox.softeng.maurodatamapper.plugins.database.summarymetadata.SummaryMetadataHelper
 import uk.ac.ox.softeng.maurodatamapper.security.User
@@ -50,6 +53,7 @@ import java.sql.PreparedStatement
 import java.sql.ResultSet
 import java.sql.ResultSetMetaData
 import java.sql.SQLException
+
 
 @Slf4j
 @CompileStatic
@@ -200,6 +204,26 @@ abstract class AbstractDatabaseDataModelImporterProviderService<S extends Databa
     }
 
     /**
+     * Does the dataType represent a column that should be summarised as a date?
+     * Extending classes must override and use database specific types.
+     * @param dataType
+     * @return boolean
+     */
+    boolean isColumnForDateSummary(DataType dataType) {
+        false
+    }
+
+    /**
+     * Does the dataType represent a column that should be summarised as a decimal?
+     * Extending classes must override and use database specific types.
+     * @param dataType
+     * @return boolean
+     */
+    boolean isColumnForDecimalSummary(DataType dataType) {
+        false
+    }
+
+    /**
      * Does the dataType represent a column that should be summarised as an integer?
      * Extending classes must override and use database specific types.
      * @param dataType
@@ -229,14 +253,14 @@ abstract class AbstractDatabaseDataModelImporterProviderService<S extends Databa
      * and column name, and return rows with the following elements:
      *  * interval_start
      *  * interval_end
-     *  * count_interval
+     *  * interval_count i.e count of values in the range interval_start to interval_end
      *
-     *  interval_start is inclusive. interval_end is exclusive. count_interval is the
+     *  interval_start is inclusive. interval_end is exclusive. interval_count is the
      *  count of values in the interval. Rows must be ordered by interval_start ascending.
      *
      * @return Query string for count by interval
      */
-    String integerRangeDistributionQueryString(String tableName, String columnName) {
+    String columnRangeDistributionQueryString(String tableName, String columnName, DataType dataType, AbstractIntervalHelper intervalHelper) {
         ""
     }
 
@@ -355,61 +379,35 @@ abstract class AbstractDatabaseDataModelImporterProviderService<S extends Databa
         }
     }
 
+    /**
+     * Compute a value distribution for relevant columns and store as summary metadata.
+     * @param user
+     * @param dataModel
+     * @param connection
+     */
     void updateDataModelWithSummaryMetadata(User user, DataModel dataModel, Connection connection) {
         dataModel.childDataClasses.each { DataClass schemaClass ->
             schemaClass.dataClasses.each { DataClass tableClass ->
                 tableClass.dataElements.each { DataElement de ->
                     DataType dt = de.dataType
-                    if (isColumnForIntegerSummary(dt)) {
+                    if (isColumnForDateSummary(dt) || isColumnForDecimalSummary(dt) || isColumnForIntegerSummary(dt)) {
                         Pair minMax = getMinMaxColumnValues(connection, tableClass.label, de.label)
+
                         //aValue is the MIN, bValue is the MAX. If they are not null then calculate the range etc...
-                        if (minMax.aValue && minMax.bValue) {
-                            IntegerIntervalHelper integerIntervalHelper = new IntegerIntervalHelper((Integer) minMax.aValue, (Integer) minMax.bValue)
+                        if (!(minMax.aValue == null) && !(minMax.bValue == null)) {
+                            AbstractIntervalHelper intervalHelper = getIntervalHelper(dt, minMax)
 
-                            //get the value distribution
-                            List<Map<String, Object>> valueDistribution = getIntegerRangeDistribution(connection, tableClass.label, de.label, integerIntervalHelper)
+                            Map<String, Integer> valueDistribution = getColumnRangeDistribution(connection, tableClass.label, de.label, dt, intervalHelper)
                             if (valueDistribution) {
-                                //SummaryMetadata summaryMetadata = SummaryMetadataHelper.createSummaryMetadataFromMap(de.label, 'Value Distribution', valueDistribution)
-                                //de.addToSummaryMetadata(summaryMetadata);
+                                SummaryMetadata summaryMetadata = SummaryMetadataHelper.createSummaryMetadataFromMap(user, de.label, 'Value Distribution', valueDistribution)
+                                de.addToSummaryMetadata(summaryMetadata);
                             }
-
                         }
-
-                        /*buildNumericValueDistribution(integerIntervalHelper.getIntervals())
-
-                        SummaryMetadata summaryMetadata = column.calculateSummaryMetadata()
-                        if (summaryMetadata) {
-                            SummaryMetadata dcSummaryMetadata = column.calculateSummaryMetadata()
-                            dataElement.addToSummaryMetadata(summaryMetadata)
-                            topLevelClass.addToSummaryMetadata(dcSummaryMetadata)
-                        }*/
                     }
                 }
             }
         }
     }
-
-    /*void buildNumericValueDistribution(Map<String, Pair<String, Number>> intervals) {
-        initialiseValueDistribution(intervals)
-        typedValues.each {typedValue ->
-            if (typedValue == null) {
-                valueDistribution[NULL_VALUE_KEY] = valueDistribution[NULL_VALUE_KEY] + 1
-            } else {
-                intervals.each {interval ->
-                    if (typedValue >= interval.value.aValue && typedValue < interval.value.bValue) {
-                        valueDistribution[interval.key] = valueDistribution[interval.key] + 1
-                    }
-                }
-            }
-        }
-    }
-
-    void initialiseValueDistribution(Map<String, Pair> intervals) {
-        valueDistribution = intervals.keySet().collectEntries {intervalName ->
-            [intervalName, 0]
-        }
-        if (optional) valueDistribution[NULL_VALUE_KEY] = 0
-    }*/
 
     /**
      * Updates DataModel with custom information which is Database specific.
@@ -625,20 +623,25 @@ abstract class AbstractDatabaseDataModelImporterProviderService<S extends Databa
         new Pair(results[0].min_value, results[0].max_value)
     }
 
-    private List<Map<String, Object>> getIntegerRangeDistribution(Connection connection, String tableName, String columnName, IntegerIntervalHelper integerIntervalHelper) {
-        String queryString = integerRangeDistributionQueryString(tableName, columnName)
+    private AbstractIntervalHelper getIntervalHelper(DataType dt, Pair minMax) {
+        if (isColumnForIntegerSummary(dt)) {
+            return new IntegerIntervalHelper((Integer) minMax.aValue, (Integer) minMax.bValue)
+        } else if (isColumnForDateSummary(dt)) {
+            return new DateIntervalHelper(((java.util.Date) minMax.aValue).toLocalDateTime(), ((java.util.Date) minMax.bValue).toLocalDateTime())
+        } else if (isColumnForDecimalSummary(dt)) {
+            return new DecimalIntervalHelper((BigDecimal) minMax.aValue, (BigDecimal) minMax.bValue)
+        }
+    }
 
-        List<Map<String, Object>> results = null
+    private Map<String, Integer> getColumnRangeDistribution(Connection connection, String tableName, String columnName, DataType dataType, AbstractIntervalHelper intervalHelper) {
+        String queryString = columnRangeDistributionQueryString(tableName, columnName, dataType, intervalHelper)
 
         final PreparedStatement preparedStatement = connection.prepareStatement(queryString)
-        preparedStatement.setInt(1, integerIntervalHelper.firstIntervalStart)
-        preparedStatement.setInt(2, integerIntervalHelper.intervalLength)
-        preparedStatement.setInt(3, integerIntervalHelper.lastIntervalStart)
-        preparedStatement.setInt(4, integerIntervalHelper.intervalLength)
-        preparedStatement.setInt(5, integerIntervalHelper.intervalLength)
-        results = executeStatement(preparedStatement)
+        List<Map<String, Object>> results = executeStatement(preparedStatement)
         preparedStatement.close()
 
-        results
+        results.collectEntries{
+            [(it.interval_label): it.interval_count]
+        }
     }
 }

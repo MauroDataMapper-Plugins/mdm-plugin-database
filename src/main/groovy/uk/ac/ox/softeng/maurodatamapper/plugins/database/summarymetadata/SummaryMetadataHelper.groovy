@@ -20,6 +20,7 @@ package uk.ac.ox.softeng.maurodatamapper.plugins.database.summarymetadata
 import uk.ac.ox.softeng.maurodatamapper.datamodel.facet.SummaryMetadata
 import uk.ac.ox.softeng.maurodatamapper.datamodel.facet.SummaryMetadataType
 import uk.ac.ox.softeng.maurodatamapper.datamodel.facet.summarymetadata.SummaryMetadataReport
+import uk.ac.ox.softeng.maurodatamapper.security.User
 
 import groovy.json.JsonBuilder
 
@@ -28,15 +29,17 @@ import java.time.OffsetDateTime
 class SummaryMetadataHelper {
 
 
-    static SummaryMetadata createSummaryMetadataFromMap(String headerName, String description, Map<String, Integer> valueDistribution ) {
+    static SummaryMetadata createSummaryMetadataFromMap(User user, String headerName, String description, Map<String, Integer> valueDistribution ) {
         SummaryMetadata summaryMetadata = new SummaryMetadata(
                 label: headerName,
                 description: description,
-                summaryMetadataType: SummaryMetadataType.MAP
+                summaryMetadataType: SummaryMetadataType.MAP,
+                createdBy: user.emailAddress
         )
         SummaryMetadataReport smr = new SummaryMetadataReport(
                 reportDate: OffsetDateTime.now(),
-                reportValue: new JsonBuilder(valueDistribution).toString()
+                reportValue: new JsonBuilder(valueDistribution).toString(),
+                createdBy: user.emailAddress
         )
         summaryMetadata.addToSummaryMetadataReports(smr)
         return summaryMetadata

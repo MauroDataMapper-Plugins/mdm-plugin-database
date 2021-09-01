@@ -20,19 +20,20 @@ package uk.ac.ox.softeng.maurodatamapper.plugins.database.summarymetadata
 import grails.util.Pair
 
 
-class IntegerIntervalHelper extends AbstractIntervalHelper<Integer> {
+class DecimalIntervalHelper extends AbstractIntervalHelper<BigDecimal> {
 
-
-    IntegerIntervalHelper(Integer minValue, Integer maxValue) {
+    DecimalIntervalHelper(BigDecimal minValue, BigDecimal maxValue) {
         super(minValue, maxValue)
     }
 
-    @Override
     void calculateInterval() {
-
         difference = maxValue - minValue
 
-        if (1 < difference && difference <= 5 ) {
+        if (0 < difference && difference <= 0.1 ) {
+            intervalLength = 0.02
+        } else if (0.1 < difference && difference <= 1 ) {
+            intervalLength = 0.2
+        } else if (1 < difference && difference <= 5 ) {
             intervalLength = 1
         } else if (5 < difference && difference <= 10 ) {
             intervalLength = 2
@@ -66,25 +67,23 @@ class IntegerIntervalHelper extends AbstractIntervalHelper<Integer> {
             intervalLength = 10000000
         } else intervalLength = maxValue - minValue / 10
 
-        firstIntervalStart = minValue.intdiv(intervalLength) * intervalLength
-        lastIntervalStart = maxValue.intdiv(intervalLength) * intervalLength
+        firstIntervalStart = minValue.divideAndRemainder(intervalLength)[0] * intervalLength
+        lastIntervalStart = maxValue.divideAndRemainder(intervalLength)[0] * intervalLength
     }
 
-    @Override
     void calculateIntervalStarts() {
         intervalStarts = []
-        Integer currNum = firstIntervalStart
+        BigDecimal currNum = firstIntervalStart
         while(currNum <= lastIntervalStart) {
             intervalStarts.add(currNum)
             currNum += intervalLength
         }
     }
 
-    @Override
     void calculateIntervals() {
         intervals = new LinkedHashMap()
         intervalStarts.each { start ->
-            Integer finish = start + intervalLength
+            BigDecimal finish = start + intervalLength
             String label = "" + start + labelSeparator + finish
             intervals[label] = (new Pair(start, finish))
         }

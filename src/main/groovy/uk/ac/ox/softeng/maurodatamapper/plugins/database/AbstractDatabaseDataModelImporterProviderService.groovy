@@ -166,30 +166,33 @@ abstract class AbstractDatabaseDataModelImporterProviderService<S extends Databa
 
     /**
      * Must return a String which will be queryable by table name
-     * and column name, and return a row with the following elements:
+     * and column name, and return a row with the following columns:
      *  * count
      *
-     *  Identifiers such as table name and column name cannot be added as variables
-     *  in PreparedStatement, so extending classes may wish to override this
-     *  method and use database specific escaping.
      * @return Query string for count of distinct values in a column
      */
-    String countDistinctColumnValuesQueryString(String tableName, String columnName) {
-        "SELECT COUNT(DISTINCT(${columnName})) AS count FROM ${tableName};"
+    String countDistinctColumnValuesQueryString(String schemaName, String tableName, String columnName) {
+        "SELECT COUNT(DISTINCT(${escapeIdentifier(columnName)})) AS count FROM ${escapeIdentifier(schemaName)}.${escapeIdentifier(tableName)}"
     }
 
     /**
      * Must return a String which will be queryable by table name
-     * and column name, and return rows with the following elements:
+     * and column name, and return rows with the following columns:
      *  * distinct_value
      *
-     *  Identifiers such as table name and column name cannot be added as variables
-     *  in PreparedStatement, so extending classes may wish to override this
-     *  method and use database specific escaping.
      * @return Query string for distinct values in a column
      */
-    String distinctColumnValuesQueryString(String tableName, String columnName) {
-        "SELECT DISTINCT(${columnName}) AS distinct_value FROM ${tableName};"
+    String distinctColumnValuesQueryString(String schemaName, String tableName, String columnName) {
+        "SELECT DISTINCT(${escapeIdentifier(columnName)}) AS distinct_value FROM ${escapeIdentifier(schemaName)}.${escapeIdentifier(tableName)}"
+    }
+
+    /**
+     * Escape an identifier using vendor specific syntax.
+     * @param identifier
+     * @return The escaped identifier
+     */
+    String escapeIdentifier(String identifier) {
+        identifier
     }
 
     /**
@@ -354,11 +357,11 @@ abstract class AbstractDatabaseDataModelImporterProviderService<S extends Databa
                 tableClass.dataElements.each {DataElement de ->
                     DataType primitiveType = de.dataType
                     if (isColumnPossibleEnumeration(primitiveType)) {
-                        int countDistinct = getCountDistinctColumnValues(connection, tableClass.label, de.label)
+                        int countDistinct = getCountDistinctColumnValues(connection, schemaClass.label, tableClass.label, de.label)
                         if (countDistinct > 0 && countDistinct <= maxEnumerations) {
                             EnumerationType enumerationType = enumerationTypeService.findOrCreateDataTypeForDataModel(dataModel, de.label, de.label, user)
 
-                            final List<Map<String, Object>> results = getDistinctColumnValues(connection, tableClass.label, de.label)
+                            final List<Map<String, Object>> results = getDistinctColumnValues(connection, schemaClass.label, tableClass.label, de.label)
 
                             results.each {
                                 enumerationType.addToEnumerationValues(new EnumerationValue(key: it.distinct_value, value: it.distinct_value))
@@ -601,15 +604,15 @@ abstract class AbstractDatabaseDataModelImporterProviderService<S extends Databa
         value.toString().toBoolean()
     }
 
-    private int getCountDistinctColumnValues(Connection connection, String tableName, String columnName) {
-        String queryString = countDistinctColumnValuesQueryString(tableName, columnName)
+    private int getCountDistinctColumnValues(Connection connection, String schemaName, String tableName, String columnName) {
+        String queryString = countDistinctColumnValuesQueryString(schemaName, tableName, columnName)
         final PreparedStatement preparedStatement = connection.prepareStatement(queryString)
         final List<Map<String, Object>> results = executeStatement(preparedStatement)
         (int) results[0].count
     }
 
-    private List<Map<String, Object>> getDistinctColumnValues(Connection connection, String tableName, String columnName) {
-        String queryString = distinctColumnValuesQueryString(tableName, columnName)
+    private List<Map<String, Object>> getDistinctColumnValues(Connection connection, String schemaName, String tableName, String columnName) {
+        String queryString = distinctColumnValuesQueryString(schemaName, tableName, columnName)
         final PreparedStatement preparedStatement = connection.prepareStatement(queryString)
         final List<Map<String, Object>> results = executeStatement(preparedStatement)
         results

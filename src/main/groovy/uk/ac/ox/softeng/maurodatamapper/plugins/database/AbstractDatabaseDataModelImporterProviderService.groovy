@@ -242,13 +242,10 @@ abstract class AbstractDatabaseDataModelImporterProviderService<S extends Databa
      *  * min_value
      *  * max_value
      *
-     *  Identifiers such as table name and column name cannot be added as variables
-     *  in PreparedStatement, so extending classes may wish to override this
-     *  method and use database specific escaping.
      * @return Query string for distinct values in a column
      */
-    String minMaxColumnValuesQueryString(String tableName, String columnName) {
-        "SELECT MIN(${columnName}) AS min_value, MAX(${columnName}) AS max_value FROM ${tableName};"
+    String minMaxColumnValuesQueryString(String schemaName, String tableName, String columnName) {
+        "SELECT MIN(${escapeIdentifier(columnName)}) AS min_value, MAX(${escapeIdentifier(columnName)}) AS max_value FROM ${escapeIdentifier(schemaName)}.${escapeIdentifier(tableName)}"
     }
 
     /**
@@ -263,7 +260,7 @@ abstract class AbstractDatabaseDataModelImporterProviderService<S extends Databa
      *
      * @return Query string for count by interval
      */
-    String columnRangeDistributionQueryString(String tableName, String columnName, DataType dataType, AbstractIntervalHelper intervalHelper) {
+    String columnRangeDistributionQueryString(String schemaName, String tableName, String columnName, DataType dataType, AbstractIntervalHelper intervalHelper) {
         ""
     }
 
@@ -394,13 +391,13 @@ abstract class AbstractDatabaseDataModelImporterProviderService<S extends Databa
                 tableClass.dataElements.each { DataElement de ->
                     DataType dt = de.dataType
                     if (isColumnForDateSummary(dt) || isColumnForDecimalSummary(dt) || isColumnForIntegerSummary(dt)) {
-                        Pair minMax = getMinMaxColumnValues(connection, tableClass.label, de.label)
+                        Pair minMax = getMinMaxColumnValues(connection, schemaClass.label, tableClass.label, de.label)
 
                         //aValue is the MIN, bValue is the MAX. If they are not null then calculate the range etc...
                         if (!(minMax.aValue == null) && !(minMax.bValue == null)) {
                             AbstractIntervalHelper intervalHelper = getIntervalHelper(dt, minMax)
 
-                            Map<String, Integer> valueDistribution = getColumnRangeDistribution(connection, tableClass.label, de.label, dt, intervalHelper)
+                            Map<String, Integer> valueDistribution = getColumnRangeDistribution(connection, schemaClass.label, tableClass.label, de.label, dt, intervalHelper)
                             if (valueDistribution) {
                                 SummaryMetadata summaryMetadata = SummaryMetadataHelper.createSummaryMetadataFromMap(user, de.label, 'Value Distribution', valueDistribution)
                                 de.addToSummaryMetadata(summaryMetadata);
@@ -618,8 +615,8 @@ abstract class AbstractDatabaseDataModelImporterProviderService<S extends Databa
         results
     }
 
-    private Pair getMinMaxColumnValues(Connection connection, String tableName, String columnName) {
-        String queryString = minMaxColumnValuesQueryString(tableName, columnName)
+    private Pair getMinMaxColumnValues(Connection connection, String schemaName, String tableName, String columnName) {
+        String queryString = minMaxColumnValuesQueryString(schemaName, tableName, columnName)
         final PreparedStatement preparedStatement = connection.prepareStatement(queryString)
         final List<Map<String, Object>> results = executeStatement(preparedStatement)
 
@@ -636,8 +633,8 @@ abstract class AbstractDatabaseDataModelImporterProviderService<S extends Databa
         }
     }
 
-    private Map<String, Integer> getColumnRangeDistribution(Connection connection, String tableName, String columnName, DataType dataType, AbstractIntervalHelper intervalHelper) {
-        String queryString = columnRangeDistributionQueryString(tableName, columnName, dataType, intervalHelper)
+    private Map<String, Integer> getColumnRangeDistribution(Connection connection, String schemaName, String tableName, String columnName, DataType dataType, AbstractIntervalHelper intervalHelper) {
+        String queryString = columnRangeDistributionQueryString(schemaName, tableName, columnName, dataType, intervalHelper)
 
         final PreparedStatement preparedStatement = connection.prepareStatement(queryString)
         List<Map<String, Object>> results = executeStatement(preparedStatement)

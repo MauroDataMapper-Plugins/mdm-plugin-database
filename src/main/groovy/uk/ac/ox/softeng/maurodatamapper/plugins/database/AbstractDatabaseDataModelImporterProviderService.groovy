@@ -165,29 +165,31 @@ abstract class AbstractDatabaseDataModelImporterProviderService<S extends Databa
     abstract String getDatabaseStructureQueryString()
 
     /**
-     * Must return a String which will be queryable by table name
-     * and column name, and return a row with the following columns:
+     * Must return a String which will be queryable by column name, table name
+     * and optionally schema name, and return a row with the following columns:
      *  * count
      *
      * @return Query string for count of distinct values in a column
      */
-    String countDistinctColumnValuesQueryString(String schemaName, String tableName, String columnName) {
-        "SELECT COUNT(DISTINCT(${escapeIdentifier(columnName)})) AS count FROM ${escapeIdentifier(schemaName)}.${escapeIdentifier(tableName)}"
+    String countDistinctColumnValuesQueryString(String columnName, String tableName, String schemaName = null) {
+        String schemaIdentifier = schemaName ? "${escapeIdentifier(schemaName)}." : ""
+        "SELECT COUNT(DISTINCT(${escapeIdentifier(columnName)})) AS count FROM ${schemaIdentifier}${escapeIdentifier(tableName)}"
     }
 
     /**
-     * Must return a String which will be queryable by table name
-     * and column name, and return rows with the following columns:
+     * Must return a String which will be queryable by column name, table name
+     * and optionally schema name, and return rows with the following columns:
      *  * distinct_value
      *
      * @return Query string for distinct values in a column
      */
-    String distinctColumnValuesQueryString(String schemaName, String tableName, String columnName) {
-        "SELECT DISTINCT(${escapeIdentifier(columnName)}) AS distinct_value FROM ${escapeIdentifier(schemaName)}.${escapeIdentifier(tableName)}"
+    String distinctColumnValuesQueryString(String columnName, String tableName, String schemaName = null) {
+        String schemaIdentifier = schemaName ? "${escapeIdentifier(schemaName)}." : ""
+        "SELECT DISTINCT(${escapeIdentifier(columnName)}) AS distinct_value FROM ${schemaIdentifier}${escapeIdentifier(tableName)}"
     }
 
     /**
-     * Escape an identifier using vendor specific syntax.
+     * Escape an identifier. Subclasses can override and using vendor specific syntax.
      * @param identifier
      * @return The escaped identifier
      */
@@ -197,7 +199,7 @@ abstract class AbstractDatabaseDataModelImporterProviderService<S extends Databa
 
     /**
      * Does the dataType represent a column that should be checked as a possible enumeration?
-     * Extending classes must override and use database specific types e.g char/varchar or
+     * Subclasses can override and use database specific types e.g char/varchar or
      * character/character varying
      * @param dataType
      * @return boolean
@@ -208,7 +210,7 @@ abstract class AbstractDatabaseDataModelImporterProviderService<S extends Databa
 
     /**
      * Does the dataType represent a column that should be summarised as a date?
-     * Extending classes must override and use database specific types.
+     * Subclasses can override and use database specific types.
      * @param dataType
      * @return boolean
      */
@@ -218,7 +220,7 @@ abstract class AbstractDatabaseDataModelImporterProviderService<S extends Databa
 
     /**
      * Does the dataType represent a column that should be summarised as a decimal?
-     * Extending classes must override and use database specific types.
+     * Subclasses can override and use database specific types.
      * @param dataType
      * @return boolean
      */
@@ -228,7 +230,7 @@ abstract class AbstractDatabaseDataModelImporterProviderService<S extends Databa
 
     /**
      * Does the dataType represent a column that should be summarised as an integer?
-     * Extending classes must override and use database specific types.
+     * Subclasses can override and use database specific types.
      * @param dataType
      * @return boolean
      */
@@ -237,15 +239,16 @@ abstract class AbstractDatabaseDataModelImporterProviderService<S extends Databa
     }
 
     /**
-     * Must return a String which will be queryable by table name
-     * and column name, and return rows with the following elements:
+     * Must return a String which will be queryable by column name, table name
+     * and optionally schema name, and return rows with the following elements:
      *  * min_value
      *  * max_value
      *
      * @return Query string for distinct values in a column
      */
-    String minMaxColumnValuesQueryString(String schemaName, String tableName, String columnName) {
-        "SELECT MIN(${escapeIdentifier(columnName)}) AS min_value, MAX(${escapeIdentifier(columnName)}) AS max_value FROM ${escapeIdentifier(schemaName)}.${escapeIdentifier(tableName)}"
+    String minMaxColumnValuesQueryString(String columnName, String tableName, String schemaName = null) {
+        String schemaIdentifier = schemaName ? "${escapeIdentifier(schemaName)}." : ""
+        "SELECT MIN(${escapeIdentifier(columnName)}) AS min_value, MAX(${escapeIdentifier(columnName)}) AS max_value FROM ${schemaIdentifier}${escapeIdentifier(tableName)}"
     }
 
     /**
@@ -258,11 +261,11 @@ abstract class AbstractDatabaseDataModelImporterProviderService<S extends Databa
      *  interval_start is inclusive. interval_end is exclusive. interval_count is the
      *  count of values in the interval. Rows must be ordered by interval_start ascending.
      *
+     *  Subclasses must implement this method using vendor specific SQL as necessary.
+     *
      * @return Query string for count by interval
      */
-    String columnRangeDistributionQueryString(String schemaName, String tableName, String columnName, DataType dataType, AbstractIntervalHelper intervalHelper) {
-        ""
-    }
+    abstract String columnRangeDistributionQueryString(DataType dataType, AbstractIntervalHelper intervalHelper, String columnName, String tableName, String schemaName)
 
     boolean isColumnNullable(String nullableColumnValue) {
         nullableColumnValue.toLowerCase() == 'yes'
@@ -354,28 +357,31 @@ abstract class AbstractDatabaseDataModelImporterProviderService<S extends Databa
                 tableClass.dataElements.each {DataElement de ->
                     DataType primitiveType = de.dataType
                     if (isColumnPossibleEnumeration(primitiveType)) {
-                        int countDistinct = getCountDistinctColumnValues(connection, schemaClass.label, tableClass.label, de.label)
+                        int countDistinct = getCountDistinctColumnValues(connection, de.label, tableClass.label, schemaClass.label)
                         if (countDistinct > 0 && countDistinct <= maxEnumerations) {
                             EnumerationType enumerationType = enumerationTypeService.findOrCreateDataTypeForDataModel(dataModel, de.label, de.label, user)
 
-                            final List<Map<String, Object>> results = getDistinctColumnValues(connection, schemaClass.label, tableClass.label, de.label)
+                            final List<Map<String, Object>> results = getDistinctColumnValues(connection, de.label, tableClass.label, schemaClass.label)
 
-                            results.each {
-                                enumerationType.addToEnumerationValues(new EnumerationValue(key: it.distinct_value, value: it.distinct_value))
-                            }
-
-                            primitiveType.removeFromDataElements(de)
-
-                            de.dataType = enumerationType
-
-                            if (primitiveType.dataElements.size() == 0 ) {
-                                dataModel.removeFromPrimitiveTypes(primitiveType)
-                            }
-
+                            replacePrimitiveTypeWithEnumerationType(dataModel, de, primitiveType, enumerationType, results)
                         }
                     }
                 }
             }
+        }
+    }
+
+    void replacePrimitiveTypeWithEnumerationType(DataModel dataModel, DataElement de, DataType primitiveType, EnumerationType enumerationType, List<Map<String, Object>> results) {
+        results.each {
+            enumerationType.addToEnumerationValues(new EnumerationValue(key: it.distinct_value, value: it.distinct_value))
+        }
+
+        primitiveType.removeFromDataElements(de)
+
+        de.dataType = enumerationType
+
+        if (primitiveType.dataElements.size() == 0 ) {
+            dataModel.removeFromPrimitiveTypes(primitiveType)
         }
     }
 
@@ -391,13 +397,13 @@ abstract class AbstractDatabaseDataModelImporterProviderService<S extends Databa
                 tableClass.dataElements.each { DataElement de ->
                     DataType dt = de.dataType
                     if (isColumnForDateSummary(dt) || isColumnForDecimalSummary(dt) || isColumnForIntegerSummary(dt)) {
-                        Pair minMax = getMinMaxColumnValues(connection, schemaClass.label, tableClass.label, de.label)
+                        Pair minMax = getMinMaxColumnValues(connection, de.label, tableClass.label, schemaClass.label)
 
                         //aValue is the MIN, bValue is the MAX. If they are not null then calculate the range etc...
                         if (!(minMax.aValue == null) && !(minMax.bValue == null)) {
                             AbstractIntervalHelper intervalHelper = getIntervalHelper(dt, minMax)
 
-                            Map<String, Integer> valueDistribution = getColumnRangeDistribution(connection, schemaClass.label, tableClass.label, de.label, dt, intervalHelper)
+                            Map<String, Integer> valueDistribution = getColumnRangeDistribution(connection, dt, intervalHelper, de.label, tableClass.label, schemaClass.label)
                             if (valueDistribution) {
                                 SummaryMetadata summaryMetadata = SummaryMetadataHelper.createSummaryMetadataFromMap(user, de.label, 'Value Distribution', valueDistribution)
                                 de.addToSummaryMetadata(summaryMetadata);
@@ -601,22 +607,22 @@ abstract class AbstractDatabaseDataModelImporterProviderService<S extends Databa
         value.toString().toBoolean()
     }
 
-    private int getCountDistinctColumnValues(Connection connection, String schemaName, String tableName, String columnName) {
-        String queryString = countDistinctColumnValuesQueryString(schemaName, tableName, columnName)
+    int getCountDistinctColumnValues(Connection connection, String columnName, String tableName, String schemaName = null) {
+        String queryString = countDistinctColumnValuesQueryString(columnName, tableName, schemaName)
         final PreparedStatement preparedStatement = connection.prepareStatement(queryString)
         final List<Map<String, Object>> results = executeStatement(preparedStatement)
         (int) results[0].count
     }
 
-    private List<Map<String, Object>> getDistinctColumnValues(Connection connection, String schemaName, String tableName, String columnName) {
-        String queryString = distinctColumnValuesQueryString(schemaName, tableName, columnName)
+    private List<Map<String, Object>> getDistinctColumnValues(Connection connection, String columnName, String tableName, String schemaName = null) {
+        String queryString = distinctColumnValuesQueryString(columnName, tableName, schemaName)
         final PreparedStatement preparedStatement = connection.prepareStatement(queryString)
         final List<Map<String, Object>> results = executeStatement(preparedStatement)
         results
     }
 
-    private Pair getMinMaxColumnValues(Connection connection, String schemaName, String tableName, String columnName) {
-        String queryString = minMaxColumnValuesQueryString(schemaName, tableName, columnName)
+    private Pair getMinMaxColumnValues(Connection connection, String columnName, String tableName, String schemaName = null) {
+        String queryString = minMaxColumnValuesQueryString(columnName, tableName, schemaName)
         final PreparedStatement preparedStatement = connection.prepareStatement(queryString)
         final List<Map<String, Object>> results = executeStatement(preparedStatement)
 
@@ -633,8 +639,8 @@ abstract class AbstractDatabaseDataModelImporterProviderService<S extends Databa
         }
     }
 
-    private Map<String, Integer> getColumnRangeDistribution(Connection connection, String schemaName, String tableName, String columnName, DataType dataType, AbstractIntervalHelper intervalHelper) {
-        String queryString = columnRangeDistributionQueryString(schemaName, tableName, columnName, dataType, intervalHelper)
+    private Map<String, Integer> getColumnRangeDistribution(Connection connection, DataType dataType, AbstractIntervalHelper intervalHelper, String columnName, String tableName, String schemaName = null) {
+        String queryString = columnRangeDistributionQueryString(dataType, intervalHelper, columnName, tableName, schemaName)
 
         final PreparedStatement preparedStatement = connection.prepareStatement(queryString)
         List<Map<String, Object>> results = executeStatement(preparedStatement)

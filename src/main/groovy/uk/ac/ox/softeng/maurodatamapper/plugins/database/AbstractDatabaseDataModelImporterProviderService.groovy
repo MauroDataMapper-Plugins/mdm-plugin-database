@@ -62,6 +62,7 @@ abstract class AbstractDatabaseDataModelImporterProviderService<S extends Databa
 
     static final String DATABASE_NAMESPACE = 'uk.ac.ox.softeng.maurodatamapper.plugins.database'
     static final String IS_NOT_NULL_CONSTRAINT = 'IS NOT NULL'
+    static final Integer MAX_ENUMERATIONS = 20
 
     @Autowired
     DataClassService dataClassService
@@ -340,7 +341,7 @@ abstract class AbstractDatabaseDataModelImporterProviderService<S extends Databa
         if (parameters.dataModelNameSuffix) dataModel.aliasesString = databaseName
 
         if (parameters.detectEnumerations) {
-            updateDataModelWithEnumerations(currentUser, parameters.maxEnumerations, dataModel, connection)
+            updateDataModelWithEnumerations(currentUser, parameters.maxEnumerations ?: MAX_ENUMERATIONS, dataModel, connection)
         }
 
         if (parameters.calculateSummaryMetadata) {

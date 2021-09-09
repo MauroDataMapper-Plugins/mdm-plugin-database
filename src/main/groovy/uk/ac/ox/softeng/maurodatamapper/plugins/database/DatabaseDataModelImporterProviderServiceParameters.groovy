@@ -81,7 +81,7 @@ abstract class DatabaseDataModelImporterProviderServiceParameters<K extends Data
 
     @ImportParameterConfig(
             displayName = 'Calculate Summary Metadata',
-            description = 'Whether to calculate summary metedata',
+            description = 'Whether to calculate summary metadata',
             order = 6,
             optional = true,
             group = @ImportGroupConfig(

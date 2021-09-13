@@ -80,6 +80,18 @@ abstract class DatabaseDataModelImporterProviderServiceParameters<K extends Data
     Integer maxEnumerations = 20
 
     @ImportParameterConfig(
+            displayName = 'Calculate Summary Metadata',
+            description = 'Whether to calculate summary metadata',
+            order = 6,
+            optional = true,
+            group = @ImportGroupConfig(
+                    name = 'Database Import Details',
+                    order = 2
+            )
+    )
+    Boolean calculateSummaryMetadata = false
+
+    @ImportParameterConfig(
         displayName = 'Database Host',
         description = 'The hostname of the server that is running the database.',
         order = 2,

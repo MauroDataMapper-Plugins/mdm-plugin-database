@@ -63,6 +63,8 @@ abstract class AbstractDatabaseDataModelImporterProviderService<S extends Databa
     static final String DATABASE_NAMESPACE = 'uk.ac.ox.softeng.maurodatamapper.plugins.database'
     static final String IS_NOT_NULL_CONSTRAINT = 'IS NOT NULL'
     static final Integer MAX_ENUMERATIONS = 20
+    static final Integer DEFAULT_SAMPLE_THRESHOLD = 0
+    static final BigDecimal DEFAULT_SAMPLE_PERCENTAGE = 1
 
     @Autowired
     DataClassService dataClassService
@@ -81,6 +83,10 @@ abstract class AbstractDatabaseDataModelImporterProviderService<S extends Databa
 
     @Autowired
     AuthorityService authorityService
+
+    SamplingStrategy getSamplingStrategy(S parameters) {
+        new SamplingStrategy()
+    }
 
     String schemaNameColumnName = 'table_schema'
     String dataTypeColumnName = 'data_type'
@@ -179,6 +185,21 @@ abstract class AbstractDatabaseDataModelImporterProviderService<S extends Databa
 
     /**
      * Must return a String which will be queryable by column name, table name
+     * and optionally schema name, and return a row with the following columns:
+     *  * count
+     * and preferably apply a sampling strategy.
+     *
+     * The base method returns a query that does not use any sampling; subclasses which
+     * support sampling should override with vendor specific SQL.
+     *
+     * @return Query string for count of distinct values in a column
+     */
+    String countDistinctColumnValuesQueryString(SamplingStrategy samplingStrategy, String columnName, String tableName, String schemaName = null) {
+        countDistinctColumnValuesQueryString(columnName, tableName, schemaName)
+    }
+
+    /**
+     * Must return a String which will be queryable by column name, table name
      * and optionally schema name, and return rows with the following columns:
      *  * distinct_value
      *
@@ -187,6 +208,22 @@ abstract class AbstractDatabaseDataModelImporterProviderService<S extends Databa
     String distinctColumnValuesQueryString(String columnName, String tableName, String schemaName = null) {
         String schemaIdentifier = schemaName ? "${escapeIdentifier(schemaName)}." : ""
         "SELECT DISTINCT(${escapeIdentifier(columnName)}) AS distinct_value FROM ${schemaIdentifier}${escapeIdentifier(tableName)}"
+    }
+
+    /**
+     * Must return a String which will be queryable by column name, table name
+     * and optionally schema name, and return rows with the following columns:
+     *  * distinct_value
+     *
+     * and preferably apply a sampling strategy.
+     *
+     * The base method returns a query that does not use any sampling; subclasses which
+     * support sampling should override with vendor specific SQL.
+     *
+     * @return Query string for distinct values in a column
+     */
+    String distinctColumnValuesQueryString(SamplingStrategy samplingStrategy, String columnName, String tableName, String schemaName = null) {
+        distinctColumnValuesQueryString(columnName, tableName, schemaName)
     }
 
     /**
@@ -240,6 +277,23 @@ abstract class AbstractDatabaseDataModelImporterProviderService<S extends Databa
     }
 
     /**
+     * Must return a String which will be queryable by table name
+     * and optionally schema name, and return rows with the following elements:
+     *  * approx_count
+     *
+     * The base implementation uses COUNT(*) which is vendor neutral, returns an
+     * exact row count, and is likely to be slow on large tables. Subclasses should
+     * override this method and provide a fast implementation for an approximate
+     * count, using vendor specific queries as appropriate.
+     *
+     * @return Query string for approximate count of rows in a table
+     */
+    String approxCountQueryString(String tableName, String schemaName = null) {
+        String schemaIdentifier = schemaName ? "${escapeIdentifier(schemaName)}." : ""
+        "SELECT COUNT(*) AS approx_count FROM ${schemaIdentifier}${escapeIdentifier(tableName)}"
+    }
+
+    /**
      * Must return a String which will be queryable by column name, table name
      * and optionally schema name, and return rows with the following elements:
      *  * min_value
@@ -250,6 +304,21 @@ abstract class AbstractDatabaseDataModelImporterProviderService<S extends Databa
     String minMaxColumnValuesQueryString(String columnName, String tableName, String schemaName = null) {
         String schemaIdentifier = schemaName ? "${escapeIdentifier(schemaName)}." : ""
         "SELECT MIN(${escapeIdentifier(columnName)}) AS min_value, MAX(${escapeIdentifier(columnName)}) AS max_value FROM ${schemaIdentifier}${escapeIdentifier(tableName)}"
+    }
+
+    /**
+     * Must return a String which will be queryable by column name, table name
+     * and optionally schema name, and return rows with the following elements:
+     *  * min_value
+     *  * max_value
+     *
+     * and use an appropriate sampling strategy.
+     *
+     * The base method does not use sampling, and should be overridden by subclasses where possible.
+     * @return Query string for distinct values in a column
+     */
+    String minMaxColumnValuesQueryString(SamplingStrategy samplingStrategy, String columnName, String tableName, String schemaName = null) {
+        minMaxColumnValuesQueryString(columnName, tableName, schemaName)
     }
 
     /**
@@ -266,7 +335,16 @@ abstract class AbstractDatabaseDataModelImporterProviderService<S extends Databa
      *
      * @return Query string for count by interval
      */
-    abstract String columnRangeDistributionQueryString(DataType dataType, AbstractIntervalHelper intervalHelper, String columnName, String tableName, String schemaName)
+    abstract String columnRangeDistributionQueryString(DataType dataType,
+                                                       AbstractIntervalHelper intervalHelper,
+                                                       String columnName, String tableName, String schemaName)
+
+
+    String columnRangeDistributionQueryString(SamplingStrategy samplingStrategy, DataType dataType,
+                                              AbstractIntervalHelper intervalHelper,
+                                              String columnName, String tableName, String schemaName)  {
+        columnRangeDistributionQueryString(dataType, intervalHelper, columnName, tableName, schemaName)
+    }
 
     boolean isColumnNullable(String nullableColumnValue) {
         nullableColumnValue.toLowerCase() == 'yes'
@@ -341,28 +419,32 @@ abstract class AbstractDatabaseDataModelImporterProviderService<S extends Databa
         if (parameters.dataModelNameSuffix) dataModel.aliasesString = databaseName
 
         if (parameters.detectEnumerations) {
-            updateDataModelWithEnumerations(currentUser, parameters.maxEnumerations ?: MAX_ENUMERATIONS, dataModel, connection)
+            updateDataModelWithEnumerations(currentUser, getSamplingStrategy(parameters), parameters.maxEnumerations ?: MAX_ENUMERATIONS, dataModel, connection)
         }
 
         if (parameters.calculateSummaryMetadata) {
-            updateDataModelWithSummaryMetadata(currentUser, dataModel, connection)
+            updateDataModelWithSummaryMetadata(currentUser, getSamplingStrategy(parameters), dataModel, connection)
         }
 
         updateDataModelWithDatabaseSpecificInformation(dataModel, connection)
         [dataModel]
     }
 
-    void updateDataModelWithEnumerations(User user, int maxEnumerations, DataModel dataModel, Connection connection) {
+    void updateDataModelWithEnumerations(User user, SamplingStrategy samplingStrategy, int maxEnumerations, DataModel dataModel, Connection connection) {
         dataModel.childDataClasses.each { DataClass schemaClass ->
             schemaClass.dataClasses.each { DataClass tableClass ->
+                //Decide whether or not to use sampling
+                if (samplingStrategy.enabled && samplingStrategy.threshold > 0) {
+                    samplingStrategy.approxCount = getApproxCount(connection, tableClass.label, schemaClass.label)
+                }
                 tableClass.dataElements.each {DataElement de ->
                     DataType primitiveType = de.dataType
                     if (isColumnPossibleEnumeration(primitiveType)) {
-                        int countDistinct = getCountDistinctColumnValues(connection, de.label, tableClass.label, schemaClass.label)
+                        int countDistinct = getCountDistinctColumnValues(connection, samplingStrategy, de.label, tableClass.label, schemaClass.label)
                         if (countDistinct > 0 && countDistinct <= maxEnumerations) {
                             EnumerationType enumerationType = enumerationTypeService.findOrCreateDataTypeForDataModel(dataModel, de.label, de.label, user)
 
-                            final List<Map<String, Object>> results = getDistinctColumnValues(connection, de.label, tableClass.label, schemaClass.label)
+                            final List<Map<String, Object>> results = getDistinctColumnValues(connection, samplingStrategy, de.label, tableClass.label, schemaClass.label)
 
                             replacePrimitiveTypeWithEnumerationType(dataModel, de, primitiveType, enumerationType, results)
                         }
@@ -392,21 +474,29 @@ abstract class AbstractDatabaseDataModelImporterProviderService<S extends Databa
      * @param dataModel
      * @param connection
      */
-    void updateDataModelWithSummaryMetadata(User user, DataModel dataModel, Connection connection) {
+    void updateDataModelWithSummaryMetadata(User user, SamplingStrategy samplingStrategy, DataModel dataModel, Connection connection) {
         dataModel.childDataClasses.each { DataClass schemaClass ->
             schemaClass.dataClasses.each { DataClass tableClass ->
+                //Decide whether or not to use sampling
+                if (samplingStrategy.enabled && samplingStrategy.threshold > 0) {
+                    samplingStrategy.approxCount = getApproxCount(connection, tableClass.label, schemaClass.label)
+                }
                 tableClass.dataElements.each { DataElement de ->
                     DataType dt = de.dataType
                     if (isColumnForDateSummary(dt) || isColumnForDecimalSummary(dt) || isColumnForIntegerSummary(dt)) {
-                        Pair minMax = getMinMaxColumnValues(connection, de.label, tableClass.label, schemaClass.label)
+                        Pair minMax = getMinMaxColumnValues(connection, samplingStrategy, de.label, tableClass.label, schemaClass.label)
 
                         //aValue is the MIN, bValue is the MAX. If they are not null then calculate the range etc...
                         if (!(minMax.aValue == null) && !(minMax.bValue == null)) {
                             AbstractIntervalHelper intervalHelper = getIntervalHelper(dt, minMax)
 
-                            Map<String, Integer> valueDistribution = getColumnRangeDistribution(connection, dt, intervalHelper, de.label, tableClass.label, schemaClass.label)
+                            Map<String, Integer> valueDistribution = getColumnRangeDistribution(connection, samplingStrategy, dt, intervalHelper, de.label, tableClass.label, schemaClass.label)
                             if (valueDistribution) {
-                                SummaryMetadata summaryMetadata = SummaryMetadataHelper.createSummaryMetadataFromMap(user, de.label, 'Value Distribution', valueDistribution)
+                                String description = 'Value Distribution';
+                                if (samplingStrategy.useSampling()) {
+                                    description = "Estimated Value Distribution (calculated by sampling ${samplingStrategy.percentage}% of rows)"
+                                }
+                                SummaryMetadata summaryMetadata = SummaryMetadataHelper.createSummaryMetadataFromMap(user, de.label, description, valueDistribution)
                                 de.addToSummaryMetadata(summaryMetadata);
                             }
                         }
@@ -608,26 +698,34 @@ abstract class AbstractDatabaseDataModelImporterProviderService<S extends Databa
         value.toString().toBoolean()
     }
 
-    int getCountDistinctColumnValues(Connection connection, String columnName, String tableName, String schemaName = null) {
-        String queryString = countDistinctColumnValuesQueryString(columnName, tableName, schemaName)
+    int getCountDistinctColumnValues(Connection connection, SamplingStrategy samplingStrategy, String columnName, String tableName, String schemaName = null) {
+        String queryString = countDistinctColumnValuesQueryString(samplingStrategy, columnName, tableName, schemaName)
         final PreparedStatement preparedStatement = connection.prepareStatement(queryString)
         final List<Map<String, Object>> results = executeStatement(preparedStatement)
         (int) results[0].count
     }
 
-    private List<Map<String, Object>> getDistinctColumnValues(Connection connection, String columnName, String tableName, String schemaName = null) {
-        String queryString = distinctColumnValuesQueryString(columnName, tableName, schemaName)
+    private List<Map<String, Object>> getDistinctColumnValues(Connection connection, SamplingStrategy samplingStrategy, String columnName, String tableName, String schemaName = null) {
+        String queryString = distinctColumnValuesQueryString(samplingStrategy, columnName, tableName, schemaName)
         final PreparedStatement preparedStatement = connection.prepareStatement(queryString)
         final List<Map<String, Object>> results = executeStatement(preparedStatement)
         results
     }
 
-    private Pair getMinMaxColumnValues(Connection connection, String columnName, String tableName, String schemaName = null) {
-        String queryString = minMaxColumnValuesQueryString(columnName, tableName, schemaName)
+    private Pair getMinMaxColumnValues(Connection connection, SamplingStrategy samplingStrategy, String columnName, String tableName, String schemaName = null) {
+        String queryString = minMaxColumnValuesQueryString(samplingStrategy, columnName, tableName, schemaName)
         final PreparedStatement preparedStatement = connection.prepareStatement(queryString)
         final List<Map<String, Object>> results = executeStatement(preparedStatement)
 
         new Pair(results[0].min_value, results[0].max_value)
+    }
+
+    private Integer getApproxCount(Connection connection, String tableName, String schemaName = null) {
+        String queryString = approxCountQueryString(tableName, schemaName)
+        final PreparedStatement preparedStatement = connection.prepareStatement(queryString)
+        final List<Map<String, Object>> results = executeStatement(preparedStatement)
+
+        (Integer) results[0].approx_count
     }
 
     private AbstractIntervalHelper getIntervalHelper(DataType dt, Pair minMax) {
@@ -640,8 +738,10 @@ abstract class AbstractDatabaseDataModelImporterProviderService<S extends Databa
         }
     }
 
-    private Map<String, Integer> getColumnRangeDistribution(Connection connection, DataType dataType, AbstractIntervalHelper intervalHelper, String columnName, String tableName, String schemaName = null) {
-        String queryString = columnRangeDistributionQueryString(dataType, intervalHelper, columnName, tableName, schemaName)
+    private Map<String, Integer> getColumnRangeDistribution(Connection connection, SamplingStrategy samplingStrategy,
+                                                            DataType dataType, AbstractIntervalHelper intervalHelper,
+                                                            String columnName, String tableName, String schemaName = null) {
+        String queryString = columnRangeDistributionQueryString(samplingStrategy, dataType, intervalHelper, columnName, tableName, schemaName)
 
         final PreparedStatement preparedStatement = connection.prepareStatement(queryString)
         List<Map<String, Object>> results = executeStatement(preparedStatement)

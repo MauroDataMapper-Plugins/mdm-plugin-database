@@ -277,20 +277,25 @@ abstract class AbstractDatabaseDataModelImporterProviderService<S extends Databa
     }
 
     /**
-     * Must return a String which will be queryable by table name
+     * Must return a List of Strings, each of which will be queryable by table name
      * and optionally schema name, and return rows with the following elements:
      *  * approx_count
      *
-     * The base implementation uses COUNT(*) which is vendor neutral, returns an
-     * exact row count, and is likely to be slow on large tables. Subclasses should
-     * override this method and provide a fast implementation for an approximate
-     * count, using vendor specific queries as appropriate.
+     * The base implementation returns a single COUNT(*) query, which is vendor neutral,
+     * returns an exact row count, and is likely to be slow on large tables. Subclasses should
+     * override this method and push to the front of the list alternative faster implementations
+     * for an approximate count, using vendor specific queries as appropriate. Some such
+     * queries may return null values (for example if statistics have not been calculated
+     * on the relevant table); if a query does return a null count, the next query
+     * in the list is executed.
      *
      * @return Query string for approximate count of rows in a table
      */
-    String approxCountQueryString(String tableName, String schemaName = null) {
+    List<String> approxCountQueryString(String tableName, String schemaName = null) {
         String schemaIdentifier = schemaName ? "${escapeIdentifier(schemaName)}." : ""
-        "SELECT COUNT(*) AS approx_count FROM ${schemaIdentifier}${escapeIdentifier(tableName)}"
+        [
+            "SELECT COUNT(*) AS approx_count FROM ${schemaIdentifier}${escapeIdentifier(tableName)}".toString()
+        ]
     }
 
     /**
@@ -720,12 +725,30 @@ abstract class AbstractDatabaseDataModelImporterProviderService<S extends Databa
         new Pair(results[0].min_value, results[0].max_value)
     }
 
+    /**
+     * Iterate candidate query strings and return the first not-null approximate count found.
+     * If there are no not-null results then return 0. We do this in case queries return null
+     * due to a lack of statistics.
+     * @param connection
+     * @param tableName
+     * @param schemaName
+     * @return
+     */
     private Integer getApproxCount(Connection connection, String tableName, String schemaName = null) {
-        String queryString = approxCountQueryString(tableName, schemaName)
-        final PreparedStatement preparedStatement = connection.prepareStatement(queryString)
-        final List<Map<String, Object>> results = executeStatement(preparedStatement)
 
-        (Integer) results[0].approx_count
+        Integer approxCount = 0
+        List<String> queryStrings = approxCountQueryString(tableName, schemaName)
+        for (String queryString: queryStrings) {
+            PreparedStatement preparedStatement = connection.prepareStatement(queryString)
+            List<Map<String, Object>> results = executeStatement(preparedStatement)
+
+            if (results[0].approx_count != null) {
+                approxCount =  (Integer) results[0].approx_count
+                break
+            }
+        }
+
+        return approxCount
     }
 
     private AbstractIntervalHelper getIntervalHelper(DataType dt, Pair minMax) {

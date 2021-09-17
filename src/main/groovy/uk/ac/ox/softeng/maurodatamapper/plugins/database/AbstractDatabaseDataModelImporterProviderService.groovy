@@ -742,7 +742,7 @@ abstract class AbstractDatabaseDataModelImporterProviderService<S extends Databa
             PreparedStatement preparedStatement = connection.prepareStatement(queryString)
             List<Map<String, Object>> results = executeStatement(preparedStatement)
 
-            if (results[0].approx_count != null) {
+            if (results && results[0].approx_count != null) {
                 approxCount =  (Integer) results[0].approx_count
                 break
             }

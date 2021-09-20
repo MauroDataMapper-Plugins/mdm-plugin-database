@@ -522,6 +522,7 @@ abstract class AbstractDatabaseDataModelImporterProviderService<S extends Databa
         addPrimaryKeyAndUniqueConstraintInformation dataModel, connection
         addIndexInformation dataModel, connection
         addForeignKeyInformation dataModel, connection
+        addMetadata dataModel, connection
     }
 
     void addStandardConstraintInformation(DataModel dataModel, Connection connection) throws ApiException, SQLException {
@@ -626,6 +627,16 @@ abstract class AbstractDatabaseDataModelImporterProviderService<S extends Databa
                 columnElement.addToMetadata(namespace, "foreign_key_columns", row.reference_column_name as String, dataModel.createdBy)
             }
         }
+    }
+
+    /**
+     * Subclasses may override this method and use vendor specific queries to add metadata / extended properties /
+     * comments to the DataModel and its constituent parts.
+     * @param dataModel
+     * @param connection
+     */
+    void addMetadata(DataModel dataModel, Connection connection) {
+        return
     }
 
     Connection getConnection(String databaseName, S parameters) throws ApiException, ApiBadRequestException {

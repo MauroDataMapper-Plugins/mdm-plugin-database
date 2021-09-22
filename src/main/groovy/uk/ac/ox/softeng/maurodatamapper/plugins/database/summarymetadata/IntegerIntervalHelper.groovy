@@ -64,7 +64,7 @@ class IntegerIntervalHelper extends AbstractIntervalHelper<Integer> {
             intervalLength = 2000000
         } else if (20000000 < difference && difference <= 100000000 ) {
             intervalLength = 10000000
-        } else intervalLength = maxValue - minValue / 10
+        } else intervalLength = (Integer) ((maxValue - minValue)  / 10)
 
         firstIntervalStart = minValue.intdiv(intervalLength) * intervalLength
         lastIntervalStart = maxValue.intdiv(intervalLength) * intervalLength

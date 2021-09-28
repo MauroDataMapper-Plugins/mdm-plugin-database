@@ -32,7 +32,9 @@ class IntegerIntervalHelper extends AbstractIntervalHelper<Integer> {
 
         difference = maxValue - minValue
 
-        if (1 < difference && difference <= 5 ) {
+        if (difference <= 1) {
+            intervalLength = 1
+        } else if (1 < difference && difference <= 5 ) {
             intervalLength = 1
         } else if (5 < difference && difference <= 10 ) {
             intervalLength = 2
@@ -64,10 +66,21 @@ class IntegerIntervalHelper extends AbstractIntervalHelper<Integer> {
             intervalLength = 2000000
         } else if (20000000 < difference && difference <= 100000000 ) {
             intervalLength = 10000000
-        } else intervalLength = (Integer) ((maxValue - minValue)  / 10)
+        } else {
+            Double base = Math.log10((Double) ((maxValue - minValue)  / 10))
+            intervalLength = (Integer) Math.pow(10, Math.ceil(base))
+        }
 
         firstIntervalStart = minValue.intdiv(intervalLength) * intervalLength
+        //For negative minima which do not align with an interval start, shift the interval one step to the left
+        if (Math.abs(minValue % intervalLength) > 0 && minValue < 0) {
+            firstIntervalStart = firstIntervalStart - intervalLength
+        }
         lastIntervalStart = maxValue.intdiv(intervalLength) * intervalLength
+        if (Math.abs(maxValue % intervalLength) > 0 && maxValue < 0) {
+            lastIntervalStart = lastIntervalStart - intervalLength
+        }
+
     }
 
     @Override

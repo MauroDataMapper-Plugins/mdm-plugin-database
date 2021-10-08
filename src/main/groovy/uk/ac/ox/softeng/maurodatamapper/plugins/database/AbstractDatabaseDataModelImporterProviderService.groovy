@@ -523,7 +523,7 @@ abstract class AbstractDatabaseDataModelImporterProviderService<S extends Databa
                             if (!(minMax.aValue == null) && !(minMax.bValue == null)) {
                                 AbstractIntervalHelper intervalHelper = getIntervalHelper(dt, minMax)
 
-                                Map<String, Integer> valueDistribution = getColumnRangeDistribution(connection, samplingStrategy, dt, intervalHelper, de.label, tableClass.label, schemaClass.label)
+                                Map<String, Long> valueDistribution = getColumnRangeDistribution(connection, samplingStrategy, dt, intervalHelper, de.label, tableClass.label, schemaClass.label)
                                 if (valueDistribution) {
                                     String description = 'Value Distribution';
                                     if (samplingStrategy.useSampling()) {
@@ -826,7 +826,7 @@ abstract class AbstractDatabaseDataModelImporterProviderService<S extends Databa
         }
     }
 
-    private Map<String, Integer> getColumnRangeDistribution(Connection connection, SamplingStrategy samplingStrategy,
+    private Map<String, Long> getColumnRangeDistribution(Connection connection, SamplingStrategy samplingStrategy,
                                                             DataType dataType, AbstractIntervalHelper intervalHelper,
                                                             String columnName, String tableName, String schemaName = null) {
         String queryString = columnRangeDistributionQueryString(samplingStrategy, dataType, intervalHelper, columnName, tableName, schemaName)

@@ -47,6 +47,7 @@ import groovy.json.JsonOutput
 import groovy.transform.CompileStatic
 import groovy.util.logging.Slf4j
 import org.springframework.beans.factory.annotation.Autowired
+import uk.ac.ox.softeng.maurodatamapper.util.Utils
 
 import java.sql.Connection
 import java.sql.PreparedStatement
@@ -436,6 +437,8 @@ abstract class AbstractDatabaseDataModelImporterProviderService<S extends Databa
     }
 
     void updateDataModelWithEnumerations(User user, SamplingStrategy samplingStrategy, int maxEnumerations, DataModel dataModel, Connection connection) {
+        log.info('Starting enumeration detection')
+        long startTime = System.currentTimeMillis()
         dataModel.childDataClasses.each { DataClass schemaClass ->
             schemaClass.dataClasses.each { DataClass tableClass ->
                 //Decide whether or not to use sampling
@@ -457,11 +460,15 @@ abstract class AbstractDatabaseDataModelImporterProviderService<S extends Databa
                 }
             }
         }
+        log.info('Finished enumeration detection in {}', Utils.timeTaken(startTime))
     }
 
     void replacePrimitiveTypeWithEnumerationType(DataModel dataModel, DataElement de, DataType primitiveType, EnumerationType enumerationType, List<Map<String, Object>> results) {
         results.each {
-            enumerationType.addToEnumerationValues(new EnumerationValue(key: it.distinct_value, value: it.distinct_value))
+            //null is not a value, so skip it
+            if (it.distinct_value != null) {
+                enumerationType.addToEnumerationValues(new EnumerationValue(key: it.distinct_value, value: it.distinct_value))
+            }
         }
 
         primitiveType.removeFromDataElements(de)
@@ -480,6 +487,8 @@ abstract class AbstractDatabaseDataModelImporterProviderService<S extends Databa
      * @param connection
      */
     void updateDataModelWithSummaryMetadata(User user, SamplingStrategy samplingStrategy, DataModel dataModel, Connection connection) {
+        log.info('Starting summary metadata')
+        long startTime = System.currentTimeMillis()
         dataModel.childDataClasses.each { DataClass schemaClass ->
             schemaClass.dataClasses.each { DataClass tableClass ->
                 //Decide whether or not to use sampling
@@ -509,6 +518,7 @@ abstract class AbstractDatabaseDataModelImporterProviderService<S extends Databa
                 }
             }
         }
+        log.info('Finished summary metadata in {}', Utils.timeTaken(startTime))
     }
 
     /**

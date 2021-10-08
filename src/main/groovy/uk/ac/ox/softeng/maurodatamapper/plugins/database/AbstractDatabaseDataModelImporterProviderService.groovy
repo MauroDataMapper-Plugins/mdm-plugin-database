@@ -300,6 +300,18 @@ abstract class AbstractDatabaseDataModelImporterProviderService<S extends Databa
     }
 
     /**
+     * Must return a String which will be queryable by table name, schema name, and model name,
+     * and return one row with the following elements:
+     *  * table_type
+     *
+     *
+     * @return Query string for table type
+     */
+    String tableTypeQueryString() {
+        "SELECT TABLE_TYPE FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_CATALOG = ? AND TABLE_SCHEMA = ? AND TABLE_NAME = ?"
+    }
+
+    /**
      * Must return a String which will be queryable by column name, table name
      * and optionally schema name, and return rows with the following elements:
      *  * min_value
@@ -425,36 +437,40 @@ abstract class AbstractDatabaseDataModelImporterProviderService<S extends Databa
         if (parameters.dataModelNameSuffix) dataModel.aliasesString = databaseName
 
         if (parameters.detectEnumerations) {
-            updateDataModelWithEnumerations(currentUser, getSamplingStrategy(parameters), parameters.maxEnumerations ?: MAX_ENUMERATIONS, dataModel, connection)
+            updateDataModelWithEnumerations(currentUser, parameters, parameters.maxEnumerations ?: MAX_ENUMERATIONS, dataModel, connection)
         }
 
         if (parameters.calculateSummaryMetadata) {
-            updateDataModelWithSummaryMetadata(currentUser, getSamplingStrategy(parameters), dataModel, connection)
+            updateDataModelWithSummaryMetadata(currentUser, parameters, dataModel, connection)
         }
 
         updateDataModelWithDatabaseSpecificInformation(dataModel, connection)
         [dataModel]
     }
 
-    void updateDataModelWithEnumerations(User user, SamplingStrategy samplingStrategy, int maxEnumerations, DataModel dataModel, Connection connection) {
+    void updateDataModelWithEnumerations(User user, S parameters, int maxEnumerations, DataModel dataModel, Connection connection) {
         log.info('Starting enumeration detection')
         long startTime = System.currentTimeMillis()
         dataModel.childDataClasses.each { DataClass schemaClass ->
             schemaClass.dataClasses.each { DataClass tableClass ->
-                //Decide whether or not to use sampling
-                if (samplingStrategy.enabled && samplingStrategy.threshold > 0) {
-                    samplingStrategy.approxCount = getApproxCount(connection, tableClass.label, schemaClass.label)
-                }
-                tableClass.dataElements.each {DataElement de ->
-                    DataType primitiveType = de.dataType
-                    if (isColumnPossibleEnumeration(primitiveType)) {
-                        int countDistinct = getCountDistinctColumnValues(connection, samplingStrategy, de.label, tableClass.label, schemaClass.label)
-                        if (countDistinct > 0 && countDistinct <= maxEnumerations) {
-                            EnumerationType enumerationType = enumerationTypeService.findOrCreateDataTypeForDataModel(dataModel, de.label, de.label, user)
+                SamplingStrategy samplingStrategy = getSamplingStrategy(parameters)
+                samplingStrategy.approxCount = getApproxCount(connection, tableClass.label, schemaClass.label)
+                samplingStrategy.tableType = getTableType(connection, tableClass.label, schemaClass.label, dataModel.label)
 
-                            final List<Map<String, Object>> results = getDistinctColumnValues(connection, samplingStrategy, de.label, tableClass.label, schemaClass.label)
+                if (!samplingStrategy.canSample() && samplingStrategy.approxCount > samplingStrategy.threshold) {
+                    log.info("Not calculating enumerations for ${samplingStrategy.tableType} ${tableClass.label} with approx rowcount ${samplingStrategy.approxCount} and threshold ${samplingStrategy.threshold}")
+                } else {
+                    tableClass.dataElements.each { DataElement de ->
+                        DataType primitiveType = de.dataType
+                        if (isColumnPossibleEnumeration(primitiveType)) {
+                            int countDistinct = getCountDistinctColumnValues(connection, samplingStrategy, de.label, tableClass.label, schemaClass.label)
+                            if (countDistinct > 0 && countDistinct <= maxEnumerations) {
+                                EnumerationType enumerationType = enumerationTypeService.findOrCreateDataTypeForDataModel(dataModel, de.label, de.label, user)
 
-                            replacePrimitiveTypeWithEnumerationType(dataModel, de, primitiveType, enumerationType, results)
+                                final List<Map<String, Object>> results = getDistinctColumnValues(connection, samplingStrategy, de.label, tableClass.label, schemaClass.label)
+
+                                replacePrimitiveTypeWithEnumerationType(dataModel, de, primitiveType, enumerationType, results)
+                            }
                         }
                     }
                 }
@@ -486,32 +502,36 @@ abstract class AbstractDatabaseDataModelImporterProviderService<S extends Databa
      * @param dataModel
      * @param connection
      */
-    void updateDataModelWithSummaryMetadata(User user, SamplingStrategy samplingStrategy, DataModel dataModel, Connection connection) {
+    void updateDataModelWithSummaryMetadata(User user, S parameters, DataModel dataModel, Connection connection) {
         log.info('Starting summary metadata')
         long startTime = System.currentTimeMillis()
         dataModel.childDataClasses.each { DataClass schemaClass ->
             schemaClass.dataClasses.each { DataClass tableClass ->
-                //Decide whether or not to use sampling
-                if (samplingStrategy.enabled && samplingStrategy.threshold > 0) {
-                    samplingStrategy.approxCount = getApproxCount(connection, tableClass.label, schemaClass.label)
-                }
-                tableClass.dataElements.each { DataElement de ->
-                    DataType dt = de.dataType
-                    if (isColumnForDateSummary(dt) || isColumnForDecimalSummary(dt) || isColumnForIntegerSummary(dt)) {
-                        Pair minMax = getMinMaxColumnValues(connection, samplingStrategy, de.label, tableClass.label, schemaClass.label)
+                SamplingStrategy samplingStrategy = getSamplingStrategy(parameters)
+                samplingStrategy.approxCount = getApproxCount(connection, tableClass.label, schemaClass.label)
+                samplingStrategy.tableType = getTableType(connection, tableClass.label, schemaClass.label, dataModel.label)
 
-                        //aValue is the MIN, bValue is the MAX. If they are not null then calculate the range etc...
-                        if (!(minMax.aValue == null) && !(minMax.bValue == null)) {
-                            AbstractIntervalHelper intervalHelper = getIntervalHelper(dt, minMax)
+                if (!samplingStrategy.canSample() && samplingStrategy.approxCount > samplingStrategy.threshold) {
+                    log.info("Not calculating summary metadata for ${samplingStrategy.tableType} ${tableClass.label} with approx rowcount ${samplingStrategy.approxCount} and threshold ${samplingStrategy.threshold}")
+                } else {
+                    tableClass.dataElements.each { DataElement de ->
+                        DataType dt = de.dataType
+                        if (isColumnForDateSummary(dt) || isColumnForDecimalSummary(dt) || isColumnForIntegerSummary(dt)) {
+                            Pair minMax = getMinMaxColumnValues(connection, samplingStrategy, de.label, tableClass.label, schemaClass.label)
 
-                            Map<String, Integer> valueDistribution = getColumnRangeDistribution(connection, samplingStrategy, dt, intervalHelper, de.label, tableClass.label, schemaClass.label)
-                            if (valueDistribution) {
-                                String description = 'Value Distribution';
-                                if (samplingStrategy.useSampling()) {
-                                    description = "Estimated Value Distribution (calculated by sampling ${samplingStrategy.percentage}% of rows)"
+                            //aValue is the MIN, bValue is the MAX. If they are not null then calculate the range etc...
+                            if (!(minMax.aValue == null) && !(minMax.bValue == null)) {
+                                AbstractIntervalHelper intervalHelper = getIntervalHelper(dt, minMax)
+
+                                Map<String, Integer> valueDistribution = getColumnRangeDistribution(connection, samplingStrategy, dt, intervalHelper, de.label, tableClass.label, schemaClass.label)
+                                if (valueDistribution) {
+                                    String description = 'Value Distribution';
+                                    if (samplingStrategy.useSampling()) {
+                                        description = "Estimated Value Distribution (calculated by sampling ${samplingStrategy.percentage}% of rows)"
+                                    }
+                                    SummaryMetadata summaryMetadata = SummaryMetadataHelper.createSummaryMetadataFromMap(user, de.label, description, valueDistribution)
+                                    de.addToSummaryMetadata(summaryMetadata);
                                 }
-                                SummaryMetadata summaryMetadata = SummaryMetadataHelper.createSummaryMetadataFromMap(user, de.label, description, valueDistribution)
-                                de.addToSummaryMetadata(summaryMetadata);
                             }
                         }
                     }
@@ -770,6 +790,30 @@ abstract class AbstractDatabaseDataModelImporterProviderService<S extends Databa
         }
 
         return approxCount
+    }
+
+    /**
+     * Get table type (BASE TABLE or VIEW) for an object
+     * @param connection
+     * @param tableName
+     * @param schemaName
+     * @return
+     */
+    private String getTableType(Connection connection, String tableName, String schemaName, String modelName) {
+
+        String tableType = ""
+        String queryString = tableTypeQueryString()
+        final PreparedStatement preparedStatement = connection.prepareStatement(queryString)
+        preparedStatement.setString(1, modelName)
+        preparedStatement.setString(2, schemaName)
+        preparedStatement.setString(3, tableName)
+        List<Map<String, Object>> results = executeStatement(preparedStatement)
+
+        if (results && results[0].table_type != null) {
+            tableType =  (String) results[0].table_type
+        }
+
+        return tableType
     }
 
     private AbstractIntervalHelper getIntervalHelper(DataType dt, Pair minMax) {

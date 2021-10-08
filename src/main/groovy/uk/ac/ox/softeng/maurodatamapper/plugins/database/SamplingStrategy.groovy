@@ -23,6 +23,7 @@ class SamplingStrategy {
     Integer threshold
     BigDecimal percentage
     Long approxCount
+    String tableType
 
     SamplingStrategy() {
         this.enabled = false
@@ -33,15 +34,24 @@ class SamplingStrategy {
         this.threshold = threshold
         this.percentage = percentage
         this.approxCount = 0
+        this.tableType = ""
     }
 
     /**
-     * Only use sampling if sampling is enabled, both threshold and percentage are > 0, and the number
-     * of rows exceeds the (non-zero) threshold for sampling.
+     * Sampling does not work on Views.
+     * @return true if tableType is BASE TABLE
+     */
+    public boolean canSample() {
+        this.tableType == 'BASE TABLE'
+    }
+
+    /**
+     * Only use sampling if sampling is enabled, both threshold and percentage are > 0, the number
+     * of rows exceeds the (non-zero) threshold for sampling, and we are looking at a table (not a view)
      * @return
      */
     public boolean useSampling() {
-       this.enabled && this.threshold > 0 && this.percentage > 0 && this.approxCount > this.threshold
+       this.enabled && this.threshold > 0 && this.percentage > 0 && this.approxCount > this.threshold && this.canSample()
     }
 
     public Integer scaleFactor() {

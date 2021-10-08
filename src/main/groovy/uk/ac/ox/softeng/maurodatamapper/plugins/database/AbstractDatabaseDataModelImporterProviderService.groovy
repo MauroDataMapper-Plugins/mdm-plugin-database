@@ -755,16 +755,16 @@ abstract class AbstractDatabaseDataModelImporterProviderService<S extends Databa
      * @param schemaName
      * @return
      */
-    private Integer getApproxCount(Connection connection, String tableName, String schemaName = null) {
+    private Long getApproxCount(Connection connection, String tableName, String schemaName = null) {
 
-        Integer approxCount = 0
+        Long approxCount = 0
         List<String> queryStrings = approxCountQueryString(tableName, schemaName)
         for (String queryString: queryStrings) {
             PreparedStatement preparedStatement = connection.prepareStatement(queryString)
             List<Map<String, Object>> results = executeStatement(preparedStatement)
 
             if (results && results[0].approx_count != null) {
-                approxCount =  (Integer) results[0].approx_count
+                approxCount =  (Long) results[0].approx_count
                 break
             }
         }

@@ -22,7 +22,7 @@ class SamplingStrategy {
     boolean enabled
     Integer threshold
     BigDecimal percentage
-    Integer approxCount
+    Long approxCount
 
     SamplingStrategy() {
         this.enabled = false

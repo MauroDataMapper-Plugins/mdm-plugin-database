@@ -40,6 +40,7 @@ import uk.ac.ox.softeng.maurodatamapper.plugins.database.summarymetadata.Abstrac
 import uk.ac.ox.softeng.maurodatamapper.plugins.database.summarymetadata.DateIntervalHelper
 import uk.ac.ox.softeng.maurodatamapper.plugins.database.summarymetadata.DecimalIntervalHelper
 import uk.ac.ox.softeng.maurodatamapper.plugins.database.summarymetadata.IntegerIntervalHelper
+import uk.ac.ox.softeng.maurodatamapper.plugins.database.summarymetadata.LongIntervalHelper
 import uk.ac.ox.softeng.maurodatamapper.plugins.database.summarymetadata.SummaryMetadataHelper
 import uk.ac.ox.softeng.maurodatamapper.security.User
 
@@ -274,6 +275,16 @@ abstract class AbstractDatabaseDataModelImporterProviderService<S extends Databa
      * @return boolean
      */
     boolean isColumnForIntegerSummary(DataType dataType) {
+        false
+    }
+
+    /**
+     * Does the dataType represent a column that should be summarised as a long?
+     * Subclasses can override and use database specific types.
+     * @param dataType
+     * @return boolean
+     */
+    boolean isColumnForLongSummary(DataType dataType) {
         false
     }
 
@@ -516,7 +527,7 @@ abstract class AbstractDatabaseDataModelImporterProviderService<S extends Databa
                 } else {
                     tableClass.dataElements.each { DataElement de ->
                         DataType dt = de.dataType
-                        if (isColumnForDateSummary(dt) || isColumnForDecimalSummary(dt) || isColumnForIntegerSummary(dt)) {
+                        if (isColumnForDateSummary(dt) || isColumnForDecimalSummary(dt) || isColumnForIntegerSummary(dt) || isColumnForLongSummary(dt)) {
                             Pair minMax = getMinMaxColumnValues(connection, samplingStrategy, de.label, tableClass.label, schemaClass.label)
 
                             //aValue is the MIN, bValue is the MAX. If they are not null then calculate the range etc...
@@ -817,7 +828,9 @@ abstract class AbstractDatabaseDataModelImporterProviderService<S extends Databa
     }
 
     private AbstractIntervalHelper getIntervalHelper(DataType dt, Pair minMax) {
-        if (isColumnForIntegerSummary(dt)) {
+        if (isColumnForLongSummary(dt)) {
+            return new LongIntervalHelper((Long) minMax.aValue, (Long) minMax.bValue)
+        } else if (isColumnForIntegerSummary(dt)) {
             return new IntegerIntervalHelper((Integer) minMax.aValue, (Integer) minMax.bValue)
         } else if (isColumnForDateSummary(dt)) {
             return new DateIntervalHelper(((java.util.Date) minMax.aValue).toLocalDateTime(), ((java.util.Date) minMax.bValue).toLocalDateTime())

@@ -38,6 +38,14 @@ class SamplingStrategy {
     }
 
     /**
+     * Does this SamplingStrategy need to know the table type (BASE TABLE or VIEW) in order to decide if sampling is possible?
+     * @return
+     */
+    public boolean requiresTableType() {
+        true
+    }
+
+    /**
      * Sampling does not work on Views.
      * @return true if tableType is BASE TABLE
      */

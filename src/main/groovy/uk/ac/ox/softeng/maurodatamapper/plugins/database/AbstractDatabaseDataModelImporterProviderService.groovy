@@ -756,23 +756,33 @@ abstract class AbstractDatabaseDataModelImporterProviderService<S extends Databa
     }
 
     int getCountDistinctColumnValues(Connection connection, SamplingStrategy samplingStrategy, String columnName, String tableName, String schemaName = null) {
+        log.info("Starting getCountDistinctColumnValues query for ${tableName}.${columnName}")
+        long startTime = System.currentTimeMillis()
         String queryString = countDistinctColumnValuesQueryString(samplingStrategy, columnName, tableName, schemaName)
         final PreparedStatement preparedStatement = connection.prepareStatement(queryString)
         final List<Map<String, Object>> results = executeStatement(preparedStatement)
+        log.info("Finished getCountDistinctColumnValues query for ${tableName}.${columnName} in {}", Utils.timeTaken(startTime))
         (int) results[0].count
     }
 
     private List<Map<String, Object>> getDistinctColumnValues(Connection connection, SamplingStrategy samplingStrategy, String columnName, String tableName, String schemaName = null) {
+        log.info("Starting getDistinctColumnValues query for ${tableName}.${columnName}")
+        long startTime = System.currentTimeMillis()
         String queryString = distinctColumnValuesQueryString(samplingStrategy, columnName, tableName, schemaName)
         final PreparedStatement preparedStatement = connection.prepareStatement(queryString)
         final List<Map<String, Object>> results = executeStatement(preparedStatement)
+        log.info("Finished getDistinctColumnValues query for ${tableName}.${columnName} in {}", Utils.timeTaken(startTime))
         results
     }
 
     private Pair getMinMaxColumnValues(Connection connection, SamplingStrategy samplingStrategy, String columnName, String tableName, String schemaName = null) {
+        log.info("Starting getMinMaxColumnValues query for ${tableName}.${columnName}")
+        long startTime = System.currentTimeMillis()
         String queryString = minMaxColumnValuesQueryString(samplingStrategy, columnName, tableName, schemaName)
         final PreparedStatement preparedStatement = connection.prepareStatement(queryString)
         final List<Map<String, Object>> results = executeStatement(preparedStatement)
+
+        log.info("Finished getMinMaxColumnValues query for ${tableName}.${columnName} in {}", Utils.timeTaken(startTime))
 
         new Pair(results[0].min_value, results[0].max_value)
     }
@@ -787,7 +797,8 @@ abstract class AbstractDatabaseDataModelImporterProviderService<S extends Databa
      * @return
      */
     private Long getApproxCount(Connection connection, String tableName, String schemaName = null) {
-
+        log.info("Starting getApproxCouunt query for ${tableName}")
+        long startTime = System.currentTimeMillis()
         Long approxCount = 0
         List<String> queryStrings = approxCountQueryString(tableName, schemaName)
         for (String queryString: queryStrings) {
@@ -799,6 +810,8 @@ abstract class AbstractDatabaseDataModelImporterProviderService<S extends Databa
                 break
             }
         }
+
+        log.info("Finished getApproxCount query for ${tableName} in {}", Utils.timeTaken(startTime))
 
         return approxCount
     }
@@ -842,11 +855,14 @@ abstract class AbstractDatabaseDataModelImporterProviderService<S extends Databa
     private Map<String, Long> getColumnRangeDistribution(Connection connection, SamplingStrategy samplingStrategy,
                                                             DataType dataType, AbstractIntervalHelper intervalHelper,
                                                             String columnName, String tableName, String schemaName = null) {
+        log.info("Starting getColumnRangeDistribution query for ${tableName}.${columnName}")
+        long startTime = System.currentTimeMillis()
         String queryString = columnRangeDistributionQueryString(samplingStrategy, dataType, intervalHelper, columnName, tableName, schemaName)
 
         final PreparedStatement preparedStatement = connection.prepareStatement(queryString)
         List<Map<String, Object>> results = executeStatement(preparedStatement)
         preparedStatement.close()
+        log.info("Finished getColumnRangeDistribution query for ${tableName}.${columnName} in {}", Utils.timeTaken(startTime))
 
         results.collectEntries{
             [(it.interval_label): it.interval_count]

@@ -466,7 +466,9 @@ abstract class AbstractDatabaseDataModelImporterProviderService<S extends Databa
             schemaClass.dataClasses.each { DataClass tableClass ->
                 SamplingStrategy samplingStrategy = getSamplingStrategy(parameters)
                 samplingStrategy.approxCount = getApproxCount(connection, tableClass.label, schemaClass.label)
-                samplingStrategy.tableType = getTableType(connection, tableClass.label, schemaClass.label, dataModel.label)
+                if (samplingStrategy.requiresTableType()) {
+                    samplingStrategy.tableType = getTableType(connection, tableClass.label, schemaClass.label, dataModel.label)
+                }
 
                 if (!samplingStrategy.canSample() && samplingStrategy.approxCount > samplingStrategy.threshold) {
                     log.info("Not calculating enumerations for ${samplingStrategy.tableType} ${tableClass.label} with approx rowcount ${samplingStrategy.approxCount} and threshold ${samplingStrategy.threshold}")
@@ -520,7 +522,9 @@ abstract class AbstractDatabaseDataModelImporterProviderService<S extends Databa
             schemaClass.dataClasses.each { DataClass tableClass ->
                 SamplingStrategy samplingStrategy = getSamplingStrategy(parameters)
                 samplingStrategy.approxCount = getApproxCount(connection, tableClass.label, schemaClass.label)
-                samplingStrategy.tableType = getTableType(connection, tableClass.label, schemaClass.label, dataModel.label)
+                if (samplingStrategy.requiresTableType()) {
+                    samplingStrategy.tableType = getTableType(connection, tableClass.label, schemaClass.label, dataModel.label)
+                }
 
                 if (!samplingStrategy.canSample() && samplingStrategy.approxCount > samplingStrategy.threshold) {
                     log.info("Not calculating summary metadata for ${samplingStrategy.tableType} ${tableClass.label} with approx rowcount ${samplingStrategy.approxCount} and threshold ${samplingStrategy.threshold}")

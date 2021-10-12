@@ -19,18 +19,15 @@ package uk.ac.ox.softeng.maurodatamapper.plugins.database
 
 class SamplingStrategy {
 
-    boolean enabled
     Integer threshold
     BigDecimal percentage
     Long approxCount
     String tableType
 
     SamplingStrategy() {
-        this.enabled = false
     }
 
     SamplingStrategy(Integer threshold, BigDecimal percentage) {
-        this.enabled = true
         this.threshold = threshold
         this.percentage = percentage
         this.approxCount = 0
@@ -41,16 +38,16 @@ class SamplingStrategy {
      * Does this SamplingStrategy need to know the table type (BASE TABLE or VIEW) in order to decide if sampling is possible?
      * @return
      */
-    public boolean requiresTableType() {
+    boolean requiresTableType() {
         true
     }
 
     /**
-     * Sampling does not work on Views.
-     * @return true if tableType is BASE TABLE
+     * By default, no sampling. Subclasses should override.
+     * @return
      */
-    public boolean canSample() {
-        this.tableType == 'BASE TABLE'
+    boolean canSample() {
+        false
     }
 
     /**
@@ -58,11 +55,19 @@ class SamplingStrategy {
      * of rows exceeds the (non-zero) threshold for sampling, and we are looking at a table (not a view)
      * @return
      */
-    public boolean useSampling() {
-       this.enabled && this.threshold > 0 && this.percentage > 0 && this.approxCount > this.threshold && this.canSample()
+    boolean useSampling() {
+       this.canSample() && this.threshold > 0 && this.percentage > 0 && this.approxCount > this.threshold
     }
 
-    public Integer scaleFactor() {
+    /**
+     * Return a sampling clause. Subclasses should override wth vendor specific sampling clauses
+     * @return
+     */
+    String samplingClause() {
+        ""
+    }
+
+    Integer scaleFactor() {
         if (this.useSampling()) {
             return 100 / this.percentage
         } else {

@@ -897,7 +897,8 @@ abstract class AbstractDatabaseDataModelImporterProviderService<S extends Databa
         log.info("Finished getEnumerationValueDistribution query for ${tableName}.${columnName} in {}", Utils.timeTaken(startTime))
 
         results.collectEntries{
-            [(it.enumeration_value): it.enumeration_count]
+            // null values are not counted by a group by query, so skip
+            it.enumeration_value != null ? [(it.enumeration_value): it.enumeration_count] : [:]
         }
     }
 }

@@ -483,7 +483,7 @@ abstract class AbstractDatabaseDataModelImporterProviderService<S extends Databa
     }
 
     void updateDataModelWithEnumerationsAndSummaryMetadata(User user, S parameters, DataModel dataModel, Connection connection) {
-        log.info('Starting enumeration and summary metedata detection')
+        log.debug('Starting enumeration and summary metadata detection')
         long startTime = System.currentTimeMillis()
         dataModel.childDataClasses.each { DataClass schemaClass ->
             schemaClass.dataClasses.each { DataClass tableClass ->
@@ -548,7 +548,7 @@ abstract class AbstractDatabaseDataModelImporterProviderService<S extends Databa
             }
         }
 
-        log.info('Finished enumeration and summary metadata detection in {}', Utils.timeTaken(startTime))
+        log.debug('Finished enumeration and summary metadata detection in {}', Utils.timeTaken(startTime))
     }
 
     void replacePrimitiveTypeWithEnumerationType(DataModel dataModel, DataElement de, DataType primitiveType, EnumerationType enumerationType, List<Map<String, Object>> results) {
@@ -772,33 +772,33 @@ abstract class AbstractDatabaseDataModelImporterProviderService<S extends Databa
     }
 
     int getCountDistinctColumnValues(Connection connection, SamplingStrategy samplingStrategy, String columnName, String tableName, String schemaName = null) {
-        log.info("Starting getCountDistinctColumnValues query for ${tableName}.${columnName}")
+        log.debug("Starting getCountDistinctColumnValues query for ${tableName}.${columnName}")
         long startTime = System.currentTimeMillis()
         String queryString = countDistinctColumnValuesQueryString(samplingStrategy, columnName, tableName, schemaName)
         final PreparedStatement preparedStatement = connection.prepareStatement(queryString)
         final List<Map<String, Object>> results = executeStatement(preparedStatement)
-        log.info("Finished getCountDistinctColumnValues query for ${tableName}.${columnName} in {}", Utils.timeTaken(startTime))
+        log.debug("Finished getCountDistinctColumnValues query for ${tableName}.${columnName} in {}", Utils.timeTaken(startTime))
         (int) results[0].count
     }
 
     private List<Map<String, Object>> getDistinctColumnValues(Connection connection, SamplingStrategy samplingStrategy, String columnName, String tableName, String schemaName = null) {
-        log.info("Starting getDistinctColumnValues query for ${tableName}.${columnName}")
+        log.debug("Starting getDistinctColumnValues query for ${tableName}.${columnName}")
         long startTime = System.currentTimeMillis()
         String queryString = distinctColumnValuesQueryString(samplingStrategy, columnName, tableName, schemaName)
         final PreparedStatement preparedStatement = connection.prepareStatement(queryString)
         final List<Map<String, Object>> results = executeStatement(preparedStatement)
-        log.info("Finished getDistinctColumnValues query for ${tableName}.${columnName} in {}", Utils.timeTaken(startTime))
+        log.debug("Finished getDistinctColumnValues query for ${tableName}.${columnName} in {}", Utils.timeTaken(startTime))
         results
     }
 
     private Pair getMinMaxColumnValues(Connection connection, SamplingStrategy samplingStrategy, String columnName, String tableName, String schemaName = null) {
-        log.info("Starting getMinMaxColumnValues query for ${tableName}.${columnName}")
+        log.debug("Starting getMinMaxColumnValues query for ${tableName}.${columnName}")
         long startTime = System.currentTimeMillis()
         String queryString = minMaxColumnValuesQueryString(samplingStrategy, columnName, tableName, schemaName)
         final PreparedStatement preparedStatement = connection.prepareStatement(queryString)
         final List<Map<String, Object>> results = executeStatement(preparedStatement)
 
-        log.info("Finished getMinMaxColumnValues query for ${tableName}.${columnName} in {}", Utils.timeTaken(startTime))
+        log.debug("Finished getMinMaxColumnValues query for ${tableName}.${columnName} in {}", Utils.timeTaken(startTime))
 
         new Pair(results[0].min_value, results[0].max_value)
     }
@@ -813,7 +813,7 @@ abstract class AbstractDatabaseDataModelImporterProviderService<S extends Databa
      * @return
      */
     private Long getApproxCount(Connection connection, String tableName, String schemaName = null) {
-        log.info("Starting getApproxCouunt query for ${tableName}")
+        log.debug("Starting getApproxCouunt query for ${tableName}")
         long startTime = System.currentTimeMillis()
         Long approxCount = 0
         List<String> queryStrings = approxCountQueryString(tableName, schemaName)
@@ -827,7 +827,7 @@ abstract class AbstractDatabaseDataModelImporterProviderService<S extends Databa
             }
         }
 
-        log.info("Finished getApproxCount query for ${tableName} in {}", Utils.timeTaken(startTime))
+        log.debug("Finished getApproxCount query for ${tableName} in {}", Utils.timeTaken(startTime))
 
         return approxCount
     }
@@ -871,14 +871,14 @@ abstract class AbstractDatabaseDataModelImporterProviderService<S extends Databa
     private Map<String, Long> getColumnRangeDistribution(Connection connection, SamplingStrategy samplingStrategy,
                                                             DataType dataType, AbstractIntervalHelper intervalHelper,
                                                             String columnName, String tableName, String schemaName = null) {
-        log.info("Starting getColumnRangeDistribution query for ${tableName}.${columnName}")
+        log.debug("Starting getColumnRangeDistribution query for ${tableName}.${columnName}")
         long startTime = System.currentTimeMillis()
         String queryString = columnRangeDistributionQueryString(samplingStrategy, dataType, intervalHelper, columnName, tableName, schemaName)
 
         final PreparedStatement preparedStatement = connection.prepareStatement(queryString)
         List<Map<String, Object>> results = executeStatement(preparedStatement)
         preparedStatement.close()
-        log.info("Finished getColumnRangeDistribution query for ${tableName}.${columnName} in {}", Utils.timeTaken(startTime))
+        log.debug("Finished getColumnRangeDistribution query for ${tableName}.${columnName} in {}", Utils.timeTaken(startTime))
 
         results.collectEntries{
             [(it.interval_label): it.interval_count]
@@ -887,14 +887,14 @@ abstract class AbstractDatabaseDataModelImporterProviderService<S extends Databa
 
     protected Map<String, Long> getEnumerationValueDistribution(Connection connection, SamplingStrategy samplingStrategy,
                                                          String columnName, String tableName, String schemaName = null) {
-        log.info("Starting getEnumerationValueDistribution query for ${tableName}.${columnName}")
+        log.debug("Starting getEnumerationValueDistribution query for ${tableName}.${columnName}")
         long startTime = System.currentTimeMillis()
         String queryString = enumerationValueDistributionQueryString(samplingStrategy, columnName, tableName, schemaName)
 
         final PreparedStatement preparedStatement = connection.prepareStatement(queryString)
         List<Map<String, Object>> results = executeStatement(preparedStatement)
         preparedStatement.close()
-        log.info("Finished getEnumerationValueDistribution query for ${tableName}.${columnName} in {}", Utils.timeTaken(startTime))
+        log.debug("Finished getEnumerationValueDistribution query for ${tableName}.${columnName} in {}", Utils.timeTaken(startTime))
 
         results.collectEntries{
             // Convert a null key to string 'NULL'. There is a risk of collision with a string value 'NULL'

@@ -385,7 +385,7 @@ abstract class AbstractDatabaseDataModelImporterProviderService<S extends Databa
 
         String sql = """
         SELECT ${escapeIdentifier(schemaName)}.${escapeIdentifier(tableName)}.${escapeIdentifier(columnName)} AS enumeration_value,
-        COUNT(${escapeIdentifier(schemaName)}.${escapeIdentifier(tableName)}.${escapeIdentifier(columnName)}) AS enumeration_count
+        COUNT(*) AS enumeration_count
         FROM ${escapeIdentifier(schemaName)}.${escapeIdentifier(tableName)} 
         ${samplingStrategy.samplingClause()}
         GROUP BY ${escapeIdentifier(schemaName)}.${escapeIdentifier(tableName)}.${escapeIdentifier(columnName)}
@@ -897,8 +897,9 @@ abstract class AbstractDatabaseDataModelImporterProviderService<S extends Databa
         log.info("Finished getEnumerationValueDistribution query for ${tableName}.${columnName} in {}", Utils.timeTaken(startTime))
 
         results.collectEntries{
-            // null values are not counted by a group by query, so skip
-            it.enumeration_value != null ? [(it.enumeration_value): it.enumeration_count] : [:]
+            // Convert a null key to string 'NULL'. There is a risk of collision with a string value 'NULL'
+            // from the database.
+            it.enumeration_value != null ? [(it.enumeration_value): it.enumeration_count] : ['NULL': it.enumeration_count]
         }
     }
 }

@@ -29,7 +29,7 @@ import java.time.OffsetDateTime
 class SummaryMetadataHelper {
 
 
-    static SummaryMetadata createSummaryMetadataFromMap(User user, String headerName, String description, Map<String, Integer> valueDistribution ) {
+    static SummaryMetadata createSummaryMetadataFromMap(User user, String headerName, String description, Map<String, Long> valueDistribution ) {
         SummaryMetadata summaryMetadata = new SummaryMetadata(
                 label: headerName,
                 description: description,

@@ -20,10 +20,10 @@ package uk.ac.ox.softeng.maurodatamapper.plugins.database.summarymetadata
 import grails.util.Pair
 
 
-class IntegerIntervalHelper extends AbstractIntervalHelper<Integer> {
+class LongIntervalHelper extends AbstractIntervalHelper<Long> {
 
 
-    IntegerIntervalHelper(Integer minValue, Integer maxValue) {
+    LongIntervalHelper(Long minValue, Long maxValue) {
         super(minValue, maxValue)
     }
 
@@ -86,7 +86,7 @@ class IntegerIntervalHelper extends AbstractIntervalHelper<Integer> {
     @Override
     void calculateIntervalStarts() {
         intervalStarts = []
-        Integer currNum = firstIntervalStart
+        Long currNum = firstIntervalStart
         while(currNum <= lastIntervalStart) {
             intervalStarts.add(currNum)
             currNum += intervalLength
@@ -97,7 +97,7 @@ class IntegerIntervalHelper extends AbstractIntervalHelper<Integer> {
     void calculateIntervals() {
         intervals = new LinkedHashMap()
         intervalStarts.each { start ->
-            Integer finish = start + intervalLength
+            Long finish = start + intervalLength
             String label = "" + start + labelSeparator + finish
             intervals[label] = (new Pair(start, finish))
         }

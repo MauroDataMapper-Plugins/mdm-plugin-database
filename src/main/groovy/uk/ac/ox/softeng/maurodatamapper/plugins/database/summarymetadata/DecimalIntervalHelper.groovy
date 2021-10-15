@@ -29,7 +29,9 @@ class DecimalIntervalHelper extends AbstractIntervalHelper<BigDecimal> {
     void calculateInterval() {
         difference = maxValue - minValue
 
-        if (0 < difference && difference <= 0.1 ) {
+        if (difference == 0) {
+            intervalLength = 1.0
+        } else if (0 < difference && difference <= 0.1 ) {
             intervalLength = 0.02
         } else if (0.1 < difference && difference <= 1 ) {
             intervalLength = 0.2
@@ -65,10 +67,23 @@ class DecimalIntervalHelper extends AbstractIntervalHelper<BigDecimal> {
             intervalLength = 2000000
         } else if (20000000 < difference && difference <= 100000000 ) {
             intervalLength = 10000000
-        } else intervalLength = maxValue - minValue / 10
+        }  else {
+            Double base = Math.log10((Double) ((maxValue - minValue)  / 10))
+            intervalLength = (BigDecimal) Math.pow(10, Math.ceil(base))
+        }
 
-        firstIntervalStart = minValue.divideAndRemainder(intervalLength)[0] * intervalLength
-        lastIntervalStart = maxValue.divideAndRemainder(intervalLength)[0] * intervalLength
+        BigDecimal[] minValueDivideAndRemainder = minValue.divideAndRemainder(intervalLength)
+        firstIntervalStart = minValueDivideAndRemainder[0] * intervalLength
+        //For negative minima which do not align with an interval start, shift the interval one step to the left
+        if (Math.abs(minValueDivideAndRemainder[1]) > 0 && minValue < 0) {
+            firstIntervalStart = firstIntervalStart - intervalLength
+        }
+
+        BigDecimal[] maxValueDivideAndRemainder = maxValue.divideAndRemainder(intervalLength)
+        lastIntervalStart = maxValueDivideAndRemainder[0] * intervalLength
+        if (Math.abs(maxValueDivideAndRemainder[1]) > 0 && maxValue < 0) {
+            lastIntervalStart = lastIntervalStart - intervalLength
+        }
     }
 
     void calculateIntervalStarts() {

@@ -17,7 +17,6 @@
  */
 package uk.ac.ox.softeng.maurodatamapper.plugins.database
 
-import grails.util.Pair
 import uk.ac.ox.softeng.maurodatamapper.api.exception.ApiBadRequestException
 import uk.ac.ox.softeng.maurodatamapper.api.exception.ApiException
 import uk.ac.ox.softeng.maurodatamapper.core.authority.AuthorityService
@@ -30,11 +29,13 @@ import uk.ac.ox.softeng.maurodatamapper.datamodel.item.DataClassService
 import uk.ac.ox.softeng.maurodatamapper.datamodel.item.DataElement
 import uk.ac.ox.softeng.maurodatamapper.datamodel.item.DataElementService
 import uk.ac.ox.softeng.maurodatamapper.datamodel.item.datatype.DataType
+import uk.ac.ox.softeng.maurodatamapper.datamodel.item.datatype.DataTypeService
 import uk.ac.ox.softeng.maurodatamapper.datamodel.item.datatype.EnumerationType
 import uk.ac.ox.softeng.maurodatamapper.datamodel.item.datatype.EnumerationTypeService
-import uk.ac.ox.softeng.maurodatamapper.datamodel.item.datatype.enumeration.EnumerationValue
 import uk.ac.ox.softeng.maurodatamapper.datamodel.item.datatype.PrimitiveTypeService
 import uk.ac.ox.softeng.maurodatamapper.datamodel.item.datatype.ReferenceTypeService
+import uk.ac.ox.softeng.maurodatamapper.datamodel.item.datatype.enumeration.EnumerationValue
+import uk.ac.ox.softeng.maurodatamapper.datamodel.provider.DefaultDataTypeProvider
 import uk.ac.ox.softeng.maurodatamapper.datamodel.provider.importer.DataModelImporterProviderService
 import uk.ac.ox.softeng.maurodatamapper.plugins.database.summarymetadata.AbstractIntervalHelper
 import uk.ac.ox.softeng.maurodatamapper.plugins.database.summarymetadata.DateIntervalHelper
@@ -43,19 +44,19 @@ import uk.ac.ox.softeng.maurodatamapper.plugins.database.summarymetadata.Integer
 import uk.ac.ox.softeng.maurodatamapper.plugins.database.summarymetadata.LongIntervalHelper
 import uk.ac.ox.softeng.maurodatamapper.plugins.database.summarymetadata.SummaryMetadataHelper
 import uk.ac.ox.softeng.maurodatamapper.security.User
+import uk.ac.ox.softeng.maurodatamapper.util.Utils
 
+import grails.util.Pair
 import groovy.json.JsonOutput
 import groovy.transform.CompileStatic
 import groovy.util.logging.Slf4j
 import org.springframework.beans.factory.annotation.Autowired
-import uk.ac.ox.softeng.maurodatamapper.util.Utils
 
 import java.sql.Connection
 import java.sql.PreparedStatement
 import java.sql.ResultSet
 import java.sql.ResultSetMetaData
 import java.sql.SQLException
-
 
 @Slf4j
 @CompileStatic
@@ -85,6 +86,9 @@ abstract class AbstractDatabaseDataModelImporterProviderService<S extends Databa
 
     @Autowired
     AuthorityService authorityService
+
+    @Autowired
+    DataTypeService dataTypeService
 
     SamplingStrategy getSamplingStrategy(S parameters) {
         new SamplingStrategy()
@@ -172,6 +176,8 @@ abstract class AbstractDatabaseDataModelImporterProviderService<S extends Databa
     abstract String getForeignKeyInformationQueryString()
 
     abstract String getDatabaseStructureQueryString()
+
+    abstract DefaultDataTypeProvider getDefaultDataTypeProvider()
 
     /**
      * Must return a String which will be queryable by column name, table name
@@ -379,9 +385,9 @@ abstract class AbstractDatabaseDataModelImporterProviderService<S extends Databa
      * @return Query string for count grouped by enumeration value
      */
     String enumerationValueDistributionQueryString(SamplingStrategy samplingStrategy,
-                                                            String columnName,
-                                                            String tableName,
-                                                            String schemaName) {
+                                                   String columnName,
+                                                   String tableName,
+                                                   String schemaName) {
 
         String sql = """
         SELECT ${escapeIdentifier(schemaName)}.${escapeIdentifier(tableName)}.${escapeIdentifier(columnName)} AS enumeration_value,
@@ -398,7 +404,7 @@ abstract class AbstractDatabaseDataModelImporterProviderService<S extends Databa
 
     String columnRangeDistributionQueryString(SamplingStrategy samplingStrategy, DataType dataType,
                                               AbstractIntervalHelper intervalHelper,
-                                              String columnName, String tableName, String schemaName)  {
+                                              String columnName, String tableName, String schemaName) {
         columnRangeDistributionQueryString(dataType, intervalHelper, columnName, tableName, schemaName)
     }
 
@@ -443,6 +449,12 @@ abstract class AbstractDatabaseDataModelImporterProviderService<S extends Databa
                                                   authority: authorityService.getDefaultAuthority())
         dataModel.addToMetadata(namespace: DATABASE_NAMESPACE, key: 'dialect', value: dialect, createdBy: user.emailAddress)
 
+        // Add any default datatypes provided by the implementing service
+        if (defaultDataTypeProvider) {
+            log.debug("Adding ${defaultDataTypeProvider.displayName} default DataTypes")
+            dataTypeService.addDefaultListOfDataTypesToDataModel(dataModel, defaultDataTypeProvider.defaultListOfDataTypes)
+        }
+
         results.each {Map<String, Object> row ->
             final DataType dataType = primitiveTypeService.findOrCreateDataTypeForDataModel(dataModel, row[dataTypeColumnName] as String, null, user)
             DataClass tableDataClass
@@ -485,8 +497,8 @@ abstract class AbstractDatabaseDataModelImporterProviderService<S extends Databa
     void updateDataModelWithEnumerationsAndSummaryMetadata(User user, S parameters, DataModel dataModel, Connection connection) {
         log.debug('Starting enumeration and summary metadata detection')
         long startTime = System.currentTimeMillis()
-        dataModel.childDataClasses.each { DataClass schemaClass ->
-            schemaClass.dataClasses.each { DataClass tableClass ->
+        dataModel.childDataClasses.each {DataClass schemaClass ->
+            schemaClass.dataClasses.each {DataClass tableClass ->
                 SamplingStrategy samplingStrategy = getSamplingStrategy(parameters)
                 samplingStrategy.approxCount = getApproxCount(connection, tableClass.label, schemaClass.label)
                 if (samplingStrategy.requiresTableType()) {
@@ -494,9 +506,11 @@ abstract class AbstractDatabaseDataModelImporterProviderService<S extends Databa
                 }
 
                 if (!samplingStrategy.canSample() && samplingStrategy.approxCount > samplingStrategy.threshold) {
-                    log.info("Not calculating enumerations or summary metadata for ${samplingStrategy.tableType} ${tableClass.label} with approx rowcount ${samplingStrategy.approxCount} and threshold ${samplingStrategy.threshold}")
+                    log.info(
+                        "Not calculating enumerations or summary metadata for ${samplingStrategy.tableType} ${tableClass.label} " +
+                        "with approx rowcount ${samplingStrategy.approxCount} and threshold ${samplingStrategy.threshold}")
                 } else {
-                    tableClass.dataElements.each { DataElement de ->
+                    tableClass.dataElements.each {DataElement de ->
                         DataType dt = de.dataType
 
                         //Enumeration detection
@@ -512,27 +526,31 @@ abstract class AbstractDatabaseDataModelImporterProviderService<S extends Databa
 
                             if (parameters.calculateSummaryMetadata) {
                                 //Count enumeration values
-                                Map<String, Long> enumerationValueDistribution = getEnumerationValueDistribution(connection, samplingStrategy, de.label, tableClass.label, schemaClass.label)
+                                Map<String, Long> enumerationValueDistribution =
+                                    getEnumerationValueDistribution(connection, samplingStrategy, de.label, tableClass.label, schemaClass.label)
                                 if (enumerationValueDistribution) {
                                     String description = 'Enumeration Value Distribution';
                                     if (samplingStrategy.useSampling()) {
                                         description = "Estimated Enumeration Value Distribution (calculated by sampling ${samplingStrategy.percentage}% of rows)"
                                     }
-                                    SummaryMetadata enumerationSummaryMetadata = SummaryMetadataHelper.createSummaryMetadataFromMap(user, de.label, description, enumerationValueDistribution)
+                                    SummaryMetadata enumerationSummaryMetadata =
+                                        SummaryMetadataHelper.createSummaryMetadataFromMap(user, de.label, description, enumerationValueDistribution)
                                     de.addToSummaryMetadata(enumerationSummaryMetadata);
                                 }
                             }
                         }
 
                         //Summary metadata on dates and numbers
-                        if (parameters.calculateSummaryMetadata && (isColumnForDateSummary(dt) || isColumnForDecimalSummary(dt) || isColumnForIntegerSummary(dt) || isColumnForLongSummary(dt))) {
+                        if (parameters.calculateSummaryMetadata &&
+                            (isColumnForDateSummary(dt) || isColumnForDecimalSummary(dt) || isColumnForIntegerSummary(dt) || isColumnForLongSummary(dt))) {
                             Pair minMax = getMinMaxColumnValues(connection, samplingStrategy, de.label, tableClass.label, schemaClass.label)
 
                             //aValue is the MIN, bValue is the MAX. If they are not null then calculate the range etc...
                             if (!(minMax.aValue == null) && !(minMax.bValue == null)) {
                                 AbstractIntervalHelper intervalHelper = getIntervalHelper(dt, minMax)
 
-                                Map<String, Long> valueDistribution = getColumnRangeDistribution(connection, samplingStrategy, dt, intervalHelper, de.label, tableClass.label, schemaClass.label)
+                                Map<String, Long> valueDistribution =
+                                    getColumnRangeDistribution(connection, samplingStrategy, dt, intervalHelper, de.label, tableClass.label, schemaClass.label)
                                 if (valueDistribution) {
                                     String description = 'Value Distribution';
                                     if (samplingStrategy.useSampling()) {
@@ -551,7 +569,8 @@ abstract class AbstractDatabaseDataModelImporterProviderService<S extends Databa
         log.debug('Finished enumeration and summary metadata detection in {}', Utils.timeTaken(startTime))
     }
 
-    void replacePrimitiveTypeWithEnumerationType(DataModel dataModel, DataElement de, DataType primitiveType, EnumerationType enumerationType, List<Map<String, Object>> results) {
+    void replacePrimitiveTypeWithEnumerationType(DataModel dataModel, DataElement de, DataType primitiveType, EnumerationType enumerationType,
+                                                 List<Map<String, Object>> results) {
         results.each {
             //null is not a value, so skip it
             if (it.distinct_value != null) {
@@ -563,7 +582,7 @@ abstract class AbstractDatabaseDataModelImporterProviderService<S extends Databa
 
         de.dataType = enumerationType
 
-        if (primitiveType.dataElements.size() == 0 ) {
+        if (primitiveType.dataElements.size() == 0) {
             dataModel.removeFromPrimitiveTypes(primitiveType)
         }
     }
@@ -781,7 +800,8 @@ abstract class AbstractDatabaseDataModelImporterProviderService<S extends Databa
         (int) results[0].count
     }
 
-    private List<Map<String, Object>> getDistinctColumnValues(Connection connection, SamplingStrategy samplingStrategy, String columnName, String tableName, String schemaName = null) {
+    private List<Map<String, Object>> getDistinctColumnValues(Connection connection, SamplingStrategy samplingStrategy, String columnName, String tableName,
+                                                              String schemaName = null) {
         log.debug("Starting getDistinctColumnValues query for ${tableName}.${columnName}")
         long startTime = System.currentTimeMillis()
         String queryString = distinctColumnValuesQueryString(samplingStrategy, columnName, tableName, schemaName)
@@ -817,12 +837,12 @@ abstract class AbstractDatabaseDataModelImporterProviderService<S extends Databa
         long startTime = System.currentTimeMillis()
         Long approxCount = 0
         List<String> queryStrings = approxCountQueryString(tableName, schemaName)
-        for (String queryString: queryStrings) {
+        for (String queryString : queryStrings) {
             PreparedStatement preparedStatement = connection.prepareStatement(queryString)
             List<Map<String, Object>> results = executeStatement(preparedStatement)
 
             if (results && results[0].approx_count != null) {
-                approxCount =  (Long) results[0].approx_count
+                approxCount = (Long) results[0].approx_count
                 break
             }
         }
@@ -850,7 +870,7 @@ abstract class AbstractDatabaseDataModelImporterProviderService<S extends Databa
         List<Map<String, Object>> results = executeStatement(preparedStatement)
 
         if (results && results[0].table_type != null) {
-            tableType =  (String) results[0].table_type
+            tableType = (String) results[0].table_type
         }
 
         return tableType
@@ -869,8 +889,8 @@ abstract class AbstractDatabaseDataModelImporterProviderService<S extends Databa
     }
 
     private Map<String, Long> getColumnRangeDistribution(Connection connection, SamplingStrategy samplingStrategy,
-                                                            DataType dataType, AbstractIntervalHelper intervalHelper,
-                                                            String columnName, String tableName, String schemaName = null) {
+                                                         DataType dataType, AbstractIntervalHelper intervalHelper,
+                                                         String columnName, String tableName, String schemaName = null) {
         log.debug("Starting getColumnRangeDistribution query for ${tableName}.${columnName}")
         long startTime = System.currentTimeMillis()
         String queryString = columnRangeDistributionQueryString(samplingStrategy, dataType, intervalHelper, columnName, tableName, schemaName)
@@ -880,13 +900,13 @@ abstract class AbstractDatabaseDataModelImporterProviderService<S extends Databa
         preparedStatement.close()
         log.debug("Finished getColumnRangeDistribution query for ${tableName}.${columnName} in {}", Utils.timeTaken(startTime))
 
-        results.collectEntries{
+        results.collectEntries {
             [(it.interval_label): it.interval_count]
         }
     }
 
     protected Map<String, Long> getEnumerationValueDistribution(Connection connection, SamplingStrategy samplingStrategy,
-                                                         String columnName, String tableName, String schemaName = null) {
+                                                                String columnName, String tableName, String schemaName = null) {
         log.debug("Starting getEnumerationValueDistribution query for ${tableName}.${columnName}")
         long startTime = System.currentTimeMillis()
         String queryString = enumerationValueDistributionQueryString(samplingStrategy, columnName, tableName, schemaName)
@@ -896,7 +916,7 @@ abstract class AbstractDatabaseDataModelImporterProviderService<S extends Databa
         preparedStatement.close()
         log.debug("Finished getEnumerationValueDistribution query for ${tableName}.${columnName} in {}", Utils.timeTaken(startTime))
 
-        results.collectEntries{
+        results.collectEntries {
             // Convert a null key to string 'NULL'. There is a risk of collision with a string value 'NULL'
             // from the database.
             it.enumeration_value != null ? [(it.enumeration_value): it.enumeration_count] : ['NULL': it.enumeration_count]

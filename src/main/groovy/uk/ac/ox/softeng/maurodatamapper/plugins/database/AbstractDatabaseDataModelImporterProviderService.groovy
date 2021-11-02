@@ -579,12 +579,7 @@ abstract class AbstractDatabaseDataModelImporterProviderService<S extends Databa
         }
 
         primitiveType.removeFromDataElements(de)
-
         de.dataType = enumerationType
-
-        if (primitiveType.dataElements.size() == 0) {
-            dataModel.removeFromPrimitiveTypes(primitiveType)
-        }
     }
 
     /**

@@ -40,7 +40,6 @@ import uk.ac.ox.softeng.maurodatamapper.datamodel.provider.importer.DataModelImp
 import uk.ac.ox.softeng.maurodatamapper.plugins.database.summarymetadata.AbstractIntervalHelper
 import uk.ac.ox.softeng.maurodatamapper.plugins.database.summarymetadata.DateIntervalHelper
 import uk.ac.ox.softeng.maurodatamapper.plugins.database.summarymetadata.DecimalIntervalHelper
-import uk.ac.ox.softeng.maurodatamapper.plugins.database.summarymetadata.IntegerIntervalHelper
 import uk.ac.ox.softeng.maurodatamapper.plugins.database.summarymetadata.LongIntervalHelper
 import uk.ac.ox.softeng.maurodatamapper.plugins.database.summarymetadata.SummaryMetadataHelper
 import uk.ac.ox.softeng.maurodatamapper.security.User
@@ -890,7 +889,7 @@ abstract class AbstractDatabaseDataModelImporterProviderService<S extends Databa
         if (isColumnForLongSummary(dt)) {
             return new LongIntervalHelper((Long) minMax.aValue, (Long) minMax.bValue)
         } else if (isColumnForIntegerSummary(dt)) {
-            return new IntegerIntervalHelper((Integer) minMax.aValue, (Integer) minMax.bValue)
+            return new LongIntervalHelper((Long) minMax.aValue, (Long) minMax.bValue)
         } else if (isColumnForDateSummary(dt)) {
             return new DateIntervalHelper(((java.util.Date) minMax.aValue).toLocalDateTime(), ((java.util.Date) minMax.bValue).toLocalDateTime())
         } else if (isColumnForDecimalSummary(dt)) {

@@ -40,7 +40,6 @@ import uk.ac.ox.softeng.maurodatamapper.datamodel.provider.importer.DataModelImp
 import uk.ac.ox.softeng.maurodatamapper.plugins.database.summarymetadata.AbstractIntervalHelper
 import uk.ac.ox.softeng.maurodatamapper.plugins.database.summarymetadata.DateIntervalHelper
 import uk.ac.ox.softeng.maurodatamapper.plugins.database.summarymetadata.DecimalIntervalHelper
-import uk.ac.ox.softeng.maurodatamapper.plugins.database.summarymetadata.IntegerIntervalHelper
 import uk.ac.ox.softeng.maurodatamapper.plugins.database.summarymetadata.LongIntervalHelper
 import uk.ac.ox.softeng.maurodatamapper.plugins.database.summarymetadata.SummaryMetadataHelper
 import uk.ac.ox.softeng.maurodatamapper.security.User
@@ -188,7 +187,8 @@ abstract class AbstractDatabaseDataModelImporterProviderService<S extends Databa
      */
     String countDistinctColumnValuesQueryString(String columnName, String tableName, String schemaName = null) {
         String schemaIdentifier = schemaName ? "${escapeIdentifier(schemaName)}." : ""
-        "SELECT COUNT(DISTINCT(${escapeIdentifier(columnName)})) AS count FROM ${schemaIdentifier}${escapeIdentifier(tableName)}"
+        "SELECT COUNT(DISTINCT(${escapeIdentifier(columnName)})) AS count FROM ${schemaIdentifier}${escapeIdentifier(tableName)}" +
+                "WHERE ${escapeIdentifier(columnName)} <> ''"
     }
 
     /**
@@ -203,7 +203,10 @@ abstract class AbstractDatabaseDataModelImporterProviderService<S extends Databa
      * @return Query string for count of distinct values in a column
      */
     String countDistinctColumnValuesQueryString(SamplingStrategy samplingStrategy, String columnName, String tableName, String schemaName = null) {
-        countDistinctColumnValuesQueryString(columnName, tableName, schemaName) + samplingStrategy.samplingClause()
+        String schemaIdentifier = schemaName ? "${escapeIdentifier(schemaName)}." : ""
+        "SELECT COUNT(DISTINCT(${escapeIdentifier(columnName)})) AS count FROM ${schemaIdentifier}${escapeIdentifier(tableName)}" +
+                samplingStrategy.samplingClause() +
+                "WHERE ${escapeIdentifier(columnName)} <> ''"
     }
 
     /**
@@ -215,7 +218,8 @@ abstract class AbstractDatabaseDataModelImporterProviderService<S extends Databa
      */
     String distinctColumnValuesQueryString(String columnName, String tableName, String schemaName = null) {
         String schemaIdentifier = schemaName ? "${escapeIdentifier(schemaName)}." : ""
-        "SELECT DISTINCT(${escapeIdentifier(columnName)}) AS distinct_value FROM ${schemaIdentifier}${escapeIdentifier(tableName)}"
+        "SELECT DISTINCT(${escapeIdentifier(columnName)}) AS distinct_value FROM ${schemaIdentifier}${escapeIdentifier(tableName)}" +
+                "WHERE ${escapeIdentifier(columnName)} <> ''"
     }
 
     /**
@@ -231,7 +235,10 @@ abstract class AbstractDatabaseDataModelImporterProviderService<S extends Databa
      * @return Query string for distinct values in a column
      */
     String distinctColumnValuesQueryString(SamplingStrategy samplingStrategy, String columnName, String tableName, String schemaName = null) {
-        distinctColumnValuesQueryString(columnName, tableName, schemaName) + samplingStrategy.samplingClause()
+        String schemaIdentifier = schemaName ? "${escapeIdentifier(schemaName)}." : ""
+        "SELECT DISTINCT(${escapeIdentifier(columnName)}) AS distinct_value FROM ${schemaIdentifier}${escapeIdentifier(tableName)}" +
+                samplingStrategy.samplingClause() +
+                "WHERE ${escapeIdentifier(columnName)} <> ''"
     }
 
     /**
@@ -529,13 +536,17 @@ abstract class AbstractDatabaseDataModelImporterProviderService<S extends Databa
                                 Map<String, Long> enumerationValueDistribution =
                                     getEnumerationValueDistribution(connection, samplingStrategy, de.label, tableClass.label, schemaClass.label)
                                 if (enumerationValueDistribution) {
-                                    String description = 'Enumeration Value Distribution';
+                                    String description = 'Enumeration Value Distribution'
                                     if (samplingStrategy.useSampling()) {
                                         description = "Estimated Enumeration Value Distribution (calculated by sampling ${samplingStrategy.percentage}% of rows)"
                                     }
                                     SummaryMetadata enumerationSummaryMetadata =
                                         SummaryMetadataHelper.createSummaryMetadataFromMap(user, de.label, description, enumerationValueDistribution)
-                                    de.addToSummaryMetadata(enumerationSummaryMetadata);
+                                    de.addToSummaryMetadata(enumerationSummaryMetadata)
+
+                                    SummaryMetadata enumerationSummaryMetadataOnTable =
+                                            SummaryMetadataHelper.createSummaryMetadataFromMap(user, de.label, description, enumerationValueDistribution)
+                                    tableClass.addToSummaryMetadata(enumerationSummaryMetadataOnTable)
                                 }
                             }
                         }
@@ -552,12 +563,15 @@ abstract class AbstractDatabaseDataModelImporterProviderService<S extends Databa
                                 Map<String, Long> valueDistribution =
                                     getColumnRangeDistribution(connection, samplingStrategy, dt, intervalHelper, de.label, tableClass.label, schemaClass.label)
                                 if (valueDistribution) {
-                                    String description = 'Value Distribution';
+                                    String description = 'Value Distribution'
                                     if (samplingStrategy.useSampling()) {
                                         description = "Estimated Value Distribution (calculated by sampling ${samplingStrategy.percentage}% of rows)"
                                     }
                                     SummaryMetadata summaryMetadata = SummaryMetadataHelper.createSummaryMetadataFromMap(user, de.label, description, valueDistribution)
-                                    de.addToSummaryMetadata(summaryMetadata);
+                                    de.addToSummaryMetadata(summaryMetadata)
+
+                                    SummaryMetadata summaryMetadataOnTable = SummaryMetadataHelper.createSummaryMetadataFromMap(user, de.label, description, valueDistribution)
+                                    tableClass.addToSummaryMetadata(summaryMetadataOnTable)
                                 }
                             }
                         }
@@ -875,7 +889,7 @@ abstract class AbstractDatabaseDataModelImporterProviderService<S extends Databa
         if (isColumnForLongSummary(dt)) {
             return new LongIntervalHelper((Long) minMax.aValue, (Long) minMax.bValue)
         } else if (isColumnForIntegerSummary(dt)) {
-            return new IntegerIntervalHelper((Integer) minMax.aValue, (Integer) minMax.bValue)
+            return new LongIntervalHelper((Long) minMax.aValue, (Long) minMax.bValue)
         } else if (isColumnForDateSummary(dt)) {
             return new DateIntervalHelper(((java.util.Date) minMax.aValue).toLocalDateTime(), ((java.util.Date) minMax.bValue).toLocalDateTime())
         } else if (isColumnForDecimalSummary(dt)) {

@@ -109,6 +109,42 @@ abstract class AbstractDatabaseDataModelImporterProviderService<S extends Databa
     ]
 
     /**
+     * Return the metadata namespace to be used when adding metadata to a column (DataElement).
+     * Subclasses may override in order to provide a specific profile for column metadata.
+     * @return String
+     */
+    String namespaceColumn() {
+        namespace
+    }
+
+    /**
+     * Return the metadata namespace to be used when adding metadata to a table (DataClass).
+     * Subclasses may override in order to provide a specific profile for table metadata.
+     * @return String
+     */
+    String namespaceTable() {
+        namespace
+    }
+
+    /**
+     * Return the metadata namespace to be used when adding metadata to a schema (DataClass).
+     * Subclasses may override in order to provide a specific profile for schema metadata.
+     * @return String
+     */
+    String namespaceSchema() {
+        namespace
+    }
+
+    /**
+     * Return the metadata namespace to be used when adding metadata to a database (DataModel).
+     * Subclasses may override in order to provide a specific profile for database metadata.
+     * @return String
+     */
+    String namespaceDatabase() {
+        DATABASE_NAMESPACE
+    }
+
+    /**
      * Must return a String which will be queryable by schema name,
      * and return a row with the following elements:
      *  * table_name
@@ -454,7 +490,7 @@ abstract class AbstractDatabaseDataModelImporterProviderService<S extends Databa
                                          boolean importSchemaAsDataClass) throws ApiException {
         final DataModel dataModel = new DataModel(createdBy: user.emailAddress, label: modelName, type: DataModelType.DATA_ASSET, folder: folder,
                                                   authority: authorityService.getDefaultAuthority())
-        dataModel.addToMetadata(namespace: DATABASE_NAMESPACE, key: 'dialect', value: dialect, createdBy: user.emailAddress)
+        dataModel.addToMetadata(namespace: namespaceDatabase(), key: 'dialect', value: dialect, createdBy: user.emailAddress)
 
         // Add any default datatypes provided by the implementing service
         if (defaultDataTypeProvider) {
@@ -480,7 +516,7 @@ abstract class AbstractDatabaseDataModelImporterProviderService<S extends Databa
             row.findAll {String column, data ->
                 data && !(column in coreColumns)
             }.each {String column, data ->
-                dataElement.addToMetadata(namespace: namespace, key: column, value: data.toString(), createdBy: user.emailAddress)
+                dataElement.addToMetadata(namespace: namespaceColumn(), key: column, value: data.toString(), createdBy: user.emailAddress)
             }
         }
 
@@ -646,13 +682,13 @@ abstract class AbstractDatabaseDataModelImporterProviderService<S extends Databa
                                                          rows.sort {it.ordinal_position}.collect {it.column_name}.join(', ')
                     final String constraintKeyName = firstRow.constraint_name.toString()
 
-                    tableClass.addToMetadata(namespace, "${constraintTypeName}_name", constraintKeyName, dataModel.createdBy)
-                    tableClass.addToMetadata(namespace, "${constraintTypeName}_columns", constraintTypeColumns, dataModel.createdBy)
+                    tableClass.addToMetadata(namespaceTable(), "${constraintTypeName}_name", constraintKeyName, dataModel.createdBy)
+                    tableClass.addToMetadata(namespaceTable(), "${constraintTypeName}_columns", constraintTypeColumns, dataModel.createdBy)
 
                     rows.each {Map<String, Object> row ->
                         final DataElement columnElement = tableClass.findDataElement(row.column_name as String)
                         if (columnElement) {
-                            columnElement.addToMetadata(namespace, (row.constraint_type as String).toLowerCase(), row.ordinal_position as String, dataModel.createdBy)
+                            columnElement.addToMetadata(namespaceColumn(), (row.constraint_type as String).toLowerCase(), row.ordinal_position as String, dataModel.createdBy)
                         }
                     }
                 }
@@ -680,7 +716,7 @@ abstract class AbstractDatabaseDataModelImporterProviderService<S extends Databa
                     ]
                 } as List<Map>
 
-                tableClass.addToMetadata(namespace, 'indexes', JsonOutput.prettyPrint(JsonOutput.toJson(indexes)), dataModel.createdBy)
+                tableClass.addToMetadata(namespaceTable(), 'indexes', JsonOutput.prettyPrint(JsonOutput.toJson(indexes)), dataModel.createdBy)
             }
         }
     }
@@ -708,8 +744,8 @@ abstract class AbstractDatabaseDataModelImporterProviderService<S extends Databa
                 final DataClass tableClass = schemaClass.findDataClass(row.table_name as String)
                 final DataElement columnElement = tableClass.findDataElement(row.column_name as String)
                 columnElement.dataType = dataType
-                columnElement.addToMetadata(namespace, "foreign_key_name", row.constraint_name as String, dataModel.createdBy)
-                columnElement.addToMetadata(namespace, "foreign_key_columns", row.reference_column_name as String, dataModel.createdBy)
+                columnElement.addToMetadata(namespaceColumn(), "foreign_key_name", row.constraint_name as String, dataModel.createdBy)
+                columnElement.addToMetadata(namespaceColumn(), "foreign_key_columns", row.reference_column_name as String, dataModel.createdBy)
             }
         }
     }

@@ -40,7 +40,6 @@ import uk.ac.ox.softeng.maurodatamapper.datamodel.provider.importer.DataModelImp
 import uk.ac.ox.softeng.maurodatamapper.plugins.database.summarymetadata.AbstractIntervalHelper
 import uk.ac.ox.softeng.maurodatamapper.plugins.database.summarymetadata.DateIntervalHelper
 import uk.ac.ox.softeng.maurodatamapper.plugins.database.summarymetadata.DecimalIntervalHelper
-import uk.ac.ox.softeng.maurodatamapper.plugins.database.summarymetadata.IntegerIntervalHelper
 import uk.ac.ox.softeng.maurodatamapper.plugins.database.summarymetadata.LongIntervalHelper
 import uk.ac.ox.softeng.maurodatamapper.plugins.database.summarymetadata.SummaryMetadataHelper
 import uk.ac.ox.softeng.maurodatamapper.security.User
@@ -108,6 +107,42 @@ abstract class AbstractDatabaseDataModelImporterProviderService<S extends Databa
         columnNameColumnName,
         tableCatalogColumnName,
     ]
+
+    /**
+     * Return the metadata namespace to be used when adding metadata to a column (DataElement).
+     * Subclasses may override in order to provide a specific profile for column metadata.
+     * @return String
+     */
+    String namespaceColumn() {
+        namespace
+    }
+
+    /**
+     * Return the metadata namespace to be used when adding metadata to a table (DataClass).
+     * Subclasses may override in order to provide a specific profile for table metadata.
+     * @return String
+     */
+    String namespaceTable() {
+        namespace
+    }
+
+    /**
+     * Return the metadata namespace to be used when adding metadata to a schema (DataClass).
+     * Subclasses may override in order to provide a specific profile for schema metadata.
+     * @return String
+     */
+    String namespaceSchema() {
+        namespace
+    }
+
+    /**
+     * Return the metadata namespace to be used when adding metadata to a database (DataModel).
+     * Subclasses may override in order to provide a specific profile for database metadata.
+     * @return String
+     */
+    String namespaceDatabase() {
+        DATABASE_NAMESPACE
+    }
 
     /**
      * Must return a String which will be queryable by schema name,
@@ -188,7 +223,8 @@ abstract class AbstractDatabaseDataModelImporterProviderService<S extends Databa
      */
     String countDistinctColumnValuesQueryString(String columnName, String tableName, String schemaName = null) {
         String schemaIdentifier = schemaName ? "${escapeIdentifier(schemaName)}." : ""
-        "SELECT COUNT(DISTINCT(${escapeIdentifier(columnName)})) AS count FROM ${schemaIdentifier}${escapeIdentifier(tableName)}"
+        "SELECT COUNT(DISTINCT(${escapeIdentifier(columnName)})) AS count FROM ${schemaIdentifier}${escapeIdentifier(tableName)}" +
+                "WHERE ${escapeIdentifier(columnName)} <> ''"
     }
 
     /**
@@ -203,7 +239,10 @@ abstract class AbstractDatabaseDataModelImporterProviderService<S extends Databa
      * @return Query string for count of distinct values in a column
      */
     String countDistinctColumnValuesQueryString(SamplingStrategy samplingStrategy, String columnName, String tableName, String schemaName = null) {
-        countDistinctColumnValuesQueryString(columnName, tableName, schemaName) + samplingStrategy.samplingClause()
+        String schemaIdentifier = schemaName ? "${escapeIdentifier(schemaName)}." : ""
+        "SELECT COUNT(DISTINCT(${escapeIdentifier(columnName)})) AS count FROM ${schemaIdentifier}${escapeIdentifier(tableName)}" +
+                samplingStrategy.samplingClause() +
+                "WHERE ${escapeIdentifier(columnName)} <> ''"
     }
 
     /**
@@ -215,7 +254,8 @@ abstract class AbstractDatabaseDataModelImporterProviderService<S extends Databa
      */
     String distinctColumnValuesQueryString(String columnName, String tableName, String schemaName = null) {
         String schemaIdentifier = schemaName ? "${escapeIdentifier(schemaName)}." : ""
-        "SELECT DISTINCT(${escapeIdentifier(columnName)}) AS distinct_value FROM ${schemaIdentifier}${escapeIdentifier(tableName)}"
+        "SELECT DISTINCT(${escapeIdentifier(columnName)}) AS distinct_value FROM ${schemaIdentifier}${escapeIdentifier(tableName)}" +
+                "WHERE ${escapeIdentifier(columnName)} <> ''"
     }
 
     /**
@@ -231,7 +271,10 @@ abstract class AbstractDatabaseDataModelImporterProviderService<S extends Databa
      * @return Query string for distinct values in a column
      */
     String distinctColumnValuesQueryString(SamplingStrategy samplingStrategy, String columnName, String tableName, String schemaName = null) {
-        distinctColumnValuesQueryString(columnName, tableName, schemaName) + samplingStrategy.samplingClause()
+        String schemaIdentifier = schemaName ? "${escapeIdentifier(schemaName)}." : ""
+        "SELECT DISTINCT(${escapeIdentifier(columnName)}) AS distinct_value FROM ${schemaIdentifier}${escapeIdentifier(tableName)}" +
+                samplingStrategy.samplingClause() +
+                "WHERE ${escapeIdentifier(columnName)} <> ''"
     }
 
     /**
@@ -447,7 +490,7 @@ abstract class AbstractDatabaseDataModelImporterProviderService<S extends Databa
                                          boolean importSchemaAsDataClass) throws ApiException {
         final DataModel dataModel = new DataModel(createdBy: user.emailAddress, label: modelName, type: DataModelType.DATA_ASSET, folder: folder,
                                                   authority: authorityService.getDefaultAuthority())
-        dataModel.addToMetadata(namespace: DATABASE_NAMESPACE, key: 'dialect', value: dialect, createdBy: user.emailAddress)
+        dataModel.addToMetadata(namespace: namespaceDatabase(), key: 'dialect', value: dialect, createdBy: user.emailAddress)
 
         // Add any default datatypes provided by the implementing service
         if (defaultDataTypeProvider) {
@@ -473,7 +516,7 @@ abstract class AbstractDatabaseDataModelImporterProviderService<S extends Databa
             row.findAll {String column, data ->
                 data && !(column in coreColumns)
             }.each {String column, data ->
-                dataElement.addToMetadata(namespace: namespace, key: column, value: data.toString(), createdBy: user.emailAddress)
+                dataElement.addToMetadata(namespace: namespaceColumn(), key: column, value: data.toString(), createdBy: user.emailAddress)
             }
         }
 
@@ -529,13 +572,17 @@ abstract class AbstractDatabaseDataModelImporterProviderService<S extends Databa
                                 Map<String, Long> enumerationValueDistribution =
                                     getEnumerationValueDistribution(connection, samplingStrategy, de.label, tableClass.label, schemaClass.label)
                                 if (enumerationValueDistribution) {
-                                    String description = 'Enumeration Value Distribution';
+                                    String description = 'Enumeration Value Distribution'
                                     if (samplingStrategy.useSampling()) {
                                         description = "Estimated Enumeration Value Distribution (calculated by sampling ${samplingStrategy.percentage}% of rows)"
                                     }
                                     SummaryMetadata enumerationSummaryMetadata =
                                         SummaryMetadataHelper.createSummaryMetadataFromMap(user, de.label, description, enumerationValueDistribution)
-                                    de.addToSummaryMetadata(enumerationSummaryMetadata);
+                                    de.addToSummaryMetadata(enumerationSummaryMetadata)
+
+                                    SummaryMetadata enumerationSummaryMetadataOnTable =
+                                            SummaryMetadataHelper.createSummaryMetadataFromMap(user, de.label, description, enumerationValueDistribution)
+                                    tableClass.addToSummaryMetadata(enumerationSummaryMetadataOnTable)
                                 }
                             }
                         }
@@ -552,12 +599,15 @@ abstract class AbstractDatabaseDataModelImporterProviderService<S extends Databa
                                 Map<String, Long> valueDistribution =
                                     getColumnRangeDistribution(connection, samplingStrategy, dt, intervalHelper, de.label, tableClass.label, schemaClass.label)
                                 if (valueDistribution) {
-                                    String description = 'Value Distribution';
+                                    String description = 'Value Distribution'
                                     if (samplingStrategy.useSampling()) {
                                         description = "Estimated Value Distribution (calculated by sampling ${samplingStrategy.percentage}% of rows)"
                                     }
                                     SummaryMetadata summaryMetadata = SummaryMetadataHelper.createSummaryMetadataFromMap(user, de.label, description, valueDistribution)
-                                    de.addToSummaryMetadata(summaryMetadata);
+                                    de.addToSummaryMetadata(summaryMetadata)
+
+                                    SummaryMetadata summaryMetadataOnTable = SummaryMetadataHelper.createSummaryMetadataFromMap(user, de.label, description, valueDistribution)
+                                    tableClass.addToSummaryMetadata(summaryMetadataOnTable)
                                 }
                             }
                         }
@@ -632,13 +682,13 @@ abstract class AbstractDatabaseDataModelImporterProviderService<S extends Databa
                                                          rows.sort {it.ordinal_position}.collect {it.column_name}.join(', ')
                     final String constraintKeyName = firstRow.constraint_name.toString()
 
-                    tableClass.addToMetadata(namespace, "${constraintTypeName}_name", constraintKeyName, dataModel.createdBy)
-                    tableClass.addToMetadata(namespace, "${constraintTypeName}_columns", constraintTypeColumns, dataModel.createdBy)
+                    tableClass.addToMetadata(namespaceTable(), "${constraintTypeName}_name", constraintKeyName, dataModel.createdBy)
+                    tableClass.addToMetadata(namespaceTable(), "${constraintTypeName}_columns", constraintTypeColumns, dataModel.createdBy)
 
                     rows.each {Map<String, Object> row ->
                         final DataElement columnElement = tableClass.findDataElement(row.column_name as String)
                         if (columnElement) {
-                            columnElement.addToMetadata(namespace, (row.constraint_type as String).toLowerCase(), row.ordinal_position as String, dataModel.createdBy)
+                            columnElement.addToMetadata(namespaceColumn(), (row.constraint_type as String).toLowerCase(), row.ordinal_position as String, dataModel.createdBy)
                         }
                     }
                 }
@@ -666,7 +716,7 @@ abstract class AbstractDatabaseDataModelImporterProviderService<S extends Databa
                     ]
                 } as List<Map>
 
-                tableClass.addToMetadata(namespace, 'indexes', JsonOutput.prettyPrint(JsonOutput.toJson(indexes)), dataModel.createdBy)
+                tableClass.addToMetadata(namespaceTable(), 'indexes', JsonOutput.prettyPrint(JsonOutput.toJson(indexes)), dataModel.createdBy)
             }
         }
     }
@@ -694,8 +744,8 @@ abstract class AbstractDatabaseDataModelImporterProviderService<S extends Databa
                 final DataClass tableClass = schemaClass.findDataClass(row.table_name as String)
                 final DataElement columnElement = tableClass.findDataElement(row.column_name as String)
                 columnElement.dataType = dataType
-                columnElement.addToMetadata(namespace, "foreign_key_name", row.constraint_name as String, dataModel.createdBy)
-                columnElement.addToMetadata(namespace, "foreign_key_columns", row.reference_column_name as String, dataModel.createdBy)
+                columnElement.addToMetadata(namespaceColumn(), "foreign_key_name", row.constraint_name as String, dataModel.createdBy)
+                columnElement.addToMetadata(namespaceColumn(), "foreign_key_columns", row.reference_column_name as String, dataModel.createdBy)
             }
         }
     }
@@ -875,7 +925,7 @@ abstract class AbstractDatabaseDataModelImporterProviderService<S extends Databa
         if (isColumnForLongSummary(dt)) {
             return new LongIntervalHelper((Long) minMax.aValue, (Long) minMax.bValue)
         } else if (isColumnForIntegerSummary(dt)) {
-            return new IntegerIntervalHelper((Integer) minMax.aValue, (Integer) minMax.bValue)
+            return new LongIntervalHelper((Long) minMax.aValue, (Long) minMax.bValue)
         } else if (isColumnForDateSummary(dt)) {
             return new DateIntervalHelper(((java.util.Date) minMax.aValue).toLocalDateTime(), ((java.util.Date) minMax.bValue).toLocalDateTime())
         } else if (isColumnForDecimalSummary(dt)) {

@@ -17,6 +17,7 @@
  */
 package uk.ac.ox.softeng.maurodatamapper.plugins.database
 
+import uk.ac.ox.softeng.maurodatamapper.path.Path
 import uk.ac.ox.softeng.maurodatamapper.security.User
 
 @Singleton
@@ -31,6 +32,11 @@ class DatabaseImporterUser implements User {
     @Override
     UUID getId() {
         UUID.randomUUID()
+    }
+
+    @Override
+    Path getPath() {
+        Path.from('cu', emailAddress)
     }
 
     @Override

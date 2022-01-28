@@ -7,9 +7,9 @@
 
 ## Requirements
 
-* Java 12 (AdoptOpenJDK)
-* Grails 4.0.6+
-* Gradle 6.7.1+
+* Java 17 (Temurin)
+* Grails 5.1.2+
+* Gradle 7.3.3+
 
 All of the above can be installed and easily maintained by using [SDKMAN!](https://sdkman.io/install).
 

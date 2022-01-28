@@ -3,9 +3,9 @@ dependencies {
     implementation group: 'uk.ac.ox.softeng.maurodatamapper', name: 'mdm-plugin-datamodel', version: mdmCoreVersion
 
     implementation group: 'org.codehaus.groovy', name: 'groovy-all', version: groovyVersion
-    implementation group: 'commons-cli', name: 'commons-cli', version: commonsCliVersion
-    implementation group: 'org.slf4j', name: 'slf4j-api', version: slf4jVersion
-    implementation group: 'ch.qos.logback', name: 'logback-classic', version: logbackVersion
+    api group: 'commons-cli', name: 'commons-cli', version: commonsCliVersion
 
-    runtimeOnly group: 'org.postgresql', name: 'postgresql', version: postgresJdbcVersion
+    runtimeOnly group: 'org.postgresql', name: 'postgresql'
+    implementation "org.grails.plugins:views-json"
+    implementation "org.grails.plugins:views-json-templates"
 }

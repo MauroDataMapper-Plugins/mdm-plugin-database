@@ -1,5 +1,5 @@
 /*
- * Copyright 2020-2021 University of Oxford and Health and Social Care Information Centre, also known as NHS Digital
+ * Copyright 2020-2022 University of Oxford and Health and Social Care Information Centre, also known as NHS Digital
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -56,42 +56,6 @@ abstract class DatabaseDataModelImporterProviderServiceParameters<K extends Data
     String databaseNames
 
     @ImportParameterConfig(
-        displayName = 'Detect Enumerations',
-        description = 'Whether to treat columns with small numbers of unique values as enumerations',
-        order = 5,
-        optional = true,
-        group = @ImportGroupConfig(
-                name = 'Database Import Details',
-                order = 2
-        )
-    )
-    Boolean detectEnumerations = false
-
-    @ImportParameterConfig(
-        displayName = 'Maximum Enumerations',
-        description = 'The maximum number of unique values to be interpreted as a defined enumeration',
-        order = 6,
-        optional = true,
-        group = @ImportGroupConfig(
-                name = 'Database Import Details',
-                order = 2
-        )
-    )
-    Integer maxEnumerations = 20
-
-    @ImportParameterConfig(
-            displayName = 'Calculate Summary Metadata',
-            description = 'Whether to calculate summary metadata',
-            order = 6,
-            optional = true,
-            group = @ImportGroupConfig(
-                    name = 'Database Import Details',
-                    order = 2
-            )
-    )
-    Boolean calculateSummaryMetadata = false
-
-    @ImportParameterConfig(
         displayName = 'Database Host',
         description = 'The hostname of the server that is running the database.',
         order = 2,
@@ -144,6 +108,42 @@ abstract class DatabaseDataModelImporterProviderServiceParameters<K extends Data
             order = 1
         ))
     Boolean databaseSSL
+
+    @ImportParameterConfig(
+        displayName = 'Detect Enumerations',
+        description = 'Treat columns with small numbers of unique values as enumerations?',
+        order = 1,
+        optional = true,
+        group = @ImportGroupConfig(
+            name = 'Summarisation',
+            order = 5
+        )
+    )
+    Boolean detectEnumerations = false
+
+    @ImportParameterConfig(
+        displayName = 'Maximum Enumerations',
+        description = 'The maximum number of unique values to be interpreted as a defined enumeration',
+        order = 2,
+        optional = true,
+        group = @ImportGroupConfig(
+            name = 'Summarisation',
+            order = 5
+        )
+    )
+    Integer maxEnumerations = 20
+
+    @ImportParameterConfig(
+        displayName = 'Calculate Summary Metadata',
+        description = 'Calculate summary metadata?',
+        order = 3,
+        optional = true,
+        group = @ImportGroupConfig(
+            name = 'Summarisation',
+            order = 5
+        )
+    )
+    Boolean calculateSummaryMetadata = false
 
     Integer getDatabasePort() {
         databasePort = databasePort ?: defaultPort

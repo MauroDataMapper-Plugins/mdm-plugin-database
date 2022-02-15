@@ -68,7 +68,7 @@ class LongIntervalHelper extends AbstractIntervalHelper<Long> {
             intervalLength = 10000000
         } else {
             Double base = Math.log10((Double) ((maxValue - minValue)  / 10))
-            intervalLength = (Integer) Math.pow(10, Math.ceil(base))
+            intervalLength = (Long) Math.pow(10, Math.ceil(base))
         }
 
         firstIntervalStart = minValue.intdiv(intervalLength) * intervalLength

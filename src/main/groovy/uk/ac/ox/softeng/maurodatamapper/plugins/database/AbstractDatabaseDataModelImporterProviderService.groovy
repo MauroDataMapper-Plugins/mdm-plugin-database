@@ -542,81 +542,102 @@ abstract class AbstractDatabaseDataModelImporterProviderService<S extends Databa
         long startTime = System.currentTimeMillis()
         dataModel.childDataClasses.each {DataClass schemaClass ->
             schemaClass.dataClasses.each {DataClass tableClass ->
+                log.info('Checking {}.{} for possible enumerations and summary metadata', schemaClass.label, tableClass.label)
                 SamplingStrategy samplingStrategy = getSamplingStrategy(parameters)
-                samplingStrategy.approxCount = getApproxCount(connection, tableClass.label, schemaClass.label)
                 if (samplingStrategy.requiresTableType()) {
                     samplingStrategy.tableType = getTableType(connection, tableClass.label, schemaClass.label, dataModel.label)
                 }
+                try {
+                    samplingStrategy.approxCount = getApproxCount(connection, tableClass.label, schemaClass.label)
 
-                if (!samplingStrategy.canSample() && samplingStrategy.approxCount > samplingStrategy.threshold) {
-                    log.info(
-                        "Not calculating enumerations or summary metadata for ${samplingStrategy.tableType} ${tableClass.label} " +
-                        "with approx rowcount ${samplingStrategy.approxCount} and threshold ${samplingStrategy.threshold}")
-                } else {
-                    tableClass.dataElements.each {DataElement de ->
-                        DataType dt = de.dataType
-
-                        //Enumeration detection
-                        if (parameters.detectEnumerations && isColumnPossibleEnumeration(dt)) {
-                            int countDistinct = getCountDistinctColumnValues(connection, samplingStrategy, de.label, tableClass.label, schemaClass.label)
-                            if (countDistinct > 0 && countDistinct <= (parameters.maxEnumerations ?: MAX_ENUMERATIONS)) {
-                                EnumerationType enumerationType = enumerationTypeService.findOrCreateDataTypeForDataModel(dataModel, de.label, de.label, user)
-
-                                final List<Map<String, Object>> results = getDistinctColumnValues(connection, samplingStrategy, de.label, tableClass.label, schemaClass.label)
-
-                                replacePrimitiveTypeWithEnumerationType(dataModel, de, dt, enumerationType, results)
-                            }
-
-                            if (parameters.calculateSummaryMetadata) {
-                                //Count enumeration values
-                                Map<String, Long> enumerationValueDistribution =
-                                    getEnumerationValueDistribution(connection, samplingStrategy, de.label, tableClass.label, schemaClass.label)
-                                if (enumerationValueDistribution) {
-                                    String description = 'Enumeration Value Distribution'
-                                    if (samplingStrategy.useSampling()) {
-                                        description = "Estimated Enumeration Value Distribution (calculated by sampling ${samplingStrategy.percentage}% of rows)"
-                                    }
-                                    SummaryMetadata enumerationSummaryMetadata =
-                                        SummaryMetadataHelper.createSummaryMetadataFromMap(user, de.label, description, enumerationValueDistribution)
-                                    de.addToSummaryMetadata(enumerationSummaryMetadata)
-
-                                    SummaryMetadata enumerationSummaryMetadataOnTable =
-                                            SummaryMetadataHelper.createSummaryMetadataFromMap(user, de.label, description, enumerationValueDistribution)
-                                    tableClass.addToSummaryMetadata(enumerationSummaryMetadataOnTable)
-                                }
-                            }
-                        }
-
-                        //Summary metadata on dates and numbers
-                        if (parameters.calculateSummaryMetadata &&
-                            (isColumnForDateSummary(dt) || isColumnForDecimalSummary(dt) || isColumnForIntegerSummary(dt) || isColumnForLongSummary(dt))) {
-                            Pair minMax = getMinMaxColumnValues(connection, samplingStrategy, de.label, tableClass.label, schemaClass.label)
-
-                            //aValue is the MIN, bValue is the MAX. If they are not null then calculate the range etc...
-                            if (!(minMax.aValue == null) && !(minMax.bValue == null)) {
-                                AbstractIntervalHelper intervalHelper = getIntervalHelper(dt, minMax)
-
-                                Map<String, Long> valueDistribution =
-                                    getColumnRangeDistribution(connection, samplingStrategy, dt, intervalHelper, de.label, tableClass.label, schemaClass.label)
-                                if (valueDistribution) {
-                                    String description = 'Value Distribution'
-                                    if (samplingStrategy.useSampling()) {
-                                        description = "Estimated Value Distribution (calculated by sampling ${samplingStrategy.percentage}% of rows)"
-                                    }
-                                    SummaryMetadata summaryMetadata = SummaryMetadataHelper.createSummaryMetadataFromMap(user, de.label, description, valueDistribution)
-                                    de.addToSummaryMetadata(summaryMetadata)
-
-                                    SummaryMetadata summaryMetadataOnTable = SummaryMetadataHelper.createSummaryMetadataFromMap(user, de.label, description, valueDistribution)
-                                    tableClass.addToSummaryMetadata(summaryMetadataOnTable)
-                                }
-                            }
-                        }
+                    if (!samplingStrategy.canSample() && samplingStrategy.approxCount > samplingStrategy.threshold) {
+                        log.warn(
+                            'Not calculating enumerations or summary metadata for {} {}.{} as approx rowcount {} is above threshold {} and we cannot use sampling',
+                            samplingStrategy.tableType, schemaClass.label, tableClass.label, samplingStrategy.approxCount, samplingStrategy.threshold)
+                    } else {
+                        calculateEnumerationsAndSummaryMetadata(dataModel, schemaClass, tableClass, samplingStrategy, connection,
+                                                                parameters.detectEnumerations,
+                                                                parameters.maxEnumerations,
+                                                                parameters.calculateSummaryMetadata,
+                                                                user)
                     }
+                }catch(SQLException exception){
+                    log.warn('Could not perform enumeration or summary metadata detection on {}.{} because of {}', schemaClass.label, tableClass.label, exception.message)
                 }
             }
         }
 
         log.debug('Finished enumeration and summary metadata detection in {}', Utils.timeTaken(startTime))
+    }
+
+    void calculateEnumerationsAndSummaryMetadata(DataModel dataModel, DataClass schemaClass, DataClass tableClass, SamplingStrategy samplingStrategy,
+                                                 Connection connection, boolean detectEnumerations, Integer maxEnumerations, boolean calculateSummaryMetadata,
+                                                 User user) {
+        log.debug('Calculating enumerations and summary metadata for {}.{}', schemaClass.label, tableClass.label)
+        tableClass.dataElements.each {DataElement de ->
+            DataType dt = de.dataType
+
+            //Enumeration detection
+            if (detectEnumerations && isColumnPossibleEnumeration(dt)) {
+                log.debug('Performing enumeration detection for column {}', de.label)
+                int countDistinct = getCountDistinctColumnValues(connection, samplingStrategy, de.label, tableClass.label, schemaClass.label)
+                if (countDistinct > 0 && countDistinct <= (maxEnumerations ?: MAX_ENUMERATIONS)) {
+                    EnumerationType enumerationType = enumerationTypeService.findOrCreateDataTypeForDataModel(dataModel, de.label, de.label, user)
+
+                    final List<Map<String, Object>> results =
+                        getDistinctColumnValues(connection, samplingStrategy, de.label, tableClass.label, schemaClass.label)
+
+                    replacePrimitiveTypeWithEnumerationType(dataModel, de, dt, enumerationType, results)
+                }
+
+                if (calculateSummaryMetadata) {
+                    log.debug('Performing enumeration summary metadata detection for column {}', de.label)
+                    //Count enumeration values
+                    Map<String, Long> enumerationValueDistribution =
+                        getEnumerationValueDistribution(connection, samplingStrategy, de.label, tableClass.label, schemaClass.label)
+                    if (enumerationValueDistribution) {
+                        String description = 'Enumeration Value Distribution'
+                        if (samplingStrategy.useSampling()) {
+                            description = "Estimated Enumeration Value Distribution (calculated by sampling ${samplingStrategy.percentage}% of rows)"
+                        }
+                        SummaryMetadata enumerationSummaryMetadata =
+                            SummaryMetadataHelper.createSummaryMetadataFromMap(user, de.label, description, enumerationValueDistribution)
+                        de.addToSummaryMetadata(enumerationSummaryMetadata)
+
+                        SummaryMetadata enumerationSummaryMetadataOnTable =
+                            SummaryMetadataHelper.createSummaryMetadataFromMap(user, de.label, description, enumerationValueDistribution)
+                        tableClass.addToSummaryMetadata(enumerationSummaryMetadataOnTable)
+                    }
+                }
+            }
+
+            //Summary metadata on dates and numbers
+            else if (calculateSummaryMetadata && isColumnForDateOrNumericSummary(dt)){
+                log.debug('Performing date or numeric summary metadata detection for column {}', de.label)
+
+                Pair minMax = getMinMaxColumnValues(connection, samplingStrategy, de.label, tableClass.label, schemaClass.label)
+
+                //aValue is the MIN, bValue is the MAX. If they are not null then calculate the range etc...
+                if (minMax.aValue != null && minMax.bValue != null) {
+                    AbstractIntervalHelper intervalHelper = getIntervalHelper(dt, minMax)
+
+                    Map<String, Long> valueDistribution =
+                        getColumnRangeDistribution(connection, samplingStrategy, dt, intervalHelper, de.label, tableClass.label, schemaClass.label)
+                    if (valueDistribution) {
+                        String description = 'Value Distribution'
+                        if (samplingStrategy.useSampling()) {
+                            description = "Estimated Value Distribution (calculated by sampling ${samplingStrategy.percentage}% of rows)"
+                        }
+                        SummaryMetadata summaryMetadata = SummaryMetadataHelper.createSummaryMetadataFromMap(user, de.label, description, valueDistribution)
+                        de.addToSummaryMetadata(summaryMetadata)
+
+                        SummaryMetadata summaryMetadataOnTable =
+                            SummaryMetadataHelper.createSummaryMetadataFromMap(user, de.label, description, valueDistribution)
+                        tableClass.addToSummaryMetadata(summaryMetadataOnTable)
+                    }
+                }
+            }
+        }
     }
 
     void replacePrimitiveTypeWithEnumerationType(DataModel dataModel, DataElement de, DataType primitiveType, EnumerationType enumerationType,
@@ -836,34 +857,34 @@ abstract class AbstractDatabaseDataModelImporterProviderService<S extends Databa
     }
 
     int getCountDistinctColumnValues(Connection connection, SamplingStrategy samplingStrategy, String columnName, String tableName, String schemaName = null) {
-        log.debug("Starting getCountDistinctColumnValues query for ${tableName}.${columnName}")
+        log.trace("Starting getCountDistinctColumnValues query for ${tableName}.${columnName}")
         long startTime = System.currentTimeMillis()
         String queryString = countDistinctColumnValuesQueryString(samplingStrategy, columnName, tableName, schemaName)
         final PreparedStatement preparedStatement = connection.prepareStatement(queryString)
         final List<Map<String, Object>> results = executeStatement(preparedStatement)
-        log.debug("Finished getCountDistinctColumnValues query for ${tableName}.${columnName} in {}", Utils.timeTaken(startTime))
+        log.trace("Finished getCountDistinctColumnValues query for ${tableName}.${columnName} in {}", Utils.timeTaken(startTime))
         (int) results[0].count
     }
 
     private List<Map<String, Object>> getDistinctColumnValues(Connection connection, SamplingStrategy samplingStrategy, String columnName, String tableName,
                                                               String schemaName = null) {
-        log.debug("Starting getDistinctColumnValues query for ${tableName}.${columnName}")
+        log.trace("Starting getDistinctColumnValues query for ${tableName}.${columnName}")
         long startTime = System.currentTimeMillis()
         String queryString = distinctColumnValuesQueryString(samplingStrategy, columnName, tableName, schemaName)
         final PreparedStatement preparedStatement = connection.prepareStatement(queryString)
         final List<Map<String, Object>> results = executeStatement(preparedStatement)
-        log.debug("Finished getDistinctColumnValues query for ${tableName}.${columnName} in {}", Utils.timeTaken(startTime))
+        log.trace("Finished getDistinctColumnValues query for ${tableName}.${columnName} in {}", Utils.timeTaken(startTime))
         results
     }
 
     private Pair getMinMaxColumnValues(Connection connection, SamplingStrategy samplingStrategy, String columnName, String tableName, String schemaName = null) {
-        log.debug("Starting getMinMaxColumnValues query for ${tableName}.${columnName}")
+        log.trace("Starting getMinMaxColumnValues query for ${tableName}.${columnName}")
         long startTime = System.currentTimeMillis()
         String queryString = minMaxColumnValuesQueryString(samplingStrategy, columnName, tableName, schemaName)
         final PreparedStatement preparedStatement = connection.prepareStatement(queryString)
         final List<Map<String, Object>> results = executeStatement(preparedStatement)
 
-        log.debug("Finished getMinMaxColumnValues query for ${tableName}.${columnName} in {}", Utils.timeTaken(startTime))
+        log.trace("Finished getMinMaxColumnValues query for ${tableName}.${columnName} in {}", Utils.timeTaken(startTime))
 
         new Pair(results[0].min_value, results[0].max_value)
     }
@@ -878,7 +899,7 @@ abstract class AbstractDatabaseDataModelImporterProviderService<S extends Databa
      * @return
      */
     private Long getApproxCount(Connection connection, String tableName, String schemaName = null) {
-        log.debug("Starting getApproxCouunt query for ${tableName}")
+        log.trace("Starting getApproxCouunt query for ${tableName}")
         long startTime = System.currentTimeMillis()
         Long approxCount = 0
         List<String> queryStrings = approxCountQueryString(tableName, schemaName)
@@ -891,8 +912,9 @@ abstract class AbstractDatabaseDataModelImporterProviderService<S extends Databa
                 break
             }
         }
-
-        log.debug("Finished getApproxCount query for ${tableName} in {}", Utils.timeTaken(startTime))
+        long tt = System.currentTimeMillis() - startTime
+        if (tt > 1000) log.warn('Finished getApproxCount query for {} in {}', tableName, Utils.timeTaken(startTime))
+        log.trace('Finished getApproxCount query for {} in {}', tableName, Utils.timeTaken(startTime))
 
         return approxCount
     }
@@ -936,14 +958,14 @@ abstract class AbstractDatabaseDataModelImporterProviderService<S extends Databa
     private Map<String, Long> getColumnRangeDistribution(Connection connection, SamplingStrategy samplingStrategy,
                                                          DataType dataType, AbstractIntervalHelper intervalHelper,
                                                          String columnName, String tableName, String schemaName = null) {
-        log.debug("Starting getColumnRangeDistribution query for ${tableName}.${columnName}")
+        log.trace("Starting getColumnRangeDistribution query for ${tableName}.${columnName}")
         long startTime = System.currentTimeMillis()
         String queryString = columnRangeDistributionQueryString(samplingStrategy, dataType, intervalHelper, columnName, tableName, schemaName)
 
         final PreparedStatement preparedStatement = connection.prepareStatement(queryString)
         List<Map<String, Object>> results = executeStatement(preparedStatement)
         preparedStatement.close()
-        log.debug("Finished getColumnRangeDistribution query for ${tableName}.${columnName} in {}", Utils.timeTaken(startTime))
+        log.trace("Finished getColumnRangeDistribution query for ${tableName}.${columnName} in {}", Utils.timeTaken(startTime))
 
         results.collectEntries {
             [(it.interval_label): it.interval_count]
@@ -952,19 +974,23 @@ abstract class AbstractDatabaseDataModelImporterProviderService<S extends Databa
 
     protected Map<String, Long> getEnumerationValueDistribution(Connection connection, SamplingStrategy samplingStrategy,
                                                                 String columnName, String tableName, String schemaName = null) {
-        log.debug("Starting getEnumerationValueDistribution query for ${tableName}.${columnName}")
+        log.trace("Starting getEnumerationValueDistribution query for ${tableName}.${columnName}")
         long startTime = System.currentTimeMillis()
         String queryString = enumerationValueDistributionQueryString(samplingStrategy, columnName, tableName, schemaName)
 
         final PreparedStatement preparedStatement = connection.prepareStatement(queryString)
         List<Map<String, Object>> results = executeStatement(preparedStatement)
         preparedStatement.close()
-        log.debug("Finished getEnumerationValueDistribution query for ${tableName}.${columnName} in {}", Utils.timeTaken(startTime))
+        log.trace("Finished getEnumerationValueDistribution query for ${tableName}.${columnName} in {}", Utils.timeTaken(startTime))
 
         results.collectEntries {
             // Convert a null key to string 'NULL'. There is a risk of collision with a string value 'NULL'
             // from the database.
             it.enumeration_value != null ? [(it.enumeration_value): it.enumeration_count] : ['NULL': it.enumeration_count]
         }
+    }
+
+    protected boolean isColumnForDateOrNumericSummary(DataType dt){
+        isColumnForDateSummary(dt) || isColumnForDecimalSummary(dt) || isColumnForIntegerSummary(dt) || isColumnForLongSummary(dt)
     }
 }

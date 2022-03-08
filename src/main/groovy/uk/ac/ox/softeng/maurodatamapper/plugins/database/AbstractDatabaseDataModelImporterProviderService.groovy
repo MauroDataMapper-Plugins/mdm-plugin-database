@@ -37,10 +37,9 @@ import uk.ac.ox.softeng.maurodatamapper.datamodel.item.datatype.ReferenceTypeSer
 import uk.ac.ox.softeng.maurodatamapper.datamodel.item.datatype.enumeration.EnumerationValue
 import uk.ac.ox.softeng.maurodatamapper.datamodel.provider.DefaultDataTypeProvider
 import uk.ac.ox.softeng.maurodatamapper.datamodel.provider.importer.DataModelImporterProviderService
+import uk.ac.ox.softeng.maurodatamapper.plugins.database.calculation.CalculationStrategy
+import uk.ac.ox.softeng.maurodatamapper.plugins.database.calculation.SamplingStrategy
 import uk.ac.ox.softeng.maurodatamapper.plugins.database.summarymetadata.AbstractIntervalHelper
-import uk.ac.ox.softeng.maurodatamapper.plugins.database.summarymetadata.DateIntervalHelper
-import uk.ac.ox.softeng.maurodatamapper.plugins.database.summarymetadata.DecimalIntervalHelper
-import uk.ac.ox.softeng.maurodatamapper.plugins.database.summarymetadata.LongIntervalHelper
 import uk.ac.ox.softeng.maurodatamapper.plugins.database.summarymetadata.SummaryMetadataHelper
 import uk.ac.ox.softeng.maurodatamapper.security.User
 import uk.ac.ox.softeng.maurodatamapper.util.Utils
@@ -64,9 +63,7 @@ abstract class AbstractDatabaseDataModelImporterProviderService<S extends Databa
 
     static final String DATABASE_NAMESPACE = 'uk.ac.ox.softeng.maurodatamapper.plugins.database'
     static final String IS_NOT_NULL_CONSTRAINT = 'IS NOT NULL'
-    static final Integer MAX_ENUMERATIONS = 20
-    static final Integer DEFAULT_SAMPLE_THRESHOLD = 0
-    static final BigDecimal DEFAULT_SAMPLE_PERCENTAGE = 1
+
 
     @Autowired
     DataClassService dataClassService
@@ -89,8 +86,12 @@ abstract class AbstractDatabaseDataModelImporterProviderService<S extends Databa
     @Autowired
     DataTypeService dataTypeService
 
-    SamplingStrategy getSamplingStrategy(S parameters) {
-        new SamplingStrategy()
+    SamplingStrategy getSamplingStrategy(String schema, String table, S parameters) {
+        new SamplingStrategy(schema, table)
+    }
+
+    CalculationStrategy getCalculationStrategy(S parameters) {
+        new CalculationStrategy(parameters)
     }
 
     String schemaNameColumnName = 'table_schema'
@@ -218,19 +219,6 @@ abstract class AbstractDatabaseDataModelImporterProviderService<S extends Databa
      * Must return a String which will be queryable by column name, table name
      * and optionally schema name, and return a row with the following columns:
      *  * count
-     *
-     * @return Query string for count of distinct values in a column
-     */
-    String countDistinctColumnValuesQueryString(String columnName, String tableName, String schemaName = null) {
-        String schemaIdentifier = schemaName ? "${escapeIdentifier(schemaName)}." : ""
-        "SELECT COUNT(DISTINCT(${escapeIdentifier(columnName)})) AS count FROM ${schemaIdentifier}${escapeIdentifier(tableName)}" +
-                "WHERE ${escapeIdentifier(columnName)} <> ''"
-    }
-
-    /**
-     * Must return a String which will be queryable by column name, table name
-     * and optionally schema name, and return a row with the following columns:
-     *  * count
      * and preferably apply a sampling strategy.
      *
      * The base method returns a query that does not use any sampling; subclasses which
@@ -241,21 +229,8 @@ abstract class AbstractDatabaseDataModelImporterProviderService<S extends Databa
     String countDistinctColumnValuesQueryString(SamplingStrategy samplingStrategy, String columnName, String tableName, String schemaName = null) {
         String schemaIdentifier = schemaName ? "${escapeIdentifier(schemaName)}." : ""
         "SELECT COUNT(DISTINCT(${escapeIdentifier(columnName)})) AS count FROM ${schemaIdentifier}${escapeIdentifier(tableName)}" +
-                samplingStrategy.samplingClause() +
-                "WHERE ${escapeIdentifier(columnName)} <> ''"
-    }
-
-    /**
-     * Must return a String which will be queryable by column name, table name
-     * and optionally schema name, and return rows with the following columns:
-     *  * distinct_value
-     *
-     * @return Query string for distinct values in a column
-     */
-    String distinctColumnValuesQueryString(String columnName, String tableName, String schemaName = null) {
-        String schemaIdentifier = schemaName ? "${escapeIdentifier(schemaName)}." : ""
-        "SELECT DISTINCT(${escapeIdentifier(columnName)}) AS distinct_value FROM ${schemaIdentifier}${escapeIdentifier(tableName)}" +
-                "WHERE ${escapeIdentifier(columnName)} <> ''"
+        samplingStrategy.samplingClause(SamplingStrategy.Type.ENUMERATION_VALUES) +
+        "WHERE ${escapeIdentifier(columnName)} <> ''"
     }
 
     /**
@@ -273,8 +248,8 @@ abstract class AbstractDatabaseDataModelImporterProviderService<S extends Databa
     String distinctColumnValuesQueryString(SamplingStrategy samplingStrategy, String columnName, String tableName, String schemaName = null) {
         String schemaIdentifier = schemaName ? "${escapeIdentifier(schemaName)}." : ""
         "SELECT DISTINCT(${escapeIdentifier(columnName)}) AS distinct_value FROM ${schemaIdentifier}${escapeIdentifier(tableName)}" +
-                samplingStrategy.samplingClause() +
-                "WHERE ${escapeIdentifier(columnName)} <> ''"
+        samplingStrategy.samplingClause(SamplingStrategy.Type.ENUMERATION_VALUES) +
+        "WHERE ${escapeIdentifier(columnName)} <> ''"
     }
 
     /**
@@ -284,57 +259,6 @@ abstract class AbstractDatabaseDataModelImporterProviderService<S extends Databa
      */
     String escapeIdentifier(String identifier) {
         identifier
-    }
-
-    /**
-     * Does the dataType represent a column that should be checked as a possible enumeration?
-     * Subclasses can override and use database specific types e.g char/varchar or
-     * character/character varying
-     * @param dataType
-     * @return boolean
-     */
-    boolean isColumnPossibleEnumeration(DataType dataType) {
-        false
-    }
-
-    /**
-     * Does the dataType represent a column that should be summarised as a date?
-     * Subclasses can override and use database specific types.
-     * @param dataType
-     * @return boolean
-     */
-    boolean isColumnForDateSummary(DataType dataType) {
-        false
-    }
-
-    /**
-     * Does the dataType represent a column that should be summarised as a decimal?
-     * Subclasses can override and use database specific types.
-     * @param dataType
-     * @return boolean
-     */
-    boolean isColumnForDecimalSummary(DataType dataType) {
-        false
-    }
-
-    /**
-     * Does the dataType represent a column that should be summarised as an integer?
-     * Subclasses can override and use database specific types.
-     * @param dataType
-     * @return boolean
-     */
-    boolean isColumnForIntegerSummary(DataType dataType) {
-        false
-    }
-
-    /**
-     * Does the dataType represent a column that should be summarised as a long?
-     * Subclasses can override and use database specific types.
-     * @param dataType
-     * @return boolean
-     */
-    boolean isColumnForLongSummary(DataType dataType) {
-        false
     }
 
     /**
@@ -377,45 +301,18 @@ abstract class AbstractDatabaseDataModelImporterProviderService<S extends Databa
      *  * min_value
      *  * max_value
      *
-     * @return Query string for distinct values in a column
-     */
-    String minMaxColumnValuesQueryString(String columnName, String tableName, String schemaName = null) {
-        String schemaIdentifier = schemaName ? "${escapeIdentifier(schemaName)}." : ""
-        "SELECT MIN(${escapeIdentifier(columnName)}) AS min_value, MAX(${escapeIdentifier(columnName)}) AS max_value FROM ${schemaIdentifier}${escapeIdentifier(tableName)}"
-    }
-
-    /**
-     * Must return a String which will be queryable by column name, table name
-     * and optionally schema name, and return rows with the following elements:
-     *  * min_value
-     *  * max_value
-     *
      * and use an appropriate sampling strategy.
      *
      * The base method does not use sampling, and should be overridden by subclasses where possible.
      * @return Query string for distinct values in a column
      */
     String minMaxColumnValuesQueryString(SamplingStrategy samplingStrategy, String columnName, String tableName, String schemaName = null) {
-        minMaxColumnValuesQueryString(columnName, tableName, schemaName) + samplingStrategy.samplingClause()
+        String schemaIdentifier = schemaName ? "${escapeIdentifier(schemaName)}." : ""
+        """SELECT MIN(${escapeIdentifier(columnName)}) AS min_value, 
+        MAX(${escapeIdentifier(columnName)}) AS max_value 
+        FROM ${schemaIdentifier}${escapeIdentifier(tableName)} 
+        ${samplingStrategy.samplingClause(SamplingStrategy.Type.SUMMARY_METADATA)}"""
     }
-
-    /**
-     * Must return a String which will be queryable by table name
-     * and column name, and return rows with the following elements:
-     *  * interval_start
-     *  * interval_end
-     *  * interval_count i.e count of values in the range interval_start to interval_end
-     *
-     *  interval_start is inclusive. interval_end is exclusive. interval_count is the
-     *  count of values in the interval. Rows must be ordered by interval_start ascending.
-     *
-     *  Subclasses must implement this method using vendor specific SQL as necessary.
-     *
-     * @return Query string for count by interval
-     */
-    abstract String columnRangeDistributionQueryString(DataType dataType,
-                                                       AbstractIntervalHelper intervalHelper,
-                                                       String columnName, String tableName, String schemaName)
 
     /**
      * Must return a String which will be queryable by table name
@@ -436,7 +333,7 @@ abstract class AbstractDatabaseDataModelImporterProviderService<S extends Databa
         SELECT ${escapeIdentifier(schemaName)}.${escapeIdentifier(tableName)}.${escapeIdentifier(columnName)} AS enumeration_value,
         COUNT(*) AS enumeration_count
         FROM ${escapeIdentifier(schemaName)}.${escapeIdentifier(tableName)} 
-        ${samplingStrategy.samplingClause()}
+        ${samplingStrategy.samplingClause(SamplingStrategy.Type.SUMMARY_METADATA)}
         GROUP BY ${escapeIdentifier(schemaName)}.${escapeIdentifier(tableName)}.${escapeIdentifier(columnName)}
         ORDER BY ${escapeIdentifier(schemaName)}.${escapeIdentifier(tableName)}.${escapeIdentifier(columnName)}
         """
@@ -444,12 +341,23 @@ abstract class AbstractDatabaseDataModelImporterProviderService<S extends Databa
         sql.stripIndent()
     }
 
-
-    String columnRangeDistributionQueryString(SamplingStrategy samplingStrategy, DataType dataType,
-                                              AbstractIntervalHelper intervalHelper,
-                                              String columnName, String tableName, String schemaName) {
-        columnRangeDistributionQueryString(dataType, intervalHelper, columnName, tableName, schemaName)
-    }
+    /**
+     * Must return a String which will be queryable by table name
+     * and column name, and return rows with the following elements:
+     *  * interval_start
+     *  * interval_end
+     *  * interval_count i.e count of values in the range interval_start to interval_end
+     *
+     *  interval_start is inclusive. interval_end is exclusive. interval_count is the
+     *  count of values in the interval. Rows must be ordered by interval_start ascending.
+     *
+     *  Subclasses must implement this method using vendor specific SQL as necessary.
+     *
+     * @return Query string for count by interval
+     */
+    abstract String columnRangeDistributionQueryString(SamplingStrategy samplingStrategy, DataType dataType,
+                                                       AbstractIntervalHelper intervalHelper,
+                                                       String columnName, String tableName, String schemaName)
 
     boolean isColumnNullable(String nullableColumnValue) {
         nullableColumnValue.toLowerCase() == 'yes'
@@ -540,28 +448,24 @@ abstract class AbstractDatabaseDataModelImporterProviderService<S extends Databa
     void updateDataModelWithEnumerationsAndSummaryMetadata(User user, S parameters, DataModel dataModel, Connection connection) {
         log.debug('Starting enumeration and summary metadata detection')
         long startTime = System.currentTimeMillis()
+        CalculationStrategy calculationStrategy = getCalculationStrategy(parameters)
         dataModel.childDataClasses.each {DataClass schemaClass ->
             schemaClass.dataClasses.each {DataClass tableClass ->
-                log.info('Checking {}.{} for possible enumerations and summary metadata', schemaClass.label, tableClass.label)
-                SamplingStrategy samplingStrategy = getSamplingStrategy(parameters)
+                log.trace('Checking {}.{} for possible enumerations and summary metadata', schemaClass.label, tableClass.label)
+                SamplingStrategy samplingStrategy = getSamplingStrategy(schemaClass.label, tableClass.label, parameters)
                 if (samplingStrategy.requiresTableType()) {
                     samplingStrategy.tableType = getTableType(connection, tableClass.label, schemaClass.label, dataModel.label)
                 }
                 try {
-                    samplingStrategy.approxCount = getApproxCount(connection, tableClass.label, schemaClass.label)
-
-                    if (!samplingStrategy.canSample() && samplingStrategy.approxCount > samplingStrategy.threshold) {
-                        log.warn(
-                            'Not calculating enumerations or summary metadata for {} {}.{} as approx rowcount {} is above threshold {} and we cannot use sampling',
-                            samplingStrategy.tableType, schemaClass.label, tableClass.label, samplingStrategy.approxCount, samplingStrategy.threshold)
+                    // If SS needs the approx count then make the query, this can take a long time hence the reason to check if we need it
+                    samplingStrategy.approxCount = samplingStrategy.requiresApproxCount() ? getApproxCount(connection, tableClass.label, schemaClass.label) : -1
+                    if (samplingStrategy.dataExists()) {
+                        calculateEnumerationsAndSummaryMetadata(dataModel, schemaClass, tableClass, calculationStrategy, samplingStrategy, connection, user)
                     } else {
-                        calculateEnumerationsAndSummaryMetadata(dataModel, schemaClass, tableClass, samplingStrategy, connection,
-                                                                parameters.detectEnumerations,
-                                                                parameters.maxEnumerations,
-                                                                parameters.calculateSummaryMetadata,
-                                                                user)
+                        log.warn('Not calculating enumerations and summary metadata in {}.{} as the table contains no data', schemaClass.label, tableClass.label)
                     }
-                }catch(SQLException exception){
+
+                } catch (SQLException exception) {
                     log.warn('Could not perform enumeration or summary metadata detection on {}.{} because of {}', schemaClass.label, tableClass.label, exception.message)
                 }
             }
@@ -570,71 +474,83 @@ abstract class AbstractDatabaseDataModelImporterProviderService<S extends Databa
         log.debug('Finished enumeration and summary metadata detection in {}', Utils.timeTaken(startTime))
     }
 
-    void calculateEnumerationsAndSummaryMetadata(DataModel dataModel, DataClass schemaClass, DataClass tableClass, SamplingStrategy samplingStrategy,
-                                                 Connection connection, boolean detectEnumerations, Integer maxEnumerations, boolean calculateSummaryMetadata,
-                                                 User user) {
-        log.debug('Calculating enumerations and summary metadata for {}.{}', schemaClass.label, tableClass.label)
+    void calculateEnumerationsAndSummaryMetadata(DataModel dataModel, DataClass schemaClass, DataClass tableClass,
+                                                 CalculationStrategy calculationStrategy, SamplingStrategy samplingStrategy,
+                                                 Connection connection, User user) {
+
+        log.debug('Calculating enumerations and summary metadata using {}', samplingStrategy)
         tableClass.dataElements.each {DataElement de ->
             DataType dt = de.dataType
 
             //Enumeration detection
-            if (detectEnumerations && isColumnPossibleEnumeration(dt)) {
-                log.debug('Performing enumeration detection for column {}', de.label)
-                int countDistinct = getCountDistinctColumnValues(connection, samplingStrategy, de.label, tableClass.label, schemaClass.label)
-                if (countDistinct > 0 && countDistinct <= (maxEnumerations ?: MAX_ENUMERATIONS)) {
-                    EnumerationType enumerationType = enumerationTypeService.findOrCreateDataTypeForDataModel(dataModel, de.label, de.label, user)
+            if (calculationStrategy.shouldDetectEnumerations(de.label, dt)) {
+                if (samplingStrategy.canDetectEnumerationValues()) {
+                    logEnumerationDetection(samplingStrategy, de)
+                    int countDistinct = getCountDistinctColumnValues(connection, samplingStrategy, de.label, tableClass.label, schemaClass.label)
+                    if (calculationStrategy.isEnumerationType(countDistinct)) {
+                        EnumerationType enumerationType = enumerationTypeService.findOrCreateDataTypeForDataModel(dataModel, de.label, de.label, user)
 
-                    final List<Map<String, Object>> results =
-                        getDistinctColumnValues(connection, samplingStrategy, de.label, tableClass.label, schemaClass.label)
+                        final List<Map<String, Object>> results =
+                            getDistinctColumnValues(connection, samplingStrategy, de.label, tableClass.label, schemaClass.label)
 
-                    replacePrimitiveTypeWithEnumerationType(dataModel, de, dt, enumerationType, results)
-                }
-
-                if (calculateSummaryMetadata) {
-                    log.debug('Performing enumeration summary metadata detection for column {}', de.label)
-                    //Count enumeration values
-                    Map<String, Long> enumerationValueDistribution =
-                        getEnumerationValueDistribution(connection, samplingStrategy, de.label, tableClass.label, schemaClass.label)
-                    if (enumerationValueDistribution) {
-                        String description = 'Enumeration Value Distribution'
-                        if (samplingStrategy.useSampling()) {
-                            description = "Estimated Enumeration Value Distribution (calculated by sampling ${samplingStrategy.percentage}% of rows)"
-                        }
-                        SummaryMetadata enumerationSummaryMetadata =
-                            SummaryMetadataHelper.createSummaryMetadataFromMap(user, de.label, description, enumerationValueDistribution)
-                        de.addToSummaryMetadata(enumerationSummaryMetadata)
-
-                        SummaryMetadata enumerationSummaryMetadataOnTable =
-                            SummaryMetadataHelper.createSummaryMetadataFromMap(user, de.label, description, enumerationValueDistribution)
-                        tableClass.addToSummaryMetadata(enumerationSummaryMetadataOnTable)
+                        replacePrimitiveTypeWithEnumerationType(dataModel, de, dt, enumerationType, results)
                     }
+
+                    if (calculationStrategy.computeSummaryMetadata) {
+                        if (samplingStrategy.canComputeSummaryMetadata()) {
+                            logSummaryMetadataDetection(samplingStrategy, de, 'enumeration')
+                            //Count enumeration values
+                            Map<String, Long> enumerationValueDistribution =
+                                getEnumerationValueDistribution(connection, samplingStrategy, de.label, tableClass.label, schemaClass.label)
+                            if (enumerationValueDistribution) {
+                                String description = 'Enumeration Value Distribution'
+                                if (samplingStrategy.useSamplingForSummaryMetadata()) {
+                                    description = "Estimated Enumeration Value Distribution (calculated by sampling ${samplingStrategy.smPercentage}% of rows)"
+                                }
+                                SummaryMetadata enumerationSummaryMetadata =
+                                    SummaryMetadataHelper.createSummaryMetadataFromMap(user, de.label, description, enumerationValueDistribution)
+                                de.addToSummaryMetadata(enumerationSummaryMetadata)
+
+                                SummaryMetadata enumerationSummaryMetadataOnTable =
+                                    SummaryMetadataHelper.createSummaryMetadataFromMap(user, de.label, description, enumerationValueDistribution)
+                                tableClass.addToSummaryMetadata(enumerationSummaryMetadataOnTable)
+                            }
+                        } else {
+                            logNotCalculatingSummaryMetadata(samplingStrategy, de)
+                        }
+                    }
+                } else {
+                    logNotDetectingEnumerationValues(samplingStrategy, de)
                 }
             }
 
             //Summary metadata on dates and numbers
-            else if (calculateSummaryMetadata && isColumnForDateOrNumericSummary(dt)){
-                log.debug('Performing date or numeric summary metadata detection for column {}', de.label)
+            else if (calculationStrategy.shouldComputeSummaryData(de.label, dt)) {
+                if (samplingStrategy.canComputeSummaryMetadata()) {
+                    logSummaryMetadataDetection(samplingStrategy, de, 'date or numeric')
+                    Pair minMax = getMinMaxColumnValues(connection, samplingStrategy, de.label, tableClass.label, schemaClass.label)
 
-                Pair minMax = getMinMaxColumnValues(connection, samplingStrategy, de.label, tableClass.label, schemaClass.label)
+                    //aValue is the MIN, bValue is the MAX. If they are not null then calculate the range etc...
+                    if (minMax.aValue != null && minMax.bValue != null) {
+                        AbstractIntervalHelper intervalHelper = calculationStrategy.getIntervalHelper(dt, minMax)
 
-                //aValue is the MIN, bValue is the MAX. If they are not null then calculate the range etc...
-                if (minMax.aValue != null && minMax.bValue != null) {
-                    AbstractIntervalHelper intervalHelper = getIntervalHelper(dt, minMax)
+                        Map<String, Long> valueDistribution =
+                            getColumnRangeDistribution(connection, samplingStrategy, dt, intervalHelper, de.label, tableClass.label, schemaClass.label)
+                        if (valueDistribution) {
+                            String description = 'Value Distribution'
+                            if (samplingStrategy.useSamplingForSummaryMetadata()) {
+                                description = "Estimated Value Distribution (calculated by sampling ${samplingStrategy.smPercentage}% of rows)"
+                            }
+                            SummaryMetadata summaryMetadata = SummaryMetadataHelper.createSummaryMetadataFromMap(user, de.label, description, valueDistribution)
+                            de.addToSummaryMetadata(summaryMetadata)
 
-                    Map<String, Long> valueDistribution =
-                        getColumnRangeDistribution(connection, samplingStrategy, dt, intervalHelper, de.label, tableClass.label, schemaClass.label)
-                    if (valueDistribution) {
-                        String description = 'Value Distribution'
-                        if (samplingStrategy.useSampling()) {
-                            description = "Estimated Value Distribution (calculated by sampling ${samplingStrategy.percentage}% of rows)"
+                            SummaryMetadata summaryMetadataOnTable =
+                                SummaryMetadataHelper.createSummaryMetadataFromMap(user, de.label, description, valueDistribution)
+                            tableClass.addToSummaryMetadata(summaryMetadataOnTable)
                         }
-                        SummaryMetadata summaryMetadata = SummaryMetadataHelper.createSummaryMetadataFromMap(user, de.label, description, valueDistribution)
-                        de.addToSummaryMetadata(summaryMetadata)
-
-                        SummaryMetadata summaryMetadataOnTable =
-                            SummaryMetadataHelper.createSummaryMetadataFromMap(user, de.label, description, valueDistribution)
-                        tableClass.addToSummaryMetadata(summaryMetadataOnTable)
                     }
+                } else {
+                    logNotCalculatingSummaryMetadata(samplingStrategy, de)
                 }
             }
         }
@@ -778,7 +694,6 @@ abstract class AbstractDatabaseDataModelImporterProviderService<S extends Databa
      * @param connection
      */
     void addMetadata(DataModel dataModel, Connection connection) {
-        return
     }
 
     Connection getConnection(String databaseName, S parameters) throws ApiException, ApiBadRequestException {
@@ -943,17 +858,6 @@ abstract class AbstractDatabaseDataModelImporterProviderService<S extends Databa
         return tableType
     }
 
-    private AbstractIntervalHelper getIntervalHelper(DataType dt, Pair minMax) {
-        if (isColumnForLongSummary(dt)) {
-            return new LongIntervalHelper((Long) minMax.aValue, (Long) minMax.bValue)
-        } else if (isColumnForIntegerSummary(dt)) {
-            return new LongIntervalHelper((Long) minMax.aValue, (Long) minMax.bValue)
-        } else if (isColumnForDateSummary(dt)) {
-            return new DateIntervalHelper(((java.util.Date) minMax.aValue).toLocalDateTime(), ((java.util.Date) minMax.bValue).toLocalDateTime())
-        } else if (isColumnForDecimalSummary(dt)) {
-            return new DecimalIntervalHelper((BigDecimal) minMax.aValue, (BigDecimal) minMax.bValue)
-        }
-    }
 
     private Map<String, Long> getColumnRangeDistribution(Connection connection, SamplingStrategy samplingStrategy,
                                                          DataType dataType, AbstractIntervalHelper intervalHelper,
@@ -990,7 +894,32 @@ abstract class AbstractDatabaseDataModelImporterProviderService<S extends Databa
         }
     }
 
-    protected boolean isColumnForDateOrNumericSummary(DataType dt){
-        isColumnForDateSummary(dt) || isColumnForDecimalSummary(dt) || isColumnForIntegerSummary(dt) || isColumnForLongSummary(dt)
+    private void logSummaryMetadataDetection(SamplingStrategy samplingStrategy, DataElement de, String type) {
+        if (samplingStrategy.useSamplingForSummaryMetadata()) {
+            log.debug('Performing {} summary metadata detection for column {} (calculated by sampling {}% of rows)', type, de.label,
+                      samplingStrategy.smPercentage)
+        } else {
+            log.debug('Performing {} summary metadata detection for column {}', type, de.label)
+        }
+    }
+
+    private void logEnumerationDetection(SamplingStrategy samplingStrategy, DataElement de) {
+        if (samplingStrategy.useSamplingForEnumerationValues()) {
+            log.debug('Performing enumeration detection for column {} (calculated by sampling {}% of rows)', de.label, samplingStrategy.evPercentage)
+        } else {
+            log.debug('Performing enumeration detection for column {}', de.label)
+        }
+    }
+
+    private void logNotCalculatingSummaryMetadata(SamplingStrategy samplingStrategy, DataElement de) {
+        log.warn(
+            'Not calculating summary metadata for {} as rowcount {} is above threshold {} and we cannot use sampling',
+            de.label, samplingStrategy.approxCount, samplingStrategy.smThreshold)
+    }
+
+    private void logNotDetectingEnumerationValues(SamplingStrategy samplingStrategy, DataElement de) {
+        log.warn(
+            'Not detecting enumerations for {} as rowcount {} is above threshold {} and we cannot use sampling',
+            de.label, samplingStrategy.approxCount, samplingStrategy.evThreshold)
     }
 }

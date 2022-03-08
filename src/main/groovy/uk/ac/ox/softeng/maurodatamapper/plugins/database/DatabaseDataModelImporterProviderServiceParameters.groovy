@@ -115,7 +115,7 @@ abstract class DatabaseDataModelImporterProviderServiceParameters<K extends Data
         order = 1,
         optional = true,
         group = @ImportGroupConfig(
-            name = 'Summarisation',
+            name = 'Enumeration Values Detection',
             order = 5
         )
     )
@@ -127,11 +127,23 @@ abstract class DatabaseDataModelImporterProviderServiceParameters<K extends Data
         order = 2,
         optional = true,
         group = @ImportGroupConfig(
-            name = 'Summarisation',
+            name = 'Enumeration Values Detection',
             order = 5
         )
     )
     Integer maxEnumerations = 20
+
+    @ImportParameterConfig(
+        displayName = 'Ignore columns matching patterns',
+        description = 'Ignore any columns which match the following CSV list of regex patterns',
+        order = 3,
+        optional = true,
+        group = @ImportGroupConfig(
+            name = 'Enumeration Values Detection',
+            order = 5
+        )
+    )
+    String ignoreColumnsForEnumerations
 
     @ImportParameterConfig(
         displayName = 'Calculate Summary Metadata',
@@ -139,11 +151,23 @@ abstract class DatabaseDataModelImporterProviderServiceParameters<K extends Data
         order = 3,
         optional = true,
         group = @ImportGroupConfig(
-            name = 'Summarisation',
-            order = 5
+            name = 'Summary Metadata Computation',
+            order = 6
         )
     )
     Boolean calculateSummaryMetadata = false
+
+    @ImportParameterConfig(
+        displayName = 'Ignore columns matching patterns',
+        description = 'Ignore any columns which match the following CSV list of regex patterns',
+        order = 3,
+        optional = true,
+        group = @ImportGroupConfig(
+            name = 'Summary Metadata Computation',
+            order = 6
+        )
+    )
+    String ignoreColumnsForSummaryMetadata
 
     Integer getDatabasePort() {
         databasePort = databasePort ?: defaultPort

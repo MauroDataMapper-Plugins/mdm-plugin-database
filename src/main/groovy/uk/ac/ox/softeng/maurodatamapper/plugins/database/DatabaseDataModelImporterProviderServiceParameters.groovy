@@ -22,10 +22,17 @@ import uk.ac.ox.softeng.maurodatamapper.core.provider.importer.parameter.config.
 import uk.ac.ox.softeng.maurodatamapper.datamodel.provider.importer.parameter.DataModelImporterProviderServiceParameters
 
 import java.sql.SQLException
+import java.util.regex.Pattern
 import javax.sql.DataSource
 
 // @CompileStatic
 abstract class DatabaseDataModelImporterProviderServiceParameters<K extends DataSource> extends DataModelImporterProviderServiceParameters {
+
+    final static int MODEL_GROUP = 0
+    final static int DB_IMPORT_GROUP = 5
+    final static int DB_CONNECTION_GROUP = 6
+    final static int EV_DETECTION_GROUP = 7
+    final static int SM_COMPUTE_GROUP = 8
 
     @ImportParameterConfig(
         displayName = 'DataModel Name Suffix',
@@ -37,7 +44,7 @@ abstract class DatabaseDataModelImporterProviderServiceParameters<K extends Data
         optional = true,
         group = @ImportGroupConfig(
             name = 'Model',
-            order = 0
+            order = MODEL_GROUP
         ))
     String dataModelNameSuffix
 
@@ -48,12 +55,39 @@ abstract class DatabaseDataModelImporterProviderServiceParameters<K extends Data
             'unless the DataModel name option is supplied.',
             'If multiple names supplied then DataModel name will be ignored and the database name will be used as the DataModel name,',
             'and the same username and password will be used for all named databases.'],
-        order = 1,
+        order = 0,
         group = @ImportGroupConfig(
             name = 'Database Import Details',
-            order = 2
+            order = DB_IMPORT_GROUP
         ))
     String databaseNames
+
+//    @ImportParameterConfig(
+//        displayName = 'Only import tables with names',
+//        description = [
+//            'Only import the CSV list of fully qualified table names in the format (<database>.)<schema>.<table>',
+//            'Table names must be supplied including the schema prefix if the database supports schemas.',
+//            'If importing multiple databases then the database name must also be included in the table name.',
+//        ],
+//        order = 5,
+//        optional = true,
+//        group = @ImportGroupConfig(
+//            name = 'Database Import Details',
+//            order = DB_IMPORT_GROUP
+//        ))
+    String onlyImportTables
+
+    @ImportParameterConfig(
+        displayName = 'Ignore tables matching patterns',
+        description = [
+            'Ignore any tables which match the following CSV list of regex patterns'],
+        order = 6,
+        optional = true,
+        group = @ImportGroupConfig(
+            name = 'Database Import Details',
+            order = DB_IMPORT_GROUP
+        ))
+    String ignoreTablesForImport
 
     @ImportParameterConfig(
         displayName = 'Database Host',
@@ -61,7 +95,7 @@ abstract class DatabaseDataModelImporterProviderServiceParameters<K extends Data
         order = 2,
         group = @ImportGroupConfig(
             name = 'Database Connection Details',
-            order = 1
+            order = DB_CONNECTION_GROUP
         ))
     String databaseHost
 
@@ -74,7 +108,7 @@ abstract class DatabaseDataModelImporterProviderServiceParameters<K extends Data
         optional = true,
         group = @ImportGroupConfig(
             name = 'Database Connection Details',
-            order = 1
+            order = DB_CONNECTION_GROUP
         ))
     Integer databasePort
 
@@ -84,7 +118,7 @@ abstract class DatabaseDataModelImporterProviderServiceParameters<K extends Data
         order = 3,
         group = @ImportGroupConfig(
             name = 'Database Connection Details',
-            order = 1
+            order = 5
         ))
     String databaseUsername
 
@@ -95,7 +129,7 @@ abstract class DatabaseDataModelImporterProviderServiceParameters<K extends Data
         password = true,
         group = @ImportGroupConfig(
             name = 'Database Connection Details',
-            order = 1
+            order = DB_CONNECTION_GROUP
         ))
     String databasePassword
 
@@ -105,7 +139,7 @@ abstract class DatabaseDataModelImporterProviderServiceParameters<K extends Data
         order = 2,
         group = @ImportGroupConfig(
             name = 'Database Connection Details',
-            order = 1
+            order = DB_CONNECTION_GROUP
         ))
     Boolean databaseSSL
 
@@ -116,7 +150,7 @@ abstract class DatabaseDataModelImporterProviderServiceParameters<K extends Data
         optional = true,
         group = @ImportGroupConfig(
             name = 'Enumeration Values Detection',
-            order = 5
+            order = EV_DETECTION_GROUP
         )
     )
     Boolean detectEnumerations = false
@@ -128,7 +162,7 @@ abstract class DatabaseDataModelImporterProviderServiceParameters<K extends Data
         optional = true,
         group = @ImportGroupConfig(
             name = 'Enumeration Values Detection',
-            order = 5
+            order = EV_DETECTION_GROUP
         )
     )
     Integer maxEnumerations = 20
@@ -140,7 +174,7 @@ abstract class DatabaseDataModelImporterProviderServiceParameters<K extends Data
         optional = true,
         group = @ImportGroupConfig(
             name = 'Enumeration Values Detection',
-            order = 5
+            order = EV_DETECTION_GROUP
         )
     )
     String ignoreColumnsForEnumerations
@@ -152,7 +186,7 @@ abstract class DatabaseDataModelImporterProviderServiceParameters<K extends Data
         optional = true,
         group = @ImportGroupConfig(
             name = 'Summary Metadata Computation',
-            order = 6
+            order = SM_COMPUTE_GROUP
         )
     )
     Boolean calculateSummaryMetadata = false
@@ -164,7 +198,7 @@ abstract class DatabaseDataModelImporterProviderServiceParameters<K extends Data
         optional = true,
         group = @ImportGroupConfig(
             name = 'Summary Metadata Computation',
-            order = 6
+            order = SM_COMPUTE_GROUP
         )
     )
     String ignoreColumnsForSummaryMetadata
@@ -210,5 +244,9 @@ abstract class DatabaseDataModelImporterProviderServiceParameters<K extends Data
 
     boolean shouldImportSchemasAsDataClasses() {
         true
+    }
+
+    List<Pattern> getListOfTableRegexesToIgnore() {
+        ignoreTablesForImport ? ignoreTablesForImport.split(',').collect {Pattern.compile(it)} : Collections.emptyList() as List<Pattern>
     }
 }

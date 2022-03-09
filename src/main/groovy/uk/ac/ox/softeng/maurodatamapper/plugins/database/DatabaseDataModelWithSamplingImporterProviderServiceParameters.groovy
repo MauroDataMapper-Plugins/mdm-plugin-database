@@ -35,7 +35,7 @@ abstract class DatabaseDataModelWithSamplingImporterProviderServiceParameters<K 
         optional = true,
         group = @ImportGroupConfig(
             name = 'Summary Metadata Computation',
-            order = 6
+            order = SM_COMPUTE_GROUP
         )
     )
     Boolean summaryMetadataUseSampling
@@ -50,10 +50,10 @@ abstract class DatabaseDataModelWithSamplingImporterProviderServiceParameters<K 
         optional = true,
         group = @ImportGroupConfig(
             name = 'Summary Metadata Computation',
-            order = 6
+            order = SM_COMPUTE_GROUP
         )
     )
-    Integer summaryMetadataSampleThreshold
+    Long summaryMetadataSampleThreshold
 
     @ImportParameterConfig(
         displayName = 'Sample Percentage for Summary Metadata',
@@ -65,7 +65,7 @@ abstract class DatabaseDataModelWithSamplingImporterProviderServiceParameters<K 
         optional = true,
         group = @ImportGroupConfig(
             name = 'Summary Metadata Computation',
-            order = 6
+            order = SM_COMPUTE_GROUP
         )
     )
     BigDecimal summaryMetadataSamplePercent
@@ -80,7 +80,7 @@ abstract class DatabaseDataModelWithSamplingImporterProviderServiceParameters<K 
         optional = true,
         group = @ImportGroupConfig(
             name = 'Enumeration Values Detection',
-            order = 5
+            order = EV_DETECTION_GROUP
         )
     )
     Boolean enumerationValueUseSampling
@@ -95,10 +95,10 @@ abstract class DatabaseDataModelWithSamplingImporterProviderServiceParameters<K 
         optional = true,
         group = @ImportGroupConfig(
             name = 'Enumeration Values Detection',
-            order = 5
+            order = EV_DETECTION_GROUP
         )
     )
-    Integer enumerationValueSampleThreshold
+    Long enumerationValueSampleThreshold
 
     @ImportParameterConfig(
         displayName = 'Sample Percentage for Enumeration Values',
@@ -110,7 +110,7 @@ abstract class DatabaseDataModelWithSamplingImporterProviderServiceParameters<K 
         optional = true,
         group = @ImportGroupConfig(
             name = 'Enumeration Values Detection',
-            order = 5
+            order = EV_DETECTION_GROUP
         )
     )
     BigDecimal enumerationValueSamplePercent

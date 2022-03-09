@@ -48,6 +48,8 @@ import grails.util.Pair
 import groovy.json.JsonOutput
 import groovy.transform.CompileStatic
 import groovy.util.logging.Slf4j
+import org.slf4j.Logger
+import org.slf4j.LoggerFactory
 import org.springframework.beans.factory.annotation.Autowired
 
 import java.sql.Connection
@@ -55,6 +57,7 @@ import java.sql.PreparedStatement
 import java.sql.ResultSet
 import java.sql.ResultSetMetaData
 import java.sql.SQLException
+import java.util.regex.Pattern
 
 @Slf4j
 @CompileStatic
@@ -64,6 +67,7 @@ abstract class AbstractDatabaseDataModelImporterProviderService<S extends Databa
     static final String DATABASE_NAMESPACE = 'uk.ac.ox.softeng.maurodatamapper.plugins.database'
     static final String IS_NOT_NULL_CONSTRAINT = 'IS NOT NULL'
 
+    public static final Logger SQL_LOGGER = LoggerFactory.getLogger('uk.ac.ox.softeng.maurodatamapper.plugins.database.sql')
 
     @Autowired
     DataClassService dataClassService
@@ -226,6 +230,7 @@ abstract class AbstractDatabaseDataModelImporterProviderService<S extends Databa
      *
      * @return Query string for count of distinct values in a column
      */
+    @Deprecated
     String countDistinctColumnValuesQueryString(SamplingStrategy samplingStrategy, String columnName, String tableName, String schemaName = null) {
         String schemaIdentifier = schemaName ? "${escapeIdentifier(schemaName)}." : ""
         "SELECT COUNT(DISTINCT(${escapeIdentifier(columnName)})) AS count FROM ${schemaIdentifier}${escapeIdentifier(tableName)}" +
@@ -243,9 +248,14 @@ abstract class AbstractDatabaseDataModelImporterProviderService<S extends Databa
      * The base method returns a query that does not use any sampling; subclasses which
      * support sampling should override with vendor specific SQL.
      *
+     * Optimisation can also occur by vendor specific SQL limiting the return to the max allowed EVs + 1,
+     * this will mean the system gets the first (e.g 21) entries. If the max allowed values is 20 then the size of 21 will stop it from being an ET
+     * it will also be faster as its only checking for 21 distinct values then returning a result.
+     *
      * @return Query string for distinct values in a column
      */
-    String distinctColumnValuesQueryString(SamplingStrategy samplingStrategy, String columnName, String tableName, String schemaName = null) {
+    String distinctColumnValuesQueryString(CalculationStrategy calculationStrategy, SamplingStrategy samplingStrategy, String columnName, String tableName,
+                                           String schemaName = null) {
         String schemaIdentifier = schemaName ? "${escapeIdentifier(schemaName)}." : ""
         "SELECT DISTINCT(${escapeIdentifier(columnName)}) AS distinct_value FROM ${schemaIdentifier}${escapeIdentifier(tableName)}" +
         samplingStrategy.samplingClause(SamplingStrategy.Type.ENUMERATION_VALUES) +
@@ -329,16 +339,14 @@ abstract class AbstractDatabaseDataModelImporterProviderService<S extends Databa
                                                    String tableName,
                                                    String schemaName) {
 
-        String sql = """
+        """
         SELECT ${escapeIdentifier(schemaName)}.${escapeIdentifier(tableName)}.${escapeIdentifier(columnName)} AS enumeration_value,
         COUNT(*) AS enumeration_count
         FROM ${escapeIdentifier(schemaName)}.${escapeIdentifier(tableName)} 
         ${samplingStrategy.samplingClause(SamplingStrategy.Type.SUMMARY_METADATA)}
         GROUP BY ${escapeIdentifier(schemaName)}.${escapeIdentifier(tableName)}.${escapeIdentifier(columnName)}
         ORDER BY ${escapeIdentifier(schemaName)}.${escapeIdentifier(tableName)}.${escapeIdentifier(columnName)}
-        """
-
-        sql.stripIndent()
+        """.stripIndent()
     }
 
     /**
@@ -395,7 +403,7 @@ abstract class AbstractDatabaseDataModelImporterProviderService<S extends Databa
     }
 
     DataModel importDataModelFromResults(User user, Folder folder, String modelName, String dialect, List<Map<String, Object>> results,
-                                         boolean importSchemaAsDataClass) throws ApiException {
+                                         boolean importSchemaAsDataClass, List<Pattern> tableRegexesToIgnore) throws ApiException {
         final DataModel dataModel = new DataModel(createdBy: user.emailAddress, label: modelName, type: DataModelType.DATA_ASSET, folder: folder,
                                                   authority: authorityService.getDefaultAuthority())
         dataModel.addToMetadata(namespace: namespaceDatabase(), key: 'dialect', value: dialect, createdBy: user.emailAddress)
@@ -407,14 +415,19 @@ abstract class AbstractDatabaseDataModelImporterProviderService<S extends Databa
         }
 
         results.each {Map<String, Object> row ->
+            String tableName = row[tableNameColumnName] as String
+
+            // If the tablename matches any of the ignore regexes then skip
+            if (tableRegexesToIgnore.any {tableName.matches(it)}) return
+
             final DataType dataType = primitiveTypeService.findOrCreateDataTypeForDataModel(dataModel, row[dataTypeColumnName] as String, null, user)
             DataClass tableDataClass
 
             if (importSchemaAsDataClass) {
                 DataClass schemaDataClass = dataClassService.findOrCreateDataClass(dataModel, row[schemaNameColumnName] as String, null, user)
-                tableDataClass = dataClassService.findOrCreateDataClass(schemaDataClass, row[tableNameColumnName] as String, null, user)
+                tableDataClass = dataClassService.findOrCreateDataClass(schemaDataClass, tableName, null, user)
             } else {
-                tableDataClass = dataClassService.findOrCreateDataClass(dataModel, row[tableNameColumnName] as String, null, user)
+                tableDataClass = dataClassService.findOrCreateDataClass(dataModel, tableName, null, user)
             }
 
             final int minMultiplicity = isColumnNullable(row[columnIsNullableColumnName] as String) ? 0 : 1
@@ -434,7 +447,8 @@ abstract class AbstractDatabaseDataModelImporterProviderService<S extends Databa
     List<DataModel> importAndUpdateDataModelsFromResults(User currentUser, String databaseName, S parameters, Folder folder, String modelName,
                                                          List<Map<String, Object>> results, Connection connection) throws ApiException, SQLException {
         final DataModel dataModel = importDataModelFromResults(currentUser, folder, modelName, parameters.databaseDialect, results,
-                                                               parameters.shouldImportSchemasAsDataClasses())
+                                                               parameters.shouldImportSchemasAsDataClasses(),
+                                                               parameters.getListOfTableRegexesToIgnore())
         if (parameters.dataModelNameSuffix) dataModel.aliasesString = databaseName
 
         if (parameters.detectEnumerations || parameters.calculateSummaryMetadata) {
@@ -483,16 +497,16 @@ abstract class AbstractDatabaseDataModelImporterProviderService<S extends Databa
             DataType dt = de.dataType
 
             //Enumeration detection
-            if (calculationStrategy.shouldDetectEnumerations(de.label, dt)) {
+            if (calculationStrategy.shouldDetectEnumerations(de.label, dt, samplingStrategy.approxCount)) {
                 if (samplingStrategy.canDetectEnumerationValues()) {
                     logEnumerationDetection(samplingStrategy, de)
-                    int countDistinct = getCountDistinctColumnValues(connection, samplingStrategy, de.label, tableClass.label, schemaClass.label)
-                    if (calculationStrategy.isEnumerationType(countDistinct)) {
+
+                    // Make 1 call to get the distinct values, then use the size of the that results to tell if its actually an ET
+                    final List<Map<String, Object>> results = getDistinctColumnValues(connection, calculationStrategy, samplingStrategy, de.label,
+                                                                                      tableClass.label, schemaClass.label)
+                    if (calculationStrategy.isEnumerationType(results.size())) {
+                        log.debug('Converting {} to an EnumerationType', de.label)
                         EnumerationType enumerationType = enumerationTypeService.findOrCreateDataTypeForDataModel(dataModel, de.label, de.label, user)
-
-                        final List<Map<String, Object>> results =
-                            getDistinctColumnValues(connection, samplingStrategy, de.label, tableClass.label, schemaClass.label)
-
                         replacePrimitiveTypeWithEnumerationType(dataModel, de, dt, enumerationType, results)
                     }
 
@@ -771,21 +785,29 @@ abstract class AbstractDatabaseDataModelImporterProviderService<S extends Databa
         value.toString().toBoolean()
     }
 
+    // Faster to get the results with 1 query just to get all the distinct values rather than 1 query to get the count and 1 to get the values
+    // Optimisation can also occur by vendor specific SQL limiting the return to the max allowed EVs + 1,
+    // this will mean the system gets the first (e.g 21) entries. If the max allowed values is 20 then the size of 21 will stop it from being an ET
+    // it will also be faster as its only checking for 21 distinct values then returning a result.
+    @Deprecated
     int getCountDistinctColumnValues(Connection connection, SamplingStrategy samplingStrategy, String columnName, String tableName, String schemaName = null) {
         log.trace("Starting getCountDistinctColumnValues query for ${tableName}.${columnName}")
         long startTime = System.currentTimeMillis()
         String queryString = countDistinctColumnValuesQueryString(samplingStrategy, columnName, tableName, schemaName)
+        SQL_LOGGER.debug('\n{}', queryString)
         final PreparedStatement preparedStatement = connection.prepareStatement(queryString)
         final List<Map<String, Object>> results = executeStatement(preparedStatement)
         log.trace("Finished getCountDistinctColumnValues query for ${tableName}.${columnName} in {}", Utils.timeTaken(startTime))
         (int) results[0].count
     }
 
-    private List<Map<String, Object>> getDistinctColumnValues(Connection connection, SamplingStrategy samplingStrategy, String columnName, String tableName,
+    private List<Map<String, Object>> getDistinctColumnValues(Connection connection, CalculationStrategy calculationStrategy, SamplingStrategy samplingStrategy,
+                                                              String columnName, String tableName,
                                                               String schemaName = null) {
         log.trace("Starting getDistinctColumnValues query for ${tableName}.${columnName}")
         long startTime = System.currentTimeMillis()
-        String queryString = distinctColumnValuesQueryString(samplingStrategy, columnName, tableName, schemaName)
+        String queryString = distinctColumnValuesQueryString(calculationStrategy, samplingStrategy, columnName, tableName, schemaName)
+        SQL_LOGGER.trace('\n{}', queryString)
         final PreparedStatement preparedStatement = connection.prepareStatement(queryString)
         final List<Map<String, Object>> results = executeStatement(preparedStatement)
         log.trace("Finished getDistinctColumnValues query for ${tableName}.${columnName} in {}", Utils.timeTaken(startTime))
@@ -796,6 +818,7 @@ abstract class AbstractDatabaseDataModelImporterProviderService<S extends Databa
         log.trace("Starting getMinMaxColumnValues query for ${tableName}.${columnName}")
         long startTime = System.currentTimeMillis()
         String queryString = minMaxColumnValuesQueryString(samplingStrategy, columnName, tableName, schemaName)
+        SQL_LOGGER.debug('\n{}', queryString)
         final PreparedStatement preparedStatement = connection.prepareStatement(queryString)
         final List<Map<String, Object>> results = executeStatement(preparedStatement)
 
@@ -819,6 +842,7 @@ abstract class AbstractDatabaseDataModelImporterProviderService<S extends Databa
         Long approxCount = 0
         List<String> queryStrings = approxCountQueryString(tableName, schemaName)
         for (String queryString : queryStrings) {
+            SQL_LOGGER.trace('\n{}', queryString)
             PreparedStatement preparedStatement = connection.prepareStatement(queryString)
             List<Map<String, Object>> results = executeStatement(preparedStatement)
 
@@ -881,7 +905,7 @@ abstract class AbstractDatabaseDataModelImporterProviderService<S extends Databa
         log.trace("Starting getEnumerationValueDistribution query for ${tableName}.${columnName}")
         long startTime = System.currentTimeMillis()
         String queryString = enumerationValueDistributionQueryString(samplingStrategy, columnName, tableName, schemaName)
-
+        log.debug('{}', queryString)
         final PreparedStatement preparedStatement = connection.prepareStatement(queryString)
         List<Map<String, Object>> results = executeStatement(preparedStatement)
         preparedStatement.close()
@@ -921,5 +945,42 @@ abstract class AbstractDatabaseDataModelImporterProviderService<S extends Databa
         log.warn(
             'Not detecting enumerations for {} as rowcount {} is above threshold {} and we cannot use sampling',
             de.label, samplingStrategy.approxCount, samplingStrategy.evThreshold)
+    }
+
+    private Map<String, Map<String, List<String>>> getTableNamesToImport(S parameters) {
+        if (!parameters.onlyImportTables) return [:]
+        boolean multipleDatabaseImport = parameters.isMultipleDataModelImport()
+        List<String[]> tableNames = parameters.onlyImportTables.split(',').collect {it.split(/\./)}
+
+        Map<String, Map<String, List<String>>> mappedTableNames
+        if (multipleDatabaseImport) {
+            if (tableNames.any {it.size() != 3}) {
+                log.warn('Attempt to only import specific tables but using multi-database import and names are not in database.schema.table format')
+                return [:]
+            }
+            mappedTableNames = [:]
+        } else {
+            if (tableNames.any {it.size() < 2}) {
+                log.warn('Attempt to only import specific tables but not enough information provided and names are not in (database.)schema.table format')
+                return [:]
+            }
+            mappedTableNames = [default: [:]] as Map<String, Map<String, List<String>>>
+        }
+
+        tableNames.each {parts ->
+            Map<String, List<String>> dbListing
+            List<String> schemaListing
+            if (parts.size() == 3) {
+                dbListing = mappedTableNames.getOrDefault(parts[0], [:])
+                schemaListing = dbListing.getOrDefault(parts[1], [])
+                schemaListing.add(parts[2])
+            } else {
+                dbListing = mappedTableNames.default
+                schemaListing = dbListing.getOrDefault(parts[0], [])
+                schemaListing.add(parts[1])
+            }
+        }
+
+        mappedTableNames
     }
 }

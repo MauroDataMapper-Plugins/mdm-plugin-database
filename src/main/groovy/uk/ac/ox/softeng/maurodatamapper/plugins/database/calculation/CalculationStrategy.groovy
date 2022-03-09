@@ -58,10 +58,11 @@ class CalculationStrategy {
             ignorePatternsForSummaryMetadata ? ignorePatternsForSummaryMetadata.split(',').collect {Pattern.compile(it)} : Collections.emptyList() as List<Pattern>
     }
 
-    boolean shouldDetectEnumerations(String columnLabel, DataType dataType) {
+    boolean shouldDetectEnumerations(String columnLabel, DataType dataType, Long rowCount) {
         detectEnumerations &&
         isColumnPossibleEnumeration(dataType) &&
-        !ignorePatternsForEnumerations.any {columnLabel.matches(it)}
+        !ignorePatternsForEnumerations.any {columnLabel.matches(it)} &&
+        rowCount > maxEnumerations // If the row count is less than maxEnum then all values will be enumerations which is not accurate
     }
 
     boolean shouldComputeSummaryData(String columnLabel, DataType dataType) {

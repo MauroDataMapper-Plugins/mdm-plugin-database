@@ -21,15 +21,15 @@ import uk.ac.ox.softeng.maurodatamapper.plugins.database.DatabaseDataModelWithSa
 
 class SamplingStrategy {
 
-    static final Integer DEFAULT_SAMPLE_THRESHOLD = 0
+    static final Long DEFAULT_SAMPLE_THRESHOLD = 0
     static final BigDecimal DEFAULT_SAMPLE_PERCENTAGE = 1
     static final boolean DEFAULT_USE_SAMPLING = false
 
     String schema
     String table
-    Integer smThreshold
+    Long smThreshold
     BigDecimal smPercentage
-    Integer evThreshold
+    Long evThreshold
     BigDecimal evPercentage
     boolean smUseSampling
     boolean evUseSampling
@@ -78,7 +78,7 @@ class SamplingStrategy {
      * @return
      */
     boolean requiresApproxCount() {
-        (smThreshold > 0 || evThreshold > 0) && (smUseSampling || evUseSampling)
+        smThreshold > 0 || evThreshold > 0 || smUseSampling || evUseSampling
     }
 
     /**
@@ -107,7 +107,7 @@ class SamplingStrategy {
     }
 
     boolean useSamplingForEnumerationValues() {
-        this.canSampleTypeType() && this.smThreshold > 0 && this.smPercentage > 0 && this.approxCount > this.smThreshold
+        this.canSampleTypeType() && this.evThreshold > 0 && this.evPercentage > 0 && this.approxCount > this.evThreshold
     }
 
     boolean useSamplingFor(Type type) {
@@ -136,21 +136,7 @@ class SamplingStrategy {
     }
 
     String toString() {
-        StringBuilder sb = new StringBuilder('Sampling Strategy\nIn General:')
-        if (evUseSampling) {
-            sb.append('\n  Allow sampling for EVs; Using sampling for row count over ').append(evThreshold).append(' rows & sample ').append(evPercentage)
-                .append('% of the data')
-        } else {
-            sb.append('\n  Do not allow sampling for EVs')
-        }
-        if (smUseSampling) {
-            sb.append('\n  Allow sampling for SM; Using sampling for row count over ').append(smThreshold).append(' rows & sample ').append(smPercentage)
-                .append('% of the data')
-        } else {
-            sb.append('\n  Do not allow sampling for SM')
-        }
-
-        sb.append('\nFor ').append(tableType.toLowerCase()).append(' ').append(schema).append('.').append(table)
+        StringBuilder sb = new StringBuilder('Sampling Strategy for ').append(tableType.toLowerCase()).append(' ').append(schema).append('.').append(table)
         if (approxCount == -1) sb.append(' with an uncalculated row count')
         else sb.append(' with a rowcount of ').append(approxCount).append(':')
 
@@ -166,6 +152,23 @@ class SamplingStrategy {
             if (useSamplingForSummaryMetadata()) sb.append('using sampling')
             else sb.append('without sampling')
         } else sb.append('\n  Cannot compute SM')
+
+
+        sb.append('\nIn General:')
+        if (evUseSampling) {
+            sb.append('\n  Allow sampling for EVs; Using sampling for row count over ').append(evThreshold).append(' rows & sample ').append(evPercentage)
+                .append('% of the data')
+        } else {
+            sb.append('\n  Do not allow sampling for EVs')
+        }
+        if (smUseSampling) {
+            sb.append('\n  Allow sampling for SM; Using sampling for row count over ').append(smThreshold).append(' rows & sample ').append(smPercentage)
+                .append('% of the data')
+        } else {
+            sb.append('\n  Do not allow sampling for SM')
+        }
+
+
 
 
         sb.toString()

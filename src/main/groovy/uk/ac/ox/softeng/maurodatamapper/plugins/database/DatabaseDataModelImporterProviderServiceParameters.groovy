@@ -182,7 +182,7 @@ abstract class DatabaseDataModelImporterProviderServiceParameters<K extends Data
     @ImportParameterConfig(
         displayName = 'Calculate Summary Metadata',
         description = 'Calculate summary metadata?',
-        order = 3,
+        order = 1,
         optional = true,
         group = @ImportGroupConfig(
             name = 'Summary Metadata Computation',
@@ -190,6 +190,21 @@ abstract class DatabaseDataModelImporterProviderServiceParameters<K extends Data
         )
     )
     Boolean calculateSummaryMetadata = false
+
+    @ImportParameterConfig(
+        displayName = 'Merge (default) or Remove empty Date buckets',
+        description = ['Value of "merge" or "remove".',
+            'For date ranges over 100 years there will be more than 10 "buckets" of data with a range of 10 years,',
+            'the default action is to merge empty buckets to reduce the complexity of the report.',
+            'You can choose instead just to remove the empty buckets and only show the decades with data.'],
+        order = 2,
+        optional = true,
+        group = @ImportGroupConfig(
+            name = 'Summary Metadata Computation',
+            order = SM_COMPUTE_GROUP
+        )
+    )
+    String mergeOrRemoveDateBuckets
 
     @ImportParameterConfig(
         displayName = 'Ignore columns matching patterns',

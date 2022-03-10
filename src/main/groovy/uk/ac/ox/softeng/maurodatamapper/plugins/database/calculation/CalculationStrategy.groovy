@@ -35,20 +35,20 @@ class CalculationStrategy {
 
     static final Integer DEFAULT_MAX_ENUMERATIONS = 20
 
-
     boolean detectEnumerations
     Integer maxEnumerations
     List<Pattern> ignorePatternsForEnumerations
     boolean computeSummaryMetadata
     List<Pattern> ignorePatternsForSummaryMetadata
+    BucketHandling dateBucketHandling
 
     CalculationStrategy(DatabaseDataModelImporterProviderServiceParameters parameters) {
         this(parameters.detectEnumerations, parameters.maxEnumerations, parameters.ignoreColumnsForEnumerations, parameters.calculateSummaryMetadata,
-             parameters.ignoreColumnsForSummaryMetadata)
+             parameters.ignoreColumnsForSummaryMetadata, parameters.mergeOrRemoveDateBuckets)
     }
 
     CalculationStrategy(boolean detectEnumerations, Integer maxEnumerations, String ignorePatternsForEnumerations, boolean computeSummaryMetadata,
-                        String ignorePatternsForSummaryMetadata) {
+                        String ignorePatternsForSummaryMetadata, String mergeOrRemoveDateBuckets) {
         this.detectEnumerations = detectEnumerations
         this.maxEnumerations = maxEnumerations
         this.ignorePatternsForEnumerations =
@@ -56,6 +56,7 @@ class CalculationStrategy {
         this.computeSummaryMetadata = computeSummaryMetadata
         this.ignorePatternsForSummaryMetadata =
             ignorePatternsForSummaryMetadata ? ignorePatternsForSummaryMetadata.split(',').collect {Pattern.compile(it)} : Collections.emptyList() as List<Pattern>
+        this.dateBucketHandling = BucketHandling.from(mergeOrRemoveDateBuckets)
     }
 
     boolean shouldDetectEnumerations(String columnLabel, DataType dataType, Long rowCount) {
@@ -139,6 +140,16 @@ class CalculationStrategy {
             return new DateIntervalHelper(((Date) minMax.aValue).toLocalDateTime(), ((Date) minMax.bValue).toLocalDateTime())
         } else if (isColumnForDecimalSummary(dataType)) {
             return new DecimalIntervalHelper((BigDecimal) minMax.aValue, (BigDecimal) minMax.bValue)
+        }
+        null
+    }
+
+    static enum BucketHandling {
+        MERGE,
+        REMOVE
+
+        static BucketHandling from(String val) {
+            val ? valueOf(val.toUpperCase()) ?: MERGE : MERGE
         }
     }
 }

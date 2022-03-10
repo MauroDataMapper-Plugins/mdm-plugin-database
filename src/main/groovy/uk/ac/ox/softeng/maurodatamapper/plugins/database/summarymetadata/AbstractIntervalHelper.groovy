@@ -18,8 +18,9 @@
 package uk.ac.ox.softeng.maurodatamapper.plugins.database.summarymetadata
 
 import grails.util.Pair
+import groovy.transform.CompileStatic
 
-
+@CompileStatic
 abstract class AbstractIntervalHelper <S extends Object> {
 
     S minValue, maxValue
@@ -28,19 +29,22 @@ abstract class AbstractIntervalHelper <S extends Object> {
     S firstIntervalStart
     S lastIntervalStart
     List<S> intervalStarts
-    LinkedHashMap<String, Pair<S, S>> intervals
+    Map<String, Pair<S, S>> intervals
 
     AbstractIntervalHelper(minValue, S maxValue) {
         this.minValue = minValue
         this.maxValue = maxValue
+        initialise()
+    }
 
+    void initialise(){
         calculateInterval()
         calculateIntervalStarts()
         calculateIntervals()
     }
 
     String getLabelSeparator() {
-        " - "
+        ' - '
     }
 
     abstract void calculateInterval()
@@ -48,5 +52,9 @@ abstract class AbstractIntervalHelper <S extends Object> {
     abstract void calculateIntervalStarts()
 
     abstract void calculateIntervals()
+
+    String toString(){
+        "${getClass().simpleName}:\n  ${intervals.collect {it.key}.join('\n  ')}"
+    }
 }
 

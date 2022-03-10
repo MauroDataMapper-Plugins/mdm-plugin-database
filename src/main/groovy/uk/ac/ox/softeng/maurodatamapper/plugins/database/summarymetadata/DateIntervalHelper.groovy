@@ -18,21 +18,23 @@
 package uk.ac.ox.softeng.maurodatamapper.plugins.database.summarymetadata
 
 import grails.util.Pair
+import groovy.transform.CompileStatic
 
 import java.time.DayOfWeek
-import java.time.LocalDateTime
 import java.time.Duration
+import java.time.LocalDateTime
 import java.time.LocalTime
 import java.time.Period
 import java.time.format.DateTimeFormatter
 import java.time.temporal.ChronoUnit
 import java.time.temporal.TemporalAdjusters
 
-
-class DateIntervalHelper  extends AbstractIntervalHelper<LocalDateTime> {
+@CompileStatic
+class DateIntervalHelper extends AbstractIntervalHelper<LocalDateTime> {
 
     Duration differenceDuration
     Period differencePeriod
+    boolean needToMergeOrRemoveEmptyBuckets
 
     DateTimeFormatter getDateDateTimeFormatter() {
         DateTimeFormatter.ofPattern("dd/MM/yyyy")
@@ -54,9 +56,18 @@ class DateIntervalHelper  extends AbstractIntervalHelper<LocalDateTime> {
         super(minValue, maxValue)
     }
 
+    @Override
+    void initialise() {
+        needToMergeOrRemoveEmptyBuckets = false
+        super.initialise()
+        // If more than 10 buckets so we should remove those which are empty
+        if (intervals.size() > 10) needToMergeOrRemoveEmptyBuckets = true
+    }
+
+    @Override
     void calculateInterval() {
         differenceDuration = Duration.between(minValue, maxValue)
-        differencePeriod = Period.between(minValue.toLocalDate(), maxValue.toLocalDate())
+        differencePeriod = Period.between(getMinValue().toLocalDate(), getMinValue().toLocalDate())
 
         long diffYears = ChronoUnit.YEARS.between(minValue, maxValue)
         long diffMonths = ChronoUnit.MONTHS.between(minValue, maxValue)
@@ -65,88 +76,98 @@ class DateIntervalHelper  extends AbstractIntervalHelper<LocalDateTime> {
         long diffHours = ChronoUnit.HOURS.between(minValue, maxValue)
         long diffMinutes = ChronoUnit.MINUTES.between(minValue, maxValue)
 
-        if(diffYears > 40) {
-            intervalLengthSize = 1
-            intervalLengthDimension = ChronoUnit.DECADES
-
-            firstIntervalStart = minValue.with(TemporalAdjusters.firstDayOfYear())
-            while(firstIntervalStart.getYear() % 10 != 0) {
-                firstIntervalStart = firstIntervalStart.minusDays(1)
-                firstIntervalStart = firstIntervalStart.with(TemporalAdjusters.firstDayOfYear())
-            }
-            firstIntervalStart = LocalDateTime.of(firstIntervalStart.toLocalDate(),LocalTime.MIDNIGHT)
-        }
-        else if(diffYears > 2 && diffYears <= 40) {
-            intervalLengthSize = 1
-            intervalLengthDimension = ChronoUnit.YEARS
-
-            firstIntervalStart = minValue.with(TemporalAdjusters.firstDayOfYear())
-            firstIntervalStart = LocalDateTime.of(firstIntervalStart.toLocalDate(),LocalTime.MIDNIGHT)
-
-        }
-        else if(diffMonths > 10 && diffYears <= 2 ) {
+        if (diffYears > 2) {
+            buildYearBuckets(diffYears)
+        } else if (diffMonths > 10 && diffYears <= 2) {
             intervalLengthSize = 2
             intervalLengthDimension = ChronoUnit.MONTHS
 
-            firstIntervalStart = minValue.with(TemporalAdjusters.firstDayOfMonth())
-            while(firstIntervalStart.getMonthValue() % 2 != 0) {
+            firstIntervalStart = minValue.with(TemporalAdjusters.firstDayOfMonth()) as LocalDateTime
+            while (firstIntervalStart.getMonthValue() % 2 != 0) {
                 firstIntervalStart = firstIntervalStart.minusDays(1)
                 firstIntervalStart = firstIntervalStart.with(TemporalAdjusters.firstDayOfMonth())
             }
-            firstIntervalStart = LocalDateTime.of(firstIntervalStart.toLocalDate(),LocalTime.MIDNIGHT)
+            firstIntervalStart = LocalDateTime.of(firstIntervalStart.toLocalDate(), LocalTime.MIDNIGHT)
         }
         else if(diffMonths > 5 && diffMonths <= 10 ) {
             intervalLengthSize = 1
             intervalLengthDimension = ChronoUnit.MONTHS
 
-            firstIntervalStart = minValue.with(TemporalAdjusters.firstDayOfMonth())
+            firstIntervalStart = minValue.with(TemporalAdjusters.firstDayOfMonth()) as LocalDateTime
             firstIntervalStart = LocalDateTime.of(firstIntervalStart.toLocalDate(),LocalTime.MIDNIGHT)
         }
         else if(diffMonths > 3 && diffMonths <= 5 ) {
             intervalLengthSize = 2
             intervalLengthDimension = ChronoUnit.WEEKS
 
-            firstIntervalStart = minValue.with(DayOfWeek.MONDAY)
+            firstIntervalStart = minValue.with(DayOfWeek.MONDAY) as LocalDateTime
             firstIntervalStart = LocalDateTime.of(firstIntervalStart.toLocalDate(),LocalTime.MIDNIGHT)
         }
-        else if(diffMonths > 0 && diffMonths <= 3 ) {
+        else if (diffMonths > 0 && diffMonths <= 3) {
             intervalLengthSize = 1
             intervalLengthDimension = ChronoUnit.WEEKS
 
-            firstIntervalStart = minValue.with(DayOfWeek.MONDAY)
-            firstIntervalStart = LocalDateTime.of(firstIntervalStart.toLocalDate(),LocalTime.MIDNIGHT)
-        }
-        else if(differencePeriod.getDays() > 15 && diffDays <= 35 ) {
+            firstIntervalStart = minValue.with(DayOfWeek.MONDAY) as LocalDateTime
+            firstIntervalStart = LocalDateTime.of(firstIntervalStart.toLocalDate(), LocalTime.MIDNIGHT)
+        } else if (differencePeriod.getDays() > 15 && diffDays <= 35) {
             intervalLengthSize = 2
             intervalLengthDimension = ChronoUnit.DAYS
 
-            firstIntervalStart = LocalDateTime.of(minValue.toLocalDate(), LocalTime.MIDNIGHT)
-            firstIntervalStart = LocalDateTime.of(firstIntervalStart.toLocalDate(),LocalTime.MIDNIGHT)
-        }
-        else if(diffDays > 1 && diffDays <= 15 ) {
+            firstIntervalStart = LocalDateTime.of(getMinValue().toLocalDate(), LocalTime.MIDNIGHT)
+            firstIntervalStart = LocalDateTime.of(firstIntervalStart.toLocalDate(), LocalTime.MIDNIGHT)
+        } else if (diffDays > 1 && diffDays <= 15) {
             intervalLengthSize = 1
             intervalLengthDimension = ChronoUnit.DAYS
 
-            firstIntervalStart = LocalDateTime.of(minValue.toLocalDate(), LocalTime.MIDNIGHT)
-        }
-        else if(diffHours > 5 && diffHours <= 30 ) {
+            firstIntervalStart = LocalDateTime.of(getMinValue().toLocalDate(), LocalTime.MIDNIGHT)
+        } else if (diffHours > 5 && diffHours <= 30) {
             intervalLengthSize = 1
             intervalLengthDimension = ChronoUnit.HOURS
 
-            firstIntervalStart = minValue.withMinute(0)
-        }
-        else {
+            firstIntervalStart = getMinValue().withMinute(0)
+        } else {
             intervalLengthSize = 1
             intervalLengthDimension = ChronoUnit.MINUTES
 
-            firstIntervalStart = minValue.withSecond(0)
+            firstIntervalStart = getMinValue().withSecond(0)
         }
+    }
+
+    private void buildYearBuckets(long diffYears) {
+
+        int intervalMod = 1
+        intervalLengthDimension = ChronoUnit.YEARS
+        LocalDateTime firstDayOfYear = minValue.with(TemporalAdjusters.firstDayOfYear()) as LocalDateTime
+
+        if (diffYears <= 10) {
+            intervalLengthSize = 1
+        } else if (diffYears <= 20) {
+            intervalLengthSize = 2
+        } else if (diffYears <= 30) {
+            intervalLengthSize = 3
+        } else if (diffYears <= 40) {
+            intervalLengthSize = 4
+        } else if (diffYears <= 50) {
+            intervalLengthSize = 5
+        } else {
+            intervalLengthSize = 1
+            intervalLengthDimension = ChronoUnit.DECADES
+            intervalMod = 10
+        }
+
+        // Get a logical first interval start where the year is the start of a logical modulus bucket
+        while (firstDayOfYear.getYear() % (intervalLengthSize * intervalMod) != 0) {
+            firstDayOfYear = firstDayOfYear.minusDays(1)
+            firstDayOfYear = firstDayOfYear.with(TemporalAdjusters.firstDayOfYear())
+        }
+        firstIntervalStart = LocalDateTime.of(firstDayOfYear.toLocalDate(), LocalTime.MIDNIGHT)
+
     }
 
     void calculateIntervalStarts() {
         intervalStarts = []
         LocalDateTime currDateTime = firstIntervalStart
-        while(currDateTime <= maxValue) {
+        while (currDateTime <= maxValue) {
             intervalStarts.add(currDateTime)
             currDateTime = currDateTime.plus(intervalLengthSize, intervalLengthDimension)
         }
@@ -154,27 +175,23 @@ class DateIntervalHelper  extends AbstractIntervalHelper<LocalDateTime> {
 
     void calculateIntervals() {
         intervals = new TreeMap()
-        intervalStarts.each { start ->
+        intervalStarts.each {start ->
 
             LocalDateTime finish = start.plus(intervalLengthSize, intervalLengthDimension)
-            String label = ""
-            if(intervalLengthSize == 1 && intervalLengthDimension == ChronoUnit.DECADES) {
-                label = "" + start.getYear() + labelSeparator + finish.getYear()
+            String label
+            if (intervalLengthSize == 1 && intervalLengthDimension == ChronoUnit.YEARS) {
+                label = "${start.getYear()}"
             }
-            else if(intervalLengthSize == 1 && intervalLengthDimension == ChronoUnit.YEARS) {
-                label = "" + start.getYear()
+            else if (intervalLengthDimension == ChronoUnit.DECADES || intervalLengthDimension == ChronoUnit.YEARS) {
+                label = "${start.getYear()}${labelSeparator}${finish.getYear()}"
             }
-            else if(intervalLengthSize == 2 && intervalLengthDimension == ChronoUnit.MONTHS) {
-                label = "" + start.format(monthDateTimeFormatter) + labelSeparator + finish.format(monthDateTimeFormatter)
+            else if (intervalLengthSize == 1 && intervalLengthDimension == ChronoUnit.MONTHS) {
+                label = start.format(monthDateTimeFormatter)
             }
-            else if(intervalLengthSize == 1 && intervalLengthDimension == ChronoUnit.MONTHS) {
-                label = "" + start.format(monthDateTimeFormatter)
-            }
-            else if(intervalLengthDimension == ChronoUnit.WEEKS || intervalLengthDimension == ChronoUnit.DAYS) {
-                label = "" + start.format(dateDateTimeFormatter) + labelSeparator + finish.format(dateDateTimeFormatter)
-            }
-            else {
-                label = "" + start.format(dateTimeDateTimeFormatter) + labelSeparator + finish.format(dateTimeDateTimeFormatter)
+            else if (intervalLengthDimension == ChronoUnit.MONTHS) {
+                label = "${start.format(monthDateTimeFormatter)}${labelSeparator}${finish.format(monthDateTimeFormatter)}"
+            } else {
+                label = "${start.format(dateDateTimeFormatter)}${labelSeparator}${finish.format(dateDateTimeFormatter)}"
             }
 
             intervals[label] = (new Pair(start, finish))

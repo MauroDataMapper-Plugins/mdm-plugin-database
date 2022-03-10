@@ -40,6 +40,7 @@ import uk.ac.ox.softeng.maurodatamapper.datamodel.provider.importer.DataModelImp
 import uk.ac.ox.softeng.maurodatamapper.plugins.database.calculation.CalculationStrategy
 import uk.ac.ox.softeng.maurodatamapper.plugins.database.calculation.SamplingStrategy
 import uk.ac.ox.softeng.maurodatamapper.plugins.database.summarymetadata.AbstractIntervalHelper
+import uk.ac.ox.softeng.maurodatamapper.plugins.database.summarymetadata.DateIntervalHelper
 import uk.ac.ox.softeng.maurodatamapper.plugins.database.summarymetadata.SummaryMetadataHelper
 import uk.ac.ox.softeng.maurodatamapper.security.User
 import uk.ac.ox.softeng.maurodatamapper.util.Utils
@@ -319,9 +320,9 @@ abstract class AbstractDatabaseDataModelImporterProviderService<S extends Databa
     String minMaxColumnValuesQueryString(SamplingStrategy samplingStrategy, String columnName, String tableName, String schemaName = null) {
         String schemaIdentifier = schemaName ? "${escapeIdentifier(schemaName)}." : ""
         """SELECT MIN(${escapeIdentifier(columnName)}) AS min_value, 
-        MAX(${escapeIdentifier(columnName)}) AS max_value 
-        FROM ${schemaIdentifier}${escapeIdentifier(tableName)} 
-        ${samplingStrategy.samplingClause(SamplingStrategy.Type.SUMMARY_METADATA)}"""
+MAX(${escapeIdentifier(columnName)}) AS max_value 
+FROM ${schemaIdentifier}${escapeIdentifier(tableName)} ${samplingStrategy.samplingClause(SamplingStrategy.Type.SUMMARY_METADATA)}
+WHERE ${escapeIdentifier(columnName)} IS NOT NULL""".stripIndent()
     }
 
     /**
@@ -547,14 +548,31 @@ abstract class AbstractDatabaseDataModelImporterProviderService<S extends Databa
                     //aValue is the MIN, bValue is the MAX. If they are not null then calculate the range etc...
                     if (minMax.aValue != null && minMax.bValue != null) {
                         AbstractIntervalHelper intervalHelper = calculationStrategy.getIntervalHelper(dt, minMax)
-
-                        Map<String, Long> valueDistribution =
-                            getColumnRangeDistribution(connection, samplingStrategy, dt, intervalHelper, de.label, tableClass.label, schemaClass.label)
+                        log.trace('Summary Metadata computation using {}', intervalHelper)
+                        Map<String, Long> valueDistribution = getColumnRangeDistribution(connection, samplingStrategy, dt, intervalHelper, de.label,
+                                                                                         tableClass.label, schemaClass.label)
                         if (valueDistribution) {
                             String description = 'Value Distribution'
                             if (samplingStrategy.useSamplingForSummaryMetadata()) {
                                 description = "Estimated Value Distribution (calculated by sampling ${samplingStrategy.smPercentage}% of rows)"
                             }
+
+                            // Dates can produce a lot of buckets and a lot of empty buckets
+                            if (calculationStrategy.isColumnForDateSummary(dt) && (intervalHelper as DateIntervalHelper).needToMergeOrRemoveEmptyBuckets) {
+                                log.debug('Need to merge or remove empty buckets from value distribution with current bucket size {}', valueDistribution.size())
+                                switch (calculationStrategy.dateBucketHandling) {
+                                    case CalculationStrategy.BucketHandling.MERGE:
+                                        valueDistribution = mergeDateBuckets(valueDistribution)
+                                        break
+                                    case CalculationStrategy.BucketHandling.REMOVE:
+                                        // Remove all buckets with no counts
+                                        log.trace('Removing date buckets with no counts')
+                                        valueDistribution.removeAll {k, v -> !v}
+                                        break
+                                }
+                                log.debug('Value distribution bucket size reduced to {}', valueDistribution.size())
+                            }
+
                             SummaryMetadata summaryMetadata = SummaryMetadataHelper.createSummaryMetadataFromMap(user, de.label, description, valueDistribution)
                             de.addToSummaryMetadata(summaryMetadata)
 
@@ -568,6 +586,29 @@ abstract class AbstractDatabaseDataModelImporterProviderService<S extends Databa
                 }
             }
         }
+    }
+
+    Map<String, Long> mergeDateBuckets(Map<String, Long> valueDistribution) {
+        log.trace('Merging date buckets')
+        Map<Pair<Integer, Integer>, Long> processing = valueDistribution.collectEntries {yearRange, value ->
+            String[] split = yearRange.split('-')
+            [new Pair<>(Integer.parseInt(split[0].trim()), Integer.parseInt(split[1].trim())), value]
+        }
+
+        Map<Pair<Integer, Integer>, Long> merged = [:]
+        processing.each {range, value ->
+            def previous = merged.find {r, v -> r.bValue == range.aValue}
+            if (previous?.value == 0 && value == 0) {
+                merged.remove(previous.key)
+                merged[new Pair<>(previous.key.aValue, range.bValue)] = 0L
+            } else {
+                merged[range] = value
+            }
+        }
+
+        merged.collectEntries {range, value ->
+            ["${range.aValue} - ${range.bValue}".toString(), value]
+        } as Map<String, Long>
     }
 
     void replacePrimitiveTypeWithEnumerationType(DataModel dataModel, DataElement de, DataType primitiveType, EnumerationType enumerationType,
@@ -818,7 +859,7 @@ abstract class AbstractDatabaseDataModelImporterProviderService<S extends Databa
         log.trace("Starting getMinMaxColumnValues query for ${tableName}.${columnName}")
         long startTime = System.currentTimeMillis()
         String queryString = minMaxColumnValuesQueryString(samplingStrategy, columnName, tableName, schemaName)
-        SQL_LOGGER.debug('\n{}', queryString)
+        SQL_LOGGER.trace('\n{}', queryString)
         final PreparedStatement preparedStatement = connection.prepareStatement(queryString)
         final List<Map<String, Object>> results = executeStatement(preparedStatement)
 
@@ -889,7 +930,7 @@ abstract class AbstractDatabaseDataModelImporterProviderService<S extends Databa
         log.trace("Starting getColumnRangeDistribution query for ${tableName}.${columnName}")
         long startTime = System.currentTimeMillis()
         String queryString = columnRangeDistributionQueryString(samplingStrategy, dataType, intervalHelper, columnName, tableName, schemaName)
-
+        SQL_LOGGER.trace('\n{}', queryString)
         final PreparedStatement preparedStatement = connection.prepareStatement(queryString)
         List<Map<String, Object>> results = executeStatement(preparedStatement)
         preparedStatement.close()

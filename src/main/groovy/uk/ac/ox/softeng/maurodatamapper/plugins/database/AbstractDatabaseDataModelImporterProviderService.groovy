@@ -21,6 +21,7 @@ import uk.ac.ox.softeng.maurodatamapper.api.exception.ApiBadRequestException
 import uk.ac.ox.softeng.maurodatamapper.api.exception.ApiException
 import uk.ac.ox.softeng.maurodatamapper.core.authority.AuthorityService
 import uk.ac.ox.softeng.maurodatamapper.core.container.Folder
+import uk.ac.ox.softeng.maurodatamapper.core.model.CatalogueItem
 import uk.ac.ox.softeng.maurodatamapper.datamodel.DataModel
 import uk.ac.ox.softeng.maurodatamapper.datamodel.DataModelType
 import uk.ac.ox.softeng.maurodatamapper.datamodel.facet.SummaryMetadata
@@ -49,6 +50,7 @@ import grails.util.Pair
 import groovy.json.JsonOutput
 import groovy.transform.CompileStatic
 import groovy.util.logging.Slf4j
+import org.apache.commons.text.WordUtils
 import org.slf4j.Logger
 import org.slf4j.LoggerFactory
 import org.springframework.beans.factory.annotation.Autowired
@@ -407,6 +409,7 @@ WHERE ${escapeIdentifier(columnName)} IS NOT NULL""".stripIndent()
                                          boolean importSchemaAsDataClass, List<Pattern> tableRegexesToIgnore) throws ApiException {
         final DataModel dataModel = new DataModel(createdBy: user.emailAddress, label: modelName, type: DataModelType.DATA_ASSET, folder: folder,
                                                   authority: authorityService.getDefaultAuthority())
+        addAliasIfSuitable(dataModel)
         dataModel.addToMetadata(namespace: namespaceDatabase(), key: 'dialect', value: dialect, createdBy: user.emailAddress)
 
         // Add any default datatypes provided by the implementing service
@@ -426,15 +429,17 @@ WHERE ${escapeIdentifier(columnName)} IS NOT NULL""".stripIndent()
 
             if (importSchemaAsDataClass) {
                 DataClass schemaDataClass = dataClassService.findOrCreateDataClass(dataModel, row[schemaNameColumnName] as String, null, user)
+                addAliasIfSuitable(schemaDataClass)
                 tableDataClass = dataClassService.findOrCreateDataClass(schemaDataClass, tableName, null, user)
             } else {
                 tableDataClass = dataClassService.findOrCreateDataClass(dataModel, tableName, null, user)
             }
 
+            addAliasIfSuitable(tableDataClass)
             final int minMultiplicity = isColumnNullable(row[columnIsNullableColumnName] as String) ? 0 : 1
             final DataElement dataElement = dataElementService.findOrCreateDataElementForDataClass(
                 tableDataClass, row[columnNameColumnName] as String, null, user, dataType, minMultiplicity, 1)
-
+            addAliasIfSuitable(dataElement)
             row.findAll {String column, data ->
                 data && !(column in coreColumns)
             }.each {String column, data ->
@@ -1023,5 +1028,12 @@ WHERE ${escapeIdentifier(columnName)} IS NOT NULL""".stripIndent()
         }
 
         mappedTableNames
+    }
+
+    private void addAliasIfSuitable(CatalogueItem catalogueItem){
+        String alias =   WordUtils.capitalizeFully(catalogueItem.label.split('_').join(' '))
+        if(alias.toLowerCase() != catalogueItem.label.toLowerCase()) {
+            catalogueItem.aliases.add(alias)
+        }
     }
 }

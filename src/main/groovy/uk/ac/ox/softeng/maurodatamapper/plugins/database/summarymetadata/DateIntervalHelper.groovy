@@ -147,7 +147,7 @@ class DateIntervalHelper extends AbstractIntervalHelper<LocalDateTime> {
             intervalLengthSize = 3
         } else if (diffYears <= 40) {
             intervalLengthSize = 4
-        } else if (diffYears <= 50) {
+        } else if (diffYears <= 100) {
             intervalLengthSize = 5
         } else {
             intervalLengthSize = 1

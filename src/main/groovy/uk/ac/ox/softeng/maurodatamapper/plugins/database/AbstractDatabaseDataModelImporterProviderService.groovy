@@ -469,8 +469,8 @@ WHERE ${escapeIdentifier(columnName)} IS NOT NULL""".stripIndent()
         log.debug('Starting enumeration and summary metadata detection')
         long startTime = System.currentTimeMillis()
         CalculationStrategy calculationStrategy = getCalculationStrategy(parameters)
-        dataModel.childDataClasses.each {DataClass schemaClass ->
-            schemaClass.dataClasses.each {DataClass tableClass ->
+        dataModel.childDataClasses.sort().each {DataClass schemaClass ->
+            schemaClass.dataClasses.sort().each {DataClass tableClass ->
                 log.trace('Checking {}.{} for possible enumerations and summary metadata', schemaClass.label, tableClass.label)
                 SamplingStrategy samplingStrategy = getSamplingStrategy(schemaClass.label, tableClass.label, parameters)
                 if (samplingStrategy.requiresTableType()) {
@@ -499,113 +499,159 @@ WHERE ${escapeIdentifier(columnName)} IS NOT NULL""".stripIndent()
                                                  Connection connection, User user) {
 
         log.debug('Calculating enumerations and summary metadata using {}', samplingStrategy)
-        tableClass.dataElements.each {DataElement de ->
-            DataType dt = de.dataType
+        tableClass.dataElements.sort().each {DataElement dataElement ->
+            DataType dt = dataElement.dataType
 
             //Enumeration detection
-            if (calculationStrategy.shouldDetectEnumerations(de.label, dt, samplingStrategy.approxCount)) {
+            if (calculationStrategy.shouldDetectEnumerations(dataElement.label, dt, samplingStrategy.approxCount)) {
                 if (samplingStrategy.canDetectEnumerationValues()) {
-                    logEnumerationDetection(samplingStrategy, de)
+                    boolean isEnumeration = detectEnumerationsForDataElement(calculationStrategy, samplingStrategy, connection,
+                                                                             dataModel, schemaClass, tableClass, dataElement, user)
 
-                    // Make 1 call to get the distinct values, then use the size of the that results to tell if its actually an ET
-                    final List<Map<String, Object>> results = getDistinctColumnValues(connection, calculationStrategy, samplingStrategy, de.label,
-                                                                                      tableClass.label, schemaClass.label)
-                    if (calculationStrategy.isEnumerationType(results.size())) {
-                        log.debug('Converting {} to an EnumerationType', de.label)
-                        EnumerationType enumerationType = enumerationTypeService.findOrCreateDataTypeForDataModel(dataModel, de.label, de.label, user)
-                        replacePrimitiveTypeWithEnumerationType(dataModel, de, dt, enumerationType, results)
-                    }
-
-                    if (calculationStrategy.computeSummaryMetadata) {
+                    if (isEnumeration && calculationStrategy.computeSummaryMetadata) {
                         if (samplingStrategy.canComputeSummaryMetadata()) {
-                            logSummaryMetadataDetection(samplingStrategy, de, 'enumeration')
-                            //Count enumeration values
-                            Map<String, Long> enumerationValueDistribution =
-                                getEnumerationValueDistribution(connection, samplingStrategy, de.label, tableClass.label, schemaClass.label)
-                            if (enumerationValueDistribution) {
-                                String description = 'Enumeration Value Distribution'
-                                if (samplingStrategy.useSamplingForSummaryMetadata()) {
-                                    description = "Estimated Enumeration Value Distribution (calculated by sampling ${samplingStrategy.smPercentage}% of rows)"
-                                }
-                                SummaryMetadata enumerationSummaryMetadata =
-                                    SummaryMetadataHelper.createSummaryMetadataFromMap(user, de.label, description, enumerationValueDistribution)
-                                de.addToSummaryMetadata(enumerationSummaryMetadata)
-
-                                SummaryMetadata enumerationSummaryMetadataOnTable =
-                                    SummaryMetadataHelper.createSummaryMetadataFromMap(user, de.label, description, enumerationValueDistribution)
-                                tableClass.addToSummaryMetadata(enumerationSummaryMetadataOnTable)
-                            }
+                            computeSummaryMetadataForEnumerations(calculationStrategy, samplingStrategy, connection, schemaClass, tableClass, dataElement, user)
                         } else {
-                            logNotCalculatingSummaryMetadata(samplingStrategy, de)
+                            logNotCalculatingSummaryMetadata(samplingStrategy, dataElement)
                         }
                     }
                 } else {
-                    logNotDetectingEnumerationValues(samplingStrategy, de)
+                    logNotDetectingEnumerationValues(samplingStrategy, dataElement)
                 }
             }
 
             //Summary metadata on dates and numbers
-            else if (calculationStrategy.shouldComputeSummaryData(de.label, dt)) {
+            else if (calculationStrategy.shouldComputeSummaryData(dataElement.label, dt)) {
                 if (samplingStrategy.canComputeSummaryMetadata()) {
-                    logSummaryMetadataDetection(samplingStrategy, de, 'date or numeric')
-                    Pair minMax = getMinMaxColumnValues(connection, samplingStrategy, de.label, tableClass.label, schemaClass.label)
-
-                    //aValue is the MIN, bValue is the MAX. If they are not null then calculate the range etc...
-                    if (minMax.aValue != null && minMax.bValue != null) {
-                        AbstractIntervalHelper intervalHelper = calculationStrategy.getIntervalHelper(dt, minMax)
-                        log.trace('Summary Metadata computation using {}', intervalHelper)
-                        Map<String, Long> valueDistribution = getColumnRangeDistribution(connection, samplingStrategy, dt, intervalHelper, de.label,
-                                                                                         tableClass.label, schemaClass.label)
-                        if (valueDistribution) {
-                            String description = 'Value Distribution'
-                            if (samplingStrategy.useSamplingForSummaryMetadata()) {
-                                description = "Estimated Value Distribution (calculated by sampling ${samplingStrategy.smPercentage}% of rows)"
-                            }
-
-                            // Dates can produce a lot of buckets and a lot of empty buckets
-                            if (calculationStrategy.isColumnForDateSummary(dt) && (intervalHelper as DateIntervalHelper).needToMergeOrRemoveEmptyBuckets) {
-                                log.debug('Need to merge or remove empty buckets from value distribution with current bucket size {}', valueDistribution.size())
-                                switch (calculationStrategy.dateBucketHandling) {
-                                    case CalculationStrategy.BucketHandling.MERGE:
-                                        valueDistribution = mergeDateBuckets(valueDistribution)
-                                        break
-                                    case CalculationStrategy.BucketHandling.REMOVE:
-                                        // Remove all buckets with no counts
-                                        log.trace('Removing date buckets with no counts')
-                                        valueDistribution.removeAll {k, v -> !v}
-                                        break
-                                }
-                                log.debug('Value distribution bucket size reduced to {}', valueDistribution.size())
-                            }
-
-                            SummaryMetadata summaryMetadata = SummaryMetadataHelper.createSummaryMetadataFromMap(user, de.label, description, valueDistribution)
-                            de.addToSummaryMetadata(summaryMetadata)
-
-                            SummaryMetadata summaryMetadataOnTable =
-                                SummaryMetadataHelper.createSummaryMetadataFromMap(user, de.label, description, valueDistribution)
-                            tableClass.addToSummaryMetadata(summaryMetadataOnTable)
-                        }
-                    }
+                    computeSummaryMetadataForDatesAndNumbers(calculationStrategy, samplingStrategy, connection, schemaClass, tableClass, dataElement, user)
                 } else {
-                    logNotCalculatingSummaryMetadata(samplingStrategy, de)
+                    logNotCalculatingSummaryMetadata(samplingStrategy, dataElement)
                 }
             }
         }
     }
 
-    Map<String, Long> mergeDateBuckets(Map<String, Long> valueDistribution) {
+    private boolean detectEnumerationsForDataElement(CalculationStrategy calculationStrategy, SamplingStrategy samplingStrategy, Connection connection,
+                                                     DataModel dataModel, DataClass schemaClass, DataClass tableClass, DataElement dataElement, User user) {
+        logEnumerationDetection(samplingStrategy, dataElement)
+
+        // Make 1 call to get the distinct values, then use the size of the that results to tell if its actually an ET
+        final List<Map<String, Object>> results = getDistinctColumnValues(connection, calculationStrategy, samplingStrategy, dataElement.label,
+                                                                          tableClass.label, schemaClass.label)
+        if (calculationStrategy.isEnumerationType(results.size())) {
+            log.debug('Converting {} to an EnumerationType', dataElement.label)
+            EnumerationType enumerationType = enumerationTypeService.findOrCreateDataTypeForDataModel(dataModel, dataElement.label, dataElement.label, user)
+            replacePrimitiveTypeWithEnumerationType(dataModel, dataElement, dataElement.dataType, enumerationType, results)
+            return true
+        }
+        false
+    }
+
+    private void computeSummaryMetadataForEnumerations(CalculationStrategy calculationStrategy, SamplingStrategy samplingStrategy, Connection connection,
+                                                       DataClass schemaClass, DataClass tableClass, DataElement dataElement, User user) {
+        logSummaryMetadataDetection(samplingStrategy, dataElement, 'enumeration')
+        //Count enumeration values
+        Map<String, Long> enumerationValueDistribution =
+            getEnumerationValueDistribution(connection, samplingStrategy, dataElement.label, tableClass.label, schemaClass.label)
+        if (enumerationValueDistribution) {
+            String description = 'Enumeration Value Distribution'
+            if (samplingStrategy.useSamplingForSummaryMetadata()) {
+                description = "Estimated Enumeration Value Distribution (calculated by sampling ${samplingStrategy.smPercentage}% of rows)"
+            }
+            SummaryMetadata enumerationSummaryMetadata =
+                SummaryMetadataHelper.createSummaryMetadataFromMap(user, dataElement.label, description, calculationStrategy.calculationDateTime,
+                                                                   enumerationValueDistribution)
+            dataElement.addToSummaryMetadata(enumerationSummaryMetadata)
+
+            SummaryMetadata enumerationSummaryMetadataOnTable =
+                SummaryMetadataHelper.createSummaryMetadataFromMap(user, dataElement.label, description, calculationStrategy.calculationDateTime,
+                                                                   enumerationValueDistribution)
+            tableClass.addToSummaryMetadata(enumerationSummaryMetadataOnTable)
+        }
+    }
+
+    private void computeSummaryMetadataForDatesAndNumbers(CalculationStrategy calculationStrategy, SamplingStrategy samplingStrategy, Connection connection,
+                                                          DataClass schemaClass, DataClass tableClass, DataElement dataElement, User user) {
+        logSummaryMetadataDetection(samplingStrategy, dataElement, 'date or numeric')
+        Pair minMax = getMinMaxColumnValues(connection, samplingStrategy, dataElement.label, tableClass.label, schemaClass.label)
+
+        //aValue is the MIN, bValue is the MAX. If they are not null then calculate the range etc...
+        if (minMax.aValue != null && minMax.bValue != null) {
+            DataType dt = dataElement.dataType
+            AbstractIntervalHelper intervalHelper = calculationStrategy.getIntervalHelper(dt, minMax)
+            log.trace('Summary Metadata computation using {}', intervalHelper)
+            Map<String, Long> valueDistribution = getColumnRangeDistribution(connection, samplingStrategy, dt, intervalHelper, dataElement.label,
+                                                                             tableClass.label, schemaClass.label)
+            if (valueDistribution) {
+                String description = 'Value Distribution'
+                if (samplingStrategy.useSamplingForSummaryMetadata()) {
+                    description = "Estimated Value Distribution (calculated by sampling ${samplingStrategy.smPercentage}% of rows)"
+                }
+
+                // Dates can produce a lot of buckets and a lot of empty buckets
+                if (calculationStrategy.isColumnForDateSummary(dt) && (intervalHelper as DateIntervalHelper).needToMergeOrRemoveEmptyBuckets) {
+                    log.debug('Need to merge or remove empty buckets from value distribution with current bucket size {}', valueDistribution.size())
+                    switch (calculationStrategy.dateBucketHandling) {
+                        case CalculationStrategy.BucketHandling.MERGE:
+                            valueDistribution = mergeDateBuckets(valueDistribution, false)
+                            break
+                        case CalculationStrategy.BucketHandling.MERGE_RELATIVE_SMALL:
+                            valueDistribution = mergeDateBuckets(valueDistribution, true)
+                            break
+                        case CalculationStrategy.BucketHandling.REMOVE:
+                            // Remove all buckets with no counts
+                            log.trace('Removing date buckets with no counts')
+                            valueDistribution.removeAll {k, v -> !v}
+                            break
+                    }
+                    log.debug('Value distribution bucket size reduced to {}', valueDistribution.size())
+                }
+
+                SummaryMetadata summaryMetadata =
+                    SummaryMetadataHelper.createSummaryMetadataFromMap(user, dataElement.label, description, calculationStrategy.calculationDateTime,
+                                                                       valueDistribution)
+                dataElement.addToSummaryMetadata(summaryMetadata)
+
+                SummaryMetadata summaryMetadataOnTable =
+                    SummaryMetadataHelper.createSummaryMetadataFromMap(user, dataElement.label, description, calculationStrategy.calculationDateTime,
+                                                                       valueDistribution)
+                tableClass.addToSummaryMetadata(summaryMetadataOnTable)
+            }
+        }
+    }
+
+    Map<String, Long> mergeDateBuckets(Map<String, Long> valueDistribution, boolean mergeRelativeSmallBuckets) {
         log.trace('Merging date buckets')
         Map<Pair<Integer, Integer>, Long> processing = valueDistribution.collectEntries {yearRange, value ->
             String[] split = yearRange.split('-')
             [new Pair<>(Integer.parseInt(split[0].trim()), Integer.parseInt(split[1].trim())), value]
         }
+        List<Long> values = valueDistribution.collect {it.value}.findAll()
+        long mergeValue = 0
+        if (mergeRelativeSmallBuckets && values.min() > 0) {
+            // check for a sensible merge value
+            // if we have lots of values that are massive we should merge tiny values along with 0s otherwise the barcharts will look empty
+            List<Integer> digitCount = values.collect {it.toString().length()}.sort()
+            int size = digitCount.size()
+            int medianPoint = size % 2 == 0 ? (size / 2).intValue() : (size / 2).round().intValue()
+            int avgDigits = (digitCount.average() as Number).intValue()
+            int median = digitCount[medianPoint]
+            mergeValue = median > avgDigits ? Math.pow(10, avgDigits - 1).toLong() : Math.pow(10, median).toLong()
+        }
 
         Map<Pair<Integer, Integer>, Long> merged = [:]
         processing.each {range, value ->
             def previous = merged.find {r, v -> r.bValue == range.aValue}
-            if (previous?.value == 0 && value == 0) {
-                merged.remove(previous.key)
-                merged[new Pair<>(previous.key.aValue, range.bValue)] = 0L
+            if (previous) {
+                if (mergeValue && previous.value < mergeValue && value < mergeValue) {
+                    merged.remove(previous.key)
+                    merged[new Pair<>(previous.key.aValue, range.bValue)] = previous.value + value
+                } else if (previous?.value == 0 && value == 0) {
+                    merged.remove(previous.key)
+                    merged[new Pair<>(previous.key.aValue, range.bValue)] = 0L
+                } else {
+                    merged[range] = value
+                }
             } else {
                 merged[range] = value
             }
@@ -951,7 +997,7 @@ WHERE ${escapeIdentifier(columnName)} IS NOT NULL""".stripIndent()
         log.trace("Starting getEnumerationValueDistribution query for ${tableName}.${columnName}")
         long startTime = System.currentTimeMillis()
         String queryString = enumerationValueDistributionQueryString(samplingStrategy, columnName, tableName, schemaName)
-        log.debug('{}', queryString)
+        SQL_LOGGER.trace('\n{}', queryString)
         final PreparedStatement preparedStatement = connection.prepareStatement(queryString)
         List<Map<String, Object>> results = executeStatement(preparedStatement)
         preparedStatement.close()

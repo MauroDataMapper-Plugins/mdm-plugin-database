@@ -29,7 +29,7 @@ import java.time.OffsetDateTime
 class SummaryMetadataHelper {
 
 
-    static SummaryMetadata createSummaryMetadataFromMap(User user, String headerName, String description, Map<String, Long> valueDistribution ) {
+    static SummaryMetadata createSummaryMetadataFromMap(User user, String headerName, String description, OffsetDateTime reportDateTime, Map<String, Long> valueDistribution ) {
         SummaryMetadata summaryMetadata = new SummaryMetadata(
                 label: headerName,
                 description: description,
@@ -37,7 +37,7 @@ class SummaryMetadataHelper {
                 createdBy: user.emailAddress
         )
         SummaryMetadataReport smr = new SummaryMetadataReport(
-                reportDate: OffsetDateTime.now(),
+                reportDate: reportDateTime,
                 reportValue: new JsonBuilder(valueDistribution).toString(),
                 createdBy: user.emailAddress
         )

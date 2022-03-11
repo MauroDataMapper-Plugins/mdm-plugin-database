@@ -26,6 +26,7 @@ import uk.ac.ox.softeng.maurodatamapper.plugins.database.summarymetadata.LongInt
 
 import grails.util.Pair
 
+import java.time.OffsetDateTime
 import java.util.regex.Pattern
 
 /**
@@ -42,21 +43,23 @@ class CalculationStrategy {
     List<Pattern> ignorePatternsForSummaryMetadata
     BucketHandling dateBucketHandling
 
-    CalculationStrategy(DatabaseDataModelImporterProviderServiceParameters parameters) {
-        this(parameters.detectEnumerations, parameters.maxEnumerations, parameters.ignoreColumnsForEnumerations, parameters.calculateSummaryMetadata,
-             parameters.ignoreColumnsForSummaryMetadata, parameters.mergeOrRemoveDateBuckets)
-    }
+    OffsetDateTime calculationDateTime
 
-    CalculationStrategy(boolean detectEnumerations, Integer maxEnumerations, String ignorePatternsForEnumerations, boolean computeSummaryMetadata,
-                        String ignorePatternsForSummaryMetadata, String mergeOrRemoveDateBuckets) {
-        this.detectEnumerations = detectEnumerations
-        this.maxEnumerations = maxEnumerations
+    CalculationStrategy(DatabaseDataModelImporterProviderServiceParameters parameters) {
+        this.detectEnumerations = parameters.detectEnumerations
+        this.maxEnumerations = parameters.maxEnumerations
         this.ignorePatternsForEnumerations =
-            ignorePatternsForEnumerations ? ignorePatternsForEnumerations.split(',').collect {Pattern.compile(it)} : Collections.emptyList() as List<Pattern>
-        this.computeSummaryMetadata = computeSummaryMetadata
+            parameters.ignoreColumnsForEnumerations ? parameters.
+                ignoreColumnsForEnumerations.split(',').collect {Pattern.compile(it)} : Collections.emptyList() as List<Pattern>
+        this.computeSummaryMetadata = parameters.calculateSummaryMetadata
         this.ignorePatternsForSummaryMetadata =
-            ignorePatternsForSummaryMetadata ? ignorePatternsForSummaryMetadata.split(',').collect {Pattern.compile(it)} : Collections.emptyList() as List<Pattern>
-        this.dateBucketHandling = BucketHandling.from(mergeOrRemoveDateBuckets)
+            parameters.ignoreColumnsForSummaryMetadata ?
+            parameters.ignoreColumnsForSummaryMetadata.split(',').collect {Pattern.compile(it)} : Collections.emptyList() as List<Pattern>
+        this.dateBucketHandling = BucketHandling.from(parameters.mergeOrRemoveDateBuckets)
+        if (dateBucketHandling == BucketHandling.MERGE & parameters.shouldMergeRelativelySmallDateBuckets()){
+            dateBucketHandling = BucketHandling.MERGE_RELATIVE_SMALL
+        }
+            calculationDateTime = OffsetDateTime.now()
     }
 
     boolean shouldDetectEnumerations(String columnLabel, DataType dataType, Long rowCount) {
@@ -146,10 +149,11 @@ class CalculationStrategy {
 
     static enum BucketHandling {
         MERGE,
-        REMOVE
+        REMOVE,
+        MERGE_RELATIVE_SMALL
 
         static BucketHandling from(String val) {
-            val ? valueOf(val.toUpperCase()) ?: MERGE : MERGE
+            val ? valueOf(val.toUpperCase()) ?: MERGE_RELATIVE_SMALL : MERGE_RELATIVE_SMALL
         }
     }
 }

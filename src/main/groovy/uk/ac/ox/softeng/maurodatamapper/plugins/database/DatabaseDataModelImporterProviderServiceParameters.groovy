@@ -207,9 +207,25 @@ abstract class DatabaseDataModelImporterProviderServiceParameters<K extends Data
     String mergeOrRemoveDateBuckets
 
     @ImportParameterConfig(
+        displayName = 'Merge relative small Date buckets',
+        description = ['If merging empty date buckets should we also merge relatively small date buckets.',
+            'If the merge option is enabled and happens then we can also merge buckets with relatively (to other counts in the same distribution) small counts.',
+            'This helps make the visual buckets more appropriate by removing consecutive buckets which will look empty compared to other buckets.',
+            'This defaults to true.'
+        ],
+        order = 4,
+        optional = true,
+        group = @ImportGroupConfig(
+            name = 'Summary Metadata Computation',
+            order = SM_COMPUTE_GROUP
+        )
+    )
+    Boolean mergeRelativeSmallDateBuckets
+
+    @ImportParameterConfig(
         displayName = 'Ignore columns matching patterns',
         description = 'Ignore any columns which match the following CSV list of regex patterns',
-        order = 3,
+        order = 5,
         optional = true,
         group = @ImportGroupConfig(
             name = 'Summary Metadata Computation',
@@ -259,6 +275,10 @@ abstract class DatabaseDataModelImporterProviderServiceParameters<K extends Data
 
     boolean shouldImportSchemasAsDataClasses() {
         true
+    }
+
+    boolean shouldMergeRelativelySmallDateBuckets(){
+        mergeRelativeSmallDateBuckets == null || mergeOrRemoveDateBuckets
     }
 
     List<Pattern> getListOfTableRegexesToIgnore() {

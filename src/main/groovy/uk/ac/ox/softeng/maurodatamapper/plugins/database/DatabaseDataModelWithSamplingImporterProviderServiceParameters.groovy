@@ -71,6 +71,22 @@ abstract class DatabaseDataModelWithSamplingImporterProviderServiceParameters<K 
     BigDecimal summaryMetadataSamplePercent
 
     @ImportParameterConfig(
+        displayName = 'Dynamically adjust sample percentage',
+        description = [
+            'If the sample percentage is used and the number of rows in the table is greater than 10x the threshold',
+            'then dynamically adjust the sample percentage down by a factor of 10 until the sample size is less than 10x the threshold.',
+            'Defaults to false'
+        ],
+        order = 8,
+        optional = true,
+        group = @ImportGroupConfig(
+            name = 'Summary Metadata Computation',
+            order = SM_COMPUTE_GROUP
+        )
+    )
+    Boolean summaryMetadataUseDynamicSamplePercent
+
+    @ImportParameterConfig(
         displayName = 'Use Sampling, if required, for Enumeration Values',
         description = [
             'Use sampling to determine Enumeration Values if the row count of the table/view is above the threshold.',
@@ -114,4 +130,20 @@ abstract class DatabaseDataModelWithSamplingImporterProviderServiceParameters<K 
         )
     )
     BigDecimal enumerationValueSamplePercent
+
+    @ImportParameterConfig(
+        displayName = 'Dynamically adjust sample percentage',
+        description = [
+            'If the sample percentage is used and the number of rows in the table is greater than 10x the threshold',
+            'then dynamically adjust the sample percentage down by a factor of 10 until the sample size is less than 10x the threshold.',
+            'Defaults to false'
+        ],
+        order = 8,
+        optional = true,
+        group = @ImportGroupConfig(
+            name =  'Enumeration Values Detection',
+            order = EV_DETECTION_GROUP
+        )
+    )
+    Boolean enumerationValueUseDynamicSamplePercent
 }

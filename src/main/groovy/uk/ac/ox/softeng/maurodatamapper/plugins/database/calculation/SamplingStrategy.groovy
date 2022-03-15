@@ -35,6 +35,8 @@ class SamplingStrategy {
     boolean evUseSampling
     Long approxCount
     String tableType
+    boolean smUseDynamicPercentage
+    boolean evUseDynamicPercentage
 
     SamplingStrategy(String schema, String table) {
         this.schema = schema
@@ -53,6 +55,8 @@ class SamplingStrategy {
         this.evPercentage = samplingImporterProviderServiceParameters.enumerationValueSamplePercent ?: DEFAULT_SAMPLE_PERCENTAGE
         this.evUseSampling = samplingImporterProviderServiceParameters.enumerationValueUseSampling == null ? DEFAULT_USE_SAMPLING :
                              samplingImporterProviderServiceParameters.enumerationValueUseSampling
+        this.smUseDynamicPercentage = samplingImporterProviderServiceParameters.summaryMetadataUseDynamicSamplePercent
+        this.smUseDynamicPercentage = samplingImporterProviderServiceParameters.enumerationValueUseDynamicSamplePercent
 
     }
 
@@ -129,10 +133,18 @@ class SamplingStrategy {
 
     Integer scaleFactor() {
         if (this.useSamplingForSummaryMetadata()) {
-            return 100 / this.smPercentage
+            return 100 / this.getSummaryMetadataSamplePercentage()
         } else {
             return 1
         }
+    }
+
+    BigDecimal getSummaryMetadataSamplePercentage() {
+        smUseDynamicPercentage ? generateDynamicPercentage(approxCount, smPercentage) : smPercentage
+    }
+
+    BigDecimal getEnumerationValueSamplePercentage() {
+        evUseDynamicPercentage ? generateDynamicPercentage(approxCount, evPercentage) : evPercentage
     }
 
     String toString() {
@@ -156,22 +168,22 @@ class SamplingStrategy {
 
         sb.append('\nIn General:')
         if (evUseSampling) {
-            sb.append('\n  Allow sampling for EVs; Using sampling for row count over ').append(evThreshold).append(' rows & sample ').append(evPercentage)
+            sb.append('\n  Allow sampling for EVs; Using sampling for row count over ').append(evThreshold).append(' rows & sample ').append(getEnumerationValueSamplePercentage())
                 .append('% of the data')
         } else {
             sb.append('\n  Do not allow sampling for EVs')
         }
         if (smUseSampling) {
-            sb.append('\n  Allow sampling for SM; Using sampling for row count over ').append(smThreshold).append(' rows & sample ').append(smPercentage)
+            sb.append('\n  Allow sampling for SM; Using sampling for row count over ').append(smThreshold).append(' rows & sample ').append(getSummaryMetadataSamplePercentage())
                 .append('% of the data')
         } else {
             sb.append('\n  Do not allow sampling for SM')
         }
-
-
-
-
         sb.toString()
+    }
+
+    private BigDecimal generateDynamicPercentage(Long rowCount, BigDecimal currentPercentage) {
+        rowCount > (10 * smThreshold) ? generateDynamicPercentage((rowCount * (currentPercentage / 100)).toLong(), currentPercentage / 10) : currentPercentage
     }
 
     static enum Type {

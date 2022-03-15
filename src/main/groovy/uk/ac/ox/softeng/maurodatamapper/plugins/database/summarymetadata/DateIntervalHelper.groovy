@@ -60,8 +60,8 @@ class DateIntervalHelper extends AbstractIntervalHelper<LocalDateTime> {
     void initialise() {
         needToMergeOrRemoveEmptyBuckets = false
         super.initialise()
-        // If more than 10 buckets so we should remove those which are empty
-        if (intervals.size() > 10) needToMergeOrRemoveEmptyBuckets = true
+        // If less than 10 buckets we can leave as-is
+        if (needToMergeOrRemoveEmptyBuckets && intervals.size() <= 10) needToMergeOrRemoveEmptyBuckets = false
     }
 
     @Override
@@ -149,10 +149,12 @@ class DateIntervalHelper extends AbstractIntervalHelper<LocalDateTime> {
             intervalLengthSize = 4
         } else if (diffYears <= 100) {
             intervalLengthSize = 5
+            needToMergeOrRemoveEmptyBuckets = true
         } else {
             intervalLengthSize = 1
             intervalLengthDimension = ChronoUnit.DECADES
             intervalMod = 10
+            needToMergeOrRemoveEmptyBuckets = true
         }
 
         // Get a logical first interval start where the year is the start of a logical modulus bucket

@@ -30,14 +30,17 @@ abstract class AbstractIntervalHelper <S extends Object> {
     S lastIntervalStart
     List<S> intervalStarts
     Map<String, Pair<S, S>> intervals
+    List<String> orderedKeys
 
-    AbstractIntervalHelper(minValue, S maxValue) {
+    AbstractIntervalHelper(S minValue, S maxValue) {
         this.minValue = minValue
         this.maxValue = maxValue
+        this.intervals = new HashMap<>()
+        this.orderedKeys = new ArrayList<>()
         initialise()
     }
 
-    void initialise(){
+    void initialise() {
         calculateInterval()
         calculateIntervalStarts()
         calculateIntervals()
@@ -53,8 +56,13 @@ abstract class AbstractIntervalHelper <S extends Object> {
 
     abstract void calculateIntervals()
 
-    String toString(){
-        "${getClass().simpleName}:\n  ${intervals.collect {it.key}.join('\n  ')}"
+    void addInterval(String key, Pair<S, S> interval) {
+        intervals[key] = interval
+        orderedKeys << key
+    }
+
+    String toString() {
+        "${getClass().simpleName}:\n  ${orderedKeys.join('\n  ')}"
     }
 }
 

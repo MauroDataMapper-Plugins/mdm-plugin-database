@@ -33,22 +33,10 @@ apply plugin: 'com.github.hierynomus.license'
 apply plugin: 'ox.softeng.ox-brc-standard'
 apply plugin: 'ox.softeng.ox-brc-artifactory'
 apply plugin: 'ox.softeng.ox-brc-grails-reliant'
-apply plugin: 'ox.softeng.integration-test'
 apply plugin: 'ox.softeng.static-code-analysis'
 
 jar {
     exclude 'logback.groovy'
-}
-
-integrationTest {
-    maxHeapSize = '4g'
-    jvmArgs '-XX:+TieredCompilation', '-XX:TieredStopAtLevel=1', '-XX:CICompilerCount=3'
-
-    def envMap = System.getenv()
-    String opts = envMap.GRAILS_FORK_OPTS ?: envMap.GRAILS_OPTS
-    if (opts) {
-        jvmArgs opts.split(' ')
-    }
 }
 
 logger.quiet(
@@ -70,33 +58,6 @@ afterEvaluate {
         applicationDefaultJvmArgs += "-Dmc.logFileName=${applicationName}"
         applicationDefaultJvmArgs += '-Dgrails.env=CUSTOM'
     }
-
-    /*
-     * Configure all the properties for testing,
-     * these are also required by the gretty startbasetasks,
-     * anything which runs up the app needs alot of these properties to make sure it all works
-     * If system property for the index base isnt set then create a value
-     */
-    if (!System.getProperty('hibernate.search.default.indexBase')) {
-        System.setProperty('hibernate.search.default.indexBase', "/tmp/${UUID.randomUUID().toString()}")
-    }
-
-    Closure runConfig = {
-        System.properties.each {prop ->
-            systemProperty prop.key, prop.value
-        }
-        systemProperty 'user.dir', projectDir
-        String indexBase = systemProperties['hibernate.search.default.indexBase']
-        doFirst {
-            logger.warn("==> Using ${indexBase} for hibernate.search.default.indexBase <==")
-            Files.createDirectories(Paths.get(indexBase))
-        }
-        doLast {
-            Paths.get(indexBase).deleteDir()
-        }
-    }
-
-    tasks.withType(Test, runConfig)
 }
 
 apply from: 'dependencies.gradle'

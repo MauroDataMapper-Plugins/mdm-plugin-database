@@ -18,9 +18,10 @@
 package uk.ac.ox.softeng.maurodatamapper.plugins.database.summarymetadata
 
 import grails.util.Pair
+import groovy.transform.CompileStatic
 
-
-class IntegerIntervalHelper extends AbstractIntervalHelper<Integer> {
+@CompileStatic
+class IntegerIntervalHelper extends NumericIntervalHelper<Integer> {
 
 
     IntegerIntervalHelper(Integer minValue, Integer maxValue) {
@@ -28,79 +29,8 @@ class IntegerIntervalHelper extends AbstractIntervalHelper<Integer> {
     }
 
     @Override
-    void calculateInterval() {
-
-        difference = maxValue - minValue
-
-        if (difference <= 1) {
-            intervalLength = 1
-        } else if (1 < difference && difference <= 5 ) {
-            intervalLength = 1
-        } else if (5 < difference && difference <= 10 ) {
-            intervalLength = 2
-        } else if (10 < difference && difference <= 20 ) {
-            intervalLength = 5
-        } else if (20 < difference && difference <= 100 ) {
-            intervalLength = 10
-        } else if (100 < difference && difference <= 200 ) {
-            intervalLength = 20
-        } else if (200 < difference && difference <= 1000 ) {
-            intervalLength = 100
-        } else if (1000 < difference && difference <= 2000 ) {
-            intervalLength = 200
-        } else if (2000 < difference && difference <= 10000 ) {
-            intervalLength = 1000
-        } else if (10000 < difference && difference <= 20000 ) {
-            intervalLength = 2000
-        } else if (20000 < difference && difference <= 100000 ) {
-            intervalLength = 10000
-        } else if (100000 < difference && difference <= 200000 ) {
-            intervalLength = 20000
-        } else if (200000 < difference && difference <= 1000000 ) {
-            intervalLength = 100000
-        } else if (1000000 < difference && difference <= 2000000 ) {
-            intervalLength = 200000
-        } else if (2000000 < difference && difference <= 10000000 ) {
-            intervalLength = 1000000
-        } else if (10000000 < difference && difference <= 20000000 ) {
-            intervalLength = 2000000
-        } else if (20000000 < difference && difference <= 100000000 ) {
-            intervalLength = 10000000
-        } else {
-            Double base = Math.log10((Double) ((maxValue - minValue)  / 10))
-            intervalLength = (Integer) Math.pow(10, Math.ceil(base))
-        }
-
-        firstIntervalStart = minValue.intdiv(intervalLength) * intervalLength
-        //For negative minima which do not align with an interval start, shift the interval one step to the left
-        if (Math.abs(minValue % intervalLength) > 0 && minValue < 0) {
-            firstIntervalStart = firstIntervalStart - intervalLength
-        }
-        lastIntervalStart = maxValue.intdiv(intervalLength) * intervalLength
-        if (Math.abs(maxValue % intervalLength) > 0 && maxValue < 0) {
-            lastIntervalStart = lastIntervalStart - intervalLength
-        }
-
-    }
-
-    @Override
-    void calculateIntervalStarts() {
-        intervalStarts = []
-        Integer currNum = firstIntervalStart
-        while(currNum <= lastIntervalStart) {
-            intervalStarts.add(currNum)
-            currNum += intervalLength
-        }
-    }
-
-    @Override
-    void calculateIntervals() {
-        intervals = new LinkedHashMap()
-        intervalStarts.each { start ->
-            Integer finish = start + intervalLength
-            String label = "" + start + labelSeparator + finish
-            intervals[label] = (new Pair(start, finish))
-        }
+    Integer safeConvert(Number number) {
+        number.toInteger()
     }
 }
 

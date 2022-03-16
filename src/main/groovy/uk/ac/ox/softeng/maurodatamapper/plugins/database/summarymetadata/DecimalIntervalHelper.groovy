@@ -45,6 +45,9 @@ class DecimalIntervalHelper extends NumericIntervalHelper<BigDecimal> {
         if (maxValueDivideAndRemainder[1].abs() > 0 && getMaxValue() < 0) {
             lastIntervalStart = lastIntervalStart - getIntervalLength()
         }
+
+        firstIntervalStart = firstIntervalStart.setScale(2, RoundingMode.HALF_UP)
+        lastIntervalStart = lastIntervalStart.setScale(2, RoundingMode.HALF_UP)
     }
 
     @Override

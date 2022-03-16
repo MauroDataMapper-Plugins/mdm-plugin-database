@@ -66,7 +66,7 @@ class CalculationStrategy {
         detectEnumerations &&
         isColumnPossibleEnumeration(dataType) &&
         !ignorePatternsForEnumerations.any {columnLabel.matches(it)} &&
-        rowCount > maxEnumerations // If the row count is less than maxEnum then all values will be enumerations which is not accurate
+        (rowCount == -1 || rowCount > maxEnumerations) // If the row count is less than maxEnum then all values will be enumerations which is not accurate
     }
 
     boolean shouldComputeSummaryData(String columnLabel, DataType dataType) {

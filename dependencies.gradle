@@ -1,9 +1,10 @@
 dependencies {
 
-    implementation group: 'uk.ac.ox.softeng.maurodatamapper', name: 'mdm-core', version: mdmCoreVersion
-    implementation group: 'uk.ac.ox.softeng.maurodatamapper', name: 'mdm-plugin-datamodel', version: mdmCoreVersion
+    platform group: 'uk.ac.ox.softeng.maurodatamapper', name: 'mdm-bom', version: mdmCoreVersion
+    api group: 'uk.ac.ox.softeng.maurodatamapper', name: 'mdm-core', version: mdmCoreVersion
+    api group: 'uk.ac.ox.softeng.maurodatamapper', name: 'mdm-plugin-datamodel', version: mdmCoreVersion
 
-    implementation group: 'org.apache.commons', name:'commons-text', version:'1.9'
+    implementation group: 'org.apache.commons', name:'commons-text'//, version:'1.9'
 
     implementation group: 'org.codehaus.groovy', name: 'groovy-all', version: groovyVersion
     api group: 'commons-cli', name: 'commons-cli', version: commonsCliVersion

@@ -29,10 +29,13 @@ buildscript {
     }
 }
 
+plugins {
+    id 'groovy'
+}
+
 apply plugin: 'com.github.hierynomus.license'
 apply plugin: 'ox.softeng.ox-brc-standard'
 apply plugin: 'ox.softeng.ox-brc-artifactory'
-apply plugin: 'ox.softeng.ox-brc-grails-reliant'
 apply plugin: 'ox.softeng.static-code-analysis'
 
 jar {
@@ -52,11 +55,6 @@ afterEvaluate {
     }
     tasks.withType(JavaExec) {
         systemProperty 'env.logFileName', project.name
-    }
-
-    if (project.hasProperty('mainClass')) {
-        applicationDefaultJvmArgs += "-Dmc.logFileName=${applicationName}"
-        applicationDefaultJvmArgs += '-Dgrails.env=CUSTOM'
     }
 }
 

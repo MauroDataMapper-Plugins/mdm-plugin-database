@@ -240,7 +240,7 @@ WHERE ${escapeIdentifier(columnName)} IS NOT NULL""".stripIndent()
 
         """SELECT 
   ${escapeIdentifier(schemaName)}.${escapeIdentifier(tableName)}.${escapeIdentifier(columnName)} AS enumeration_value,
-  ${samplingStrategy.scaleFactor()} * COUNT_BIG(*) AS enumeration_count
+  ${samplingStrategy.scaleFactor()} * COUNT(*) AS enumeration_count
 FROM ${escapeIdentifier(schemaName)}.${escapeIdentifier(tableName)} ${samplingStrategy.samplingClause(SamplingStrategy.Type.SUMMARY_METADATA)}
 GROUP BY ${escapeIdentifier(schemaName)}.${escapeIdentifier(tableName)}.${escapeIdentifier(columnName)}
 ORDER BY ${escapeIdentifier(schemaName)}.${escapeIdentifier(tableName)}.${escapeIdentifier(columnName)}""".stripIndent()

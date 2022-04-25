@@ -499,56 +499,65 @@ abstract class AbstractDatabaseDataModelImporterProviderService<S extends Databa
     void addIndexInformation(DataModel dataModel, Connection connection) throws ApiException, SQLException {
         if (!queryStringProvider.indexInformationQueryString) return
         dataModel.childDataClasses.each {DataClass schemaClass ->
-            final List<Map<String, Object>> results = executePreparedStatement(dataModel, schemaClass, connection, queryStringProvider.indexInformationQueryString)
+            addIndexInformation(dataModel, schemaClass, connection)
+        }
+    }
 
-            results.groupBy {it.table_name}.each {tableName, rows ->
-                final DataClass tableClass = schemaClass.findDataClass(tableName as String)
-                if (!tableClass) {
-                    log.warn 'Could not add indexes as DataClass for table {} does not exist', tableName
-                    return
-                }
+    void addIndexInformation(DataModel dataModel, DataClass schemaClass, Connection connection) throws ApiException, SQLException {
+        final List<Map<String, Object>> results = executePreparedStatement(dataModel, schemaClass, connection, queryStringProvider.indexInformationQueryString)
 
-                List<Map> indexes = rows.collect {row ->
-                    [name          : (row.index_name as String).trim(),
-                     columns       : (row.column_names as String).trim(),
-                     primaryIndex  : getBooleanValue(row.primary_index),
-                     uniqueIndex   : getBooleanValue(row.unique_index),
-                     clusteredIndex: getBooleanValue(row.clustered),
-                    ]
-                } as List<Map>
-
-                tableClass.addToMetadata(namespaceTable(), 'indexes', JsonOutput.prettyPrint(JsonOutput.toJson(indexes)), dataModel.createdBy)
+        results.groupBy {it.table_name}.each {tableName, rows ->
+            final DataClass tableClass = schemaClass ? schemaClass.findDataClass(tableName as String) : dataModel.dataClasses.find {(it.label == tableName as String)}
+            if (!tableClass) {
+                log.warn 'Could not add indexes as DataClass for table {} does not exist', tableName
+                return
             }
+
+            List<Map> indexes = rows.collect {row ->
+                [name          : (row.index_name as String).trim(),
+                 columns       : (row.column_names as String).trim(),
+                 primaryIndex  : getBooleanValue(row.primary_index),
+                 uniqueIndex   : getBooleanValue(row.unique_index),
+                 clusteredIndex: getBooleanValue(row.clustered),
+                ]
+            } as List<Map>
+
+            tableClass.addToMetadata(namespaceTable(), 'indexes', JsonOutput.prettyPrint(JsonOutput.toJson(indexes)), dataModel.createdBy)
         }
     }
 
     void addForeignKeyInformation(DataModel dataModel, Connection connection) throws ApiException, SQLException {
         if (!queryStringProvider.foreignKeyInformationQueryString) return
         dataModel.childDataClasses.each {DataClass schemaClass ->
-            final List<Map<String, Object>> results = executePreparedStatement(dataModel, schemaClass, connection, queryStringProvider.foreignKeyInformationQueryString)
-            results.each {Map<String, Object> row ->
-                final DataClass foreignTableClass = dataModel.dataClasses.find {DataClass dataClass -> dataClass.label == row.reference_table_name}
-                DataType dataType
-
-                if (foreignTableClass) {
-                    dataType = referenceTypeService.findOrCreateDataTypeForDataModel(
-                        dataModel, "${foreignTableClass.label}Type", "Linked to DataElement [${row.reference_column_name}]",
-                        dataModel.createdBy, foreignTableClass)
-                    dataModel.addToDataTypes dataType
-                } else {
-                    dataType = primitiveTypeService.findOrCreateDataTypeForDataModel(
-                        dataModel, "${row.reference_table_name}Type",
-                        "Missing link to foreign key table [${row.reference_table_name}.${row.reference_column_name}]",
-                        dataModel.createdBy)
-                }
-
-                final DataClass tableClass = schemaClass.findDataClass(row.table_name as String)
-                final DataElement columnElement = tableClass.findDataElement(row.column_name as String)
-                columnElement.dataType = dataType
-                columnElement.addToMetadata(namespaceColumn(), "foreign_key_name", row.constraint_name as String, dataModel.createdBy)
-                columnElement.addToMetadata(namespaceColumn(), "foreign_key_columns", row.reference_column_name as String, dataModel.createdBy)
-            }
+            addForeignKeyInformation(dataModel, schemaClass, connection)
         }
+    }
+
+    void addForeignKeyInformation(DataModel dataModel, DataClass schemaClass, Connection connection) throws ApiException, SQLException {
+        final List<Map<String, Object>> results = executePreparedStatement(dataModel, schemaClass, connection, queryStringProvider.foreignKeyInformationQueryString)
+        results.each {Map<String, Object> row ->
+            final DataClass foreignTableClass = dataModel.dataClasses.find {DataClass dataClass -> dataClass.label == row.reference_table_name}
+            DataType dataType
+
+            if (foreignTableClass) {
+                dataType = referenceTypeService.findOrCreateDataTypeForDataModel(
+                    dataModel, "${foreignTableClass.label}Type", "Linked to DataElement [${row.reference_column_name}]",
+                    dataModel.createdBy, foreignTableClass)
+                dataModel.addToDataTypes dataType
+            } else {
+                dataType = primitiveTypeService.findOrCreateDataTypeForDataModel(
+                    dataModel, "${row.reference_table_name}Type",
+                    "Missing link to foreign key table [${row.reference_table_name}.${row.reference_column_name}]",
+                    dataModel.createdBy)
+            }
+
+            final DataClass tableClass = schemaClass.findDataClass(row.table_name as String)
+            final DataElement columnElement = tableClass.findDataElement(row.column_name as String)
+            columnElement.dataType = dataType
+            columnElement.addToMetadata(namespaceColumn(), "foreign_key_name", row.constraint_name as String, dataModel.createdBy)
+            columnElement.addToMetadata(namespaceColumn(), "foreign_key_columns", row.reference_column_name as String, dataModel.createdBy)
+        }
+
     }
 
     /**
@@ -569,12 +578,18 @@ abstract class AbstractDatabaseDataModelImporterProviderService<S extends Databa
         }
     }
 
-    private List<Map<String, Object>> executePreparedStatement(DataModel dataModel, DataClass schemaClass, Connection connection,
-                                                               String queryString) throws ApiException, SQLException {
+    List<Map<String, Object>> executePreparedStatement(DataModel dataModel, Connection connection,
+                                                       String queryString) {
+        executePreparedStatement(dataModel, null, connection, queryString)
+    }
+
+
+    List<Map<String, Object>> executePreparedStatement(DataModel dataModel, DataClass schemaClass, Connection connection,
+                                                       String queryString) throws ApiException, SQLException {
         List<Map<String, Object>> results = null
         try {
             final PreparedStatement preparedStatement = connection.prepareStatement(queryString)
-            preparedStatement.setString(1, schemaClass.label)
+            preparedStatement.setString(1, schemaClass?.label ?: dataModel.label)
             results = executeStatement(preparedStatement)
             preparedStatement.close()
         } catch (SQLException e) {
@@ -592,7 +607,7 @@ abstract class AbstractDatabaseDataModelImporterProviderService<S extends Databa
      * @param schemaName
      * @return
      */
-    private String getTableType(Connection connection, String tableName, String schemaName, String modelName) {
+    String getTableType(Connection connection, String tableName, String schemaName, String modelName) {
 
         String tableType = ""
         final PreparedStatement preparedStatement = connection.prepareStatement(queryStringProvider.tableTypeQueryString())
@@ -617,7 +632,7 @@ abstract class AbstractDatabaseDataModelImporterProviderService<S extends Databa
      * @param schemaName
      * @return
      */
-    private Long getApproxCount(Connection connection, String tableName, String schemaName = null) {
+    Long getApproxCount(Connection connection, String tableName, String schemaName = null) {
         log.trace("Starting getApproxCouunt query for ${tableName}")
         long startTime = System.currentTimeMillis()
         Long approxCount = 0

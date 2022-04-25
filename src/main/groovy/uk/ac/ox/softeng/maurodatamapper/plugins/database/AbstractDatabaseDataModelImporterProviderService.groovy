@@ -364,7 +364,7 @@ abstract class AbstractDatabaseDataModelImporterProviderService<S extends Databa
 
         // Make 1 call to get the distinct values, then use the size of the that results to tell if its actually an ET
         final List<Map<String, Object>> results = getDistinctColumnValues(connection, calculationStrategy, samplingStrategy, dataElement.label,
-                                                                          tableClass.label, schemaClass.label)
+                                                                          tableClass.label, schemaClass?.label)
         if (calculationStrategy.isEnumerationType(results.size())) {
 
             EnumerationType enumerationType = enumerationTypeService.findOrCreateDataTypeForDataModel(dataModel, dataElement.label, dataElement.label, user)
@@ -379,7 +379,7 @@ abstract class AbstractDatabaseDataModelImporterProviderService<S extends Databa
         logSummaryMetadataDetection(samplingStrategy, dataElement, 'enumeration')
         //Count enumeration values
         Map<String, Long> enumerationValueDistribution =
-            getEnumerationValueDistribution(connection, samplingStrategy, dataElement.label, tableClass.label, schemaClass.label)
+            getEnumerationValueDistribution(connection, samplingStrategy, dataElement.label, tableClass.label, schemaClass?.label)
         if (enumerationValueDistribution) {
             String description = 'Enumeration Value Distribution'
             if (samplingStrategy.useSamplingForSummaryMetadata()) {
@@ -400,7 +400,7 @@ abstract class AbstractDatabaseDataModelImporterProviderService<S extends Databa
     void computeSummaryMetadataForDatesAndNumbers(CalculationStrategy calculationStrategy, SamplingStrategy samplingStrategy, Connection connection,
                                                   DataClass schemaClass, DataClass tableClass, DataElement dataElement, User user) {
         logSummaryMetadataDetection(samplingStrategy, dataElement, 'date or numeric')
-        Pair minMax = getMinMaxColumnValues(connection, samplingStrategy, dataElement.label, tableClass.label, schemaClass.label)
+        Pair minMax = getMinMaxColumnValues(connection, samplingStrategy, dataElement.label, tableClass.label, schemaClass?.label)
 
         //aValue is the MIN, bValue is the MAX. If they are not null then calculate the range etc...
         if (minMax.aValue != null && minMax.bValue != null) {
@@ -408,7 +408,7 @@ abstract class AbstractDatabaseDataModelImporterProviderService<S extends Databa
             AbstractIntervalHelper intervalHelper = calculationStrategy.getIntervalHelper(dt, minMax)
             log.trace('Summary Metadata computation using {}', intervalHelper)
             Map<String, Long> valueDistribution = getColumnRangeDistribution(connection, samplingStrategy, dt, intervalHelper, dataElement.label,
-                                                                             tableClass.label, schemaClass.label)
+                                                                             tableClass.label, schemaClass?.label)
             if (valueDistribution) {
                 String description = 'Value Distribution'
                 if (samplingStrategy.useSamplingForSummaryMetadata()) {
@@ -551,7 +551,7 @@ abstract class AbstractDatabaseDataModelImporterProviderService<S extends Databa
                     dataModel.createdBy)
             }
 
-            final DataClass tableClass = schemaClass.findDataClass(row.table_name as String)
+            final DataClass tableClass = schemaClass ? schemaClass.findDataClass(row.table_name as String) : dataModel.dataClasses.find {it.label == row.table_name as String}
             final DataElement columnElement = tableClass.findDataElement(row.column_name as String)
             columnElement.dataType = dataType
             columnElement.addToMetadata(namespaceColumn(), "foreign_key_name", row.constraint_name as String, dataModel.createdBy)
@@ -655,8 +655,7 @@ abstract class AbstractDatabaseDataModelImporterProviderService<S extends Databa
     }
 
     private List<Map<String, Object>> getDistinctColumnValues(Connection connection, CalculationStrategy calculationStrategy, SamplingStrategy samplingStrategy,
-                                                              String columnName, String tableName,
-                                                              String schemaName = null) {
+                                                              String columnName, String tableName, String schemaName) {
         log.trace("Starting getDistinctColumnValues query for ${tableName}.${columnName}")
         long startTime = System.currentTimeMillis()
         String queryString = queryStringProvider.distinctColumnValuesQueryString(calculationStrategy, samplingStrategy, columnName, tableName, schemaName)
@@ -667,7 +666,7 @@ abstract class AbstractDatabaseDataModelImporterProviderService<S extends Databa
         results
     }
 
-    private Pair getMinMaxColumnValues(Connection connection, SamplingStrategy samplingStrategy, String columnName, String tableName, String schemaName = null) {
+    private Pair getMinMaxColumnValues(Connection connection, SamplingStrategy samplingStrategy, String columnName, String tableName, String schemaName) {
         log.trace("Starting getMinMaxColumnValues query for ${tableName}.${columnName}")
         long startTime = System.currentTimeMillis()
         String queryString = queryStringProvider.minMaxColumnValuesQueryString(samplingStrategy, columnName, tableName, schemaName)
@@ -682,7 +681,7 @@ abstract class AbstractDatabaseDataModelImporterProviderService<S extends Databa
 
     private Map<String, Long> getColumnRangeDistribution(Connection connection, SamplingStrategy samplingStrategy,
                                                          DataType dataType, AbstractIntervalHelper intervalHelper,
-                                                         String columnName, String tableName, String schemaName = null) {
+                                                         String columnName, String tableName, String schemaName) {
         log.trace("Starting getColumnRangeDistribution query for ${tableName}.${columnName}")
         long startTime = System.currentTimeMillis()
         String queryString = queryStringProvider.columnRangeDistributionQueryString(samplingStrategy, dataType, intervalHelper, columnName, tableName, schemaName)
@@ -698,7 +697,7 @@ abstract class AbstractDatabaseDataModelImporterProviderService<S extends Databa
     }
 
     private Map<String, Long> getEnumerationValueDistribution(Connection connection, SamplingStrategy samplingStrategy,
-                                                              String columnName, String tableName, String schemaName = null) {
+                                                              String columnName, String tableName, String schemaName) {
         log.trace("Starting getEnumerationValueDistribution query for ${tableName}.${columnName}")
         long startTime = System.currentTimeMillis()
         String queryString = queryStringProvider.enumerationValueDistributionQueryString(samplingStrategy, columnName, tableName, schemaName)

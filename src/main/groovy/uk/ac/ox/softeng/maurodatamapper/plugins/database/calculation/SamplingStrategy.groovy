@@ -43,6 +43,14 @@ class SamplingStrategy {
         this.table = table
         this.approxCount = -1
         this.tableType = ''
+        this.smThreshold = DEFAULT_SAMPLE_THRESHOLD
+        this.smPercentage = DEFAULT_SAMPLE_PERCENTAGE
+        this.smUseSampling = DEFAULT_USE_SAMPLING
+        this.evThreshold = DEFAULT_SAMPLE_THRESHOLD
+        this.evPercentage = DEFAULT_SAMPLE_PERCENTAGE
+        this.evUseSampling = DEFAULT_USE_SAMPLING
+        this.smUseDynamicPercentage = false
+        this.smUseDynamicPercentage = false
     }
 
     SamplingStrategy(String schema, String table, DatabaseDataModelWithSamplingImporterProviderServiceParameters samplingImporterProviderServiceParameters) {
@@ -168,13 +176,15 @@ class SamplingStrategy {
 
         sb.append('\nIn General:')
         if (evUseSampling) {
-            sb.append('\n  Allow sampling for EVs; Using sampling for row count over ').append(evThreshold).append(' rows & sample ').append(getEnumerationValueSamplePercentage())
+            sb.append('\n  Allow sampling for EVs; Using sampling for row count over ').append(evThreshold).append(' rows & sample ').append(
+                getEnumerationValueSamplePercentage())
                 .append('% of the data')
         } else {
             sb.append('\n  Do not allow sampling for EVs')
         }
         if (smUseSampling) {
-            sb.append('\n  Allow sampling for SM; Using sampling for row count over ').append(smThreshold).append(' rows & sample ').append(getSummaryMetadataSamplePercentage())
+            sb.append('\n  Allow sampling for SM; Using sampling for row count over ').append(smThreshold).append(' rows & sample ').append(
+                getSummaryMetadataSamplePercentage())
                 .append('% of the data')
         } else {
             sb.append('\n  Do not allow sampling for SM')

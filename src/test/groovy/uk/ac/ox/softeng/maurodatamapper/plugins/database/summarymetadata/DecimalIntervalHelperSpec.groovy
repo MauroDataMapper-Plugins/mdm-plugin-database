@@ -19,7 +19,6 @@ package uk.ac.ox.softeng.maurodatamapper.plugins.database.summarymetadata
 
 import uk.ac.ox.softeng.maurodatamapper.test.MdmSpecification
 
-import grails.util.Pair
 import groovy.util.logging.Slf4j
 import org.grails.testing.GrailsUnitTest
 

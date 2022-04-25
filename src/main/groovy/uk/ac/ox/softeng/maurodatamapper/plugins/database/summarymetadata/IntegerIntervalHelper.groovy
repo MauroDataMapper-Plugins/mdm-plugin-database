@@ -17,7 +17,7 @@
  */
 package uk.ac.ox.softeng.maurodatamapper.plugins.database.summarymetadata
 
-import grails.util.Pair
+
 import groovy.transform.CompileStatic
 
 @CompileStatic

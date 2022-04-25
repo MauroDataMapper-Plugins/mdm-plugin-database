@@ -89,16 +89,16 @@ class SamplingStrategy {
      * By default, no sampling. Subclasses should override.
      * @return
      */
-    boolean canSampleTypeType() {
+    boolean canSampleTableType() {
         false
     }
 
     boolean canComputeSummaryMetadata() {
-        smThreshold == 0 || approxCount < smThreshold || (canSampleTypeType() && smUseSampling)
+        smThreshold == 0 || approxCount < smThreshold || (canSampleTableType() && smUseSampling)
     }
 
     boolean canDetectEnumerationValues() {
-        evThreshold == 0 || approxCount < evThreshold || (canSampleTypeType() && evUseSampling)
+        evThreshold == 0 || approxCount < evThreshold || (canSampleTableType() && evUseSampling)
     }
 
     /**
@@ -107,11 +107,11 @@ class SamplingStrategy {
      * @return
      */
     boolean useSamplingForSummaryMetadata() {
-        this.canSampleTypeType() && this.smThreshold > 0 && this.smPercentage > 0 && this.approxCount > this.smThreshold
+        this.canSampleTableType() && this.smThreshold > 0 && this.smPercentage > 0 && this.approxCount > this.smThreshold
     }
 
     boolean useSamplingForEnumerationValues() {
-        this.canSampleTypeType() && this.evThreshold > 0 && this.evPercentage > 0 && this.approxCount > this.evThreshold
+        this.canSampleTableType() && this.evThreshold > 0 && this.evPercentage > 0 && this.approxCount > this.evThreshold
     }
 
     boolean useSamplingFor(Type type) {

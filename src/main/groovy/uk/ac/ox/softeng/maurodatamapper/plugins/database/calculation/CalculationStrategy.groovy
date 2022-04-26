@@ -18,11 +18,11 @@
 package uk.ac.ox.softeng.maurodatamapper.plugins.database.calculation
 
 import uk.ac.ox.softeng.maurodatamapper.datamodel.item.datatype.DataType
+import uk.ac.ox.softeng.maurodatamapper.datamodel.summarymetadata.AbstractIntervalHelper
+import uk.ac.ox.softeng.maurodatamapper.datamodel.summarymetadata.DateIntervalHelper
+import uk.ac.ox.softeng.maurodatamapper.datamodel.summarymetadata.DecimalIntervalHelper
+import uk.ac.ox.softeng.maurodatamapper.datamodel.summarymetadata.LongIntervalHelper
 import uk.ac.ox.softeng.maurodatamapper.plugins.database.DatabaseDataModelImporterProviderServiceParameters
-import uk.ac.ox.softeng.maurodatamapper.plugins.database.summarymetadata.AbstractIntervalHelper
-import uk.ac.ox.softeng.maurodatamapper.plugins.database.summarymetadata.DateIntervalHelper
-import uk.ac.ox.softeng.maurodatamapper.plugins.database.summarymetadata.DecimalIntervalHelper
-import uk.ac.ox.softeng.maurodatamapper.plugins.database.summarymetadata.LongIntervalHelper
 
 import grails.util.Pair
 

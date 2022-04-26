@@ -18,9 +18,9 @@
 package uk.ac.ox.softeng.maurodatamapper.plugins.database.query
 
 import uk.ac.ox.softeng.maurodatamapper.datamodel.item.datatype.DataType
+import uk.ac.ox.softeng.maurodatamapper.datamodel.summarymetadata.AbstractIntervalHelper
 import uk.ac.ox.softeng.maurodatamapper.plugins.database.calculation.CalculationStrategy
 import uk.ac.ox.softeng.maurodatamapper.plugins.database.calculation.SamplingStrategy
-import uk.ac.ox.softeng.maurodatamapper.plugins.database.summarymetadata.AbstractIntervalHelper
 
 /**
  * @since 11/03/2022

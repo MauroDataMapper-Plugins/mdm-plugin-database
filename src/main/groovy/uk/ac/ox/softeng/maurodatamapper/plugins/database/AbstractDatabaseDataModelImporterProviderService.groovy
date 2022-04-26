@@ -38,12 +38,12 @@ import uk.ac.ox.softeng.maurodatamapper.datamodel.item.datatype.ReferenceTypeSer
 import uk.ac.ox.softeng.maurodatamapper.datamodel.item.datatype.enumeration.EnumerationValue
 import uk.ac.ox.softeng.maurodatamapper.datamodel.provider.DefaultDataTypeProvider
 import uk.ac.ox.softeng.maurodatamapper.datamodel.provider.importer.DataModelImporterProviderService
+import uk.ac.ox.softeng.maurodatamapper.datamodel.summarymetadata.AbstractIntervalHelper
+import uk.ac.ox.softeng.maurodatamapper.datamodel.summarymetadata.DateIntervalHelper
+import uk.ac.ox.softeng.maurodatamapper.datamodel.summarymetadata.SummaryMetadataHelper
 import uk.ac.ox.softeng.maurodatamapper.plugins.database.calculation.CalculationStrategy
 import uk.ac.ox.softeng.maurodatamapper.plugins.database.calculation.SamplingStrategy
 import uk.ac.ox.softeng.maurodatamapper.plugins.database.query.QueryStringProvider
-import uk.ac.ox.softeng.maurodatamapper.plugins.database.summarymetadata.AbstractIntervalHelper
-import uk.ac.ox.softeng.maurodatamapper.plugins.database.summarymetadata.DateIntervalHelper
-import uk.ac.ox.softeng.maurodatamapper.plugins.database.summarymetadata.SummaryMetadataHelper
 import uk.ac.ox.softeng.maurodatamapper.security.User
 import uk.ac.ox.softeng.maurodatamapper.util.Utils
 
@@ -801,7 +801,8 @@ abstract class AbstractDatabaseDataModelImporterProviderService<S extends Databa
         } as Map<String, Long>
     }
 
-    private Map<String, Map<String, List<String>>> getTableNamesToImport(S parameters) {
+    @Deprecated
+    Map<String, Map<String, List<String>>> getTableNamesToImport(S parameters) {
         if (!parameters.onlyImportTables) return [:]
         boolean multipleDatabaseImport = parameters.isMultipleDataModelImport()
         List<String[]> tableNames = parameters.onlyImportTables.split(',').collect {it.split(/\./)}

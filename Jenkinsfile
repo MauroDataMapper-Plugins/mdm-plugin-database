@@ -52,10 +52,10 @@ pipeline {
             }
         }
 
-        stage('Integration Test') {
+        stage('Unit Test') {
 
             steps {
-                sh "./gradlew --build-cache integrationTest"
+                sh "./gradlew --build-cache test"
             }
             post {
                 always {
@@ -63,12 +63,12 @@ pipeline {
                         allowMissing         : true,
                         alwaysLinkToLastBuild: true,
                         keepAll              : true,
-                        reportDir            : 'build/reports/tests/integrationTest',
+                        reportDir            : 'build/reports/tests/test',
                         reportFiles          : 'index.html',
-                        reportName           : 'Integration Test Report',
+                        reportName           : 'Test Report',
                         reportTitles         : 'Test'
                     ])
-                    junit allowEmptyResults: true, testResults: 'build/test-results/integrationTest/*.xml'
+                    junit allowEmptyResults: true, testResults: 'build/test-results/test/*.xml'
                 }
             }
         }
@@ -105,7 +105,7 @@ pipeline {
             }
             steps {
                 script {
-                    sh "./gradlew artifactoryPublish"
+                    sh "./gradlew publish"
                 }
             }
         }

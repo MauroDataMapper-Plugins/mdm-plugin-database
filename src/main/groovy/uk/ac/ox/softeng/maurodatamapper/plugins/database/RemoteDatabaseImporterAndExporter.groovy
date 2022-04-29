@@ -243,8 +243,8 @@ class RemoteDatabaseImporterAndExporter {
         CookieHandler.setDefault(new CookieManager(null, CookiePolicy.ACCEPT_ALL)) // Ensure session is maintained throughout
 
         String host = properties.getProperty('export.server.url')
-        host = !host.endsWith('/') ?: host - '/'
-        host = host.endsWith('api') ?: "${host}/api"
+        host = host.endsWith('/') ? host - '/' : host
+        host = host.endsWith('api') ? host : "${host}/api"
         if (host.startsWith('https')) enableSslConnection()
         log.info 'Using Mauro Data Mapper server: {}', host
 

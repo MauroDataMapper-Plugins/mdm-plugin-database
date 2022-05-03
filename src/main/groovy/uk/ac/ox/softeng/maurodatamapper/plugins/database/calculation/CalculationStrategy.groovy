@@ -26,6 +26,8 @@ import uk.ac.ox.softeng.maurodatamapper.plugins.database.DatabaseDataModelImport
 
 import grails.util.Pair
 
+import java.time.LocalDate
+import java.time.LocalDateTime
 import java.time.OffsetDateTime
 import java.util.regex.Pattern
 
@@ -140,11 +142,18 @@ class CalculationStrategy {
         } else if (isColumnForIntegerSummary(dataType)) {
             return new LongIntervalHelper((Long) minMax.aValue, (Long) minMax.bValue)
         } else if (isColumnForDateSummary(dataType)) {
-            return new DateIntervalHelper(((Date) minMax.aValue).toLocalDateTime(), ((Date) minMax.bValue).toLocalDateTime())
+            return new DateIntervalHelper(getLocalDateTime(minMax.aValue), getLocalDateTime(minMax.bValue))
         } else if (isColumnForDecimalSummary(dataType)) {
             return new DecimalIntervalHelper((BigDecimal) minMax.aValue, (BigDecimal) minMax.bValue)
         }
         null
+    }
+
+    static LocalDateTime getLocalDateTime(Object value) {
+        if (value instanceof LocalDateTime) return value
+        if (value instanceof OffsetDateTime) return value.toLocalDateTime()
+        if (value instanceof LocalDate) return value.atStartOfDay()
+        if (value instanceof Date) return value.toLocalDateTime()
     }
 
     static enum BucketHandling {

@@ -863,7 +863,7 @@ abstract class AbstractDatabaseDataModelImporterProviderService<S extends Databa
         }
     }
 
-    static boolean isColumnNullable(String nullableColumnValue) {
+    boolean isColumnNullable(String nullableColumnValue) {
         nullableColumnValue.toLowerCase() == 'yes'
     }
 

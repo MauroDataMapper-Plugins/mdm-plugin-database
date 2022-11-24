@@ -19,6 +19,7 @@ package uk.ac.ox.softeng.maurodatamapper.plugins.database
 
 import uk.ac.ox.softeng.maurodatamapper.api.exception.ApiBadRequestException
 import uk.ac.ox.softeng.maurodatamapper.api.exception.ApiException
+import uk.ac.ox.softeng.maurodatamapper.api.exception.ApiInvalidModelException
 import uk.ac.ox.softeng.maurodatamapper.core.authority.AuthorityService
 import uk.ac.ox.softeng.maurodatamapper.core.container.Folder
 import uk.ac.ox.softeng.maurodatamapper.core.model.CatalogueItem
@@ -48,13 +49,17 @@ import uk.ac.ox.softeng.maurodatamapper.security.User
 import uk.ac.ox.softeng.maurodatamapper.util.Utils
 
 import grails.util.Pair
+import grails.validation.ValidationErrors
 import groovy.json.JsonOutput
 import groovy.transform.CompileStatic
 import groovy.util.logging.Slf4j
 import org.apache.commons.text.WordUtils
+import org.grails.datastore.gorm.GormValidateable
 import org.slf4j.Logger
 import org.slf4j.LoggerFactory
 import org.springframework.beans.factory.annotation.Autowired
+import org.springframework.context.MessageSource
+import org.springframework.validation.Errors
 
 import java.sql.Connection
 import java.sql.PreparedStatement
@@ -64,7 +69,7 @@ import java.sql.SQLException
 import java.util.regex.Pattern
 
 @Slf4j
-@CompileStatic
+//@CompileStatic
 abstract class AbstractDatabaseDataModelImporterProviderService<S extends DatabaseDataModelImporterProviderServiceParameters>
     extends DataModelImporterProviderService<S> {
 
@@ -93,6 +98,9 @@ abstract class AbstractDatabaseDataModelImporterProviderService<S extends Databa
 
     @Autowired
     DataTypeService dataTypeService
+
+    @Autowired
+    MessageSource messageSource
 
     String schemaNameColumnName = 'table_schema'
     String dataTypeColumnName = 'data_type'
@@ -133,11 +141,29 @@ abstract class AbstractDatabaseDataModelImporterProviderService<S extends Databa
         final List<String> databaseNames = parameters.databaseNames.split(',').toList()
         log.info 'Importing {} DataModel(s)', databaseNames.size()
 
-        final List<DataModel> dataModels = []
+        List<DataModel> dataModels = []
         databaseNames.each {String databaseName ->
             List<DataModel> importedModels = importDataModelsFromParameters(currentUser, databaseName, parameters as S)
             dataModels.addAll(importedModels)
         }
+
+        dataModels.each {DataModel dm ->
+            updateImportedModelFromParameters(dm, parameters as S, false)
+        }
+
+        validateImportedDataModels(dataModels).each {DataModel dm ->
+            checkImport(currentUser, dm, parameters as S)
+        }
+
+        if (dataModels.any {it.hasErrors()}) {
+            Errors errors = new ValidationErrors(dataModels, dataModels.first().class.getName())
+            dataModels.findAll {it.hasErrors()}.each {errors.addAllErrors((it as GormValidateable).errors)}
+            throw new ApiInvalidModelException('IS03', 'Invalid models', errors, messageSource)
+        }
+        log.debug('No errors in imported models')
+
+        dataModels.each {DataModel dm -> dataModelService.saveModelWithContent(dm)}
+
         dataModels
     }
 
@@ -187,6 +213,38 @@ abstract class AbstractDatabaseDataModelImporterProviderService<S extends Databa
 
     PreparedStatement prepareCoreStatement(Connection connection, S parameters) {
         connection.prepareStatement(getQueryStringProvider().databaseStructureQueryString)
+    }
+
+    /**
+     * Shallow validate DataModels for performance.
+     * All populated associations should have their validate method called.
+     * @param dataModels
+     * @return dataModels
+     */
+    List<DataModel> validateImportedDataModels(List<DataModel> dataModels) {
+        dataModels.each {DataModel dm ->
+            dm.validate(deepValidate: false)
+            dm.dataTypes.each {
+                it.validate(deepValidate: false)
+                it.metadata.each {it.validate(deepValidate: false)}
+            }
+            dm.enumerationTypes.each {
+                it.enumerationValues.each {
+                    it.validate(deepValidate: false)
+                    it.metadata.each {it.validate(deepValidate: false)}
+                }
+            }
+            dm.dataClasses.each {
+                it.validate(deepValidate: false)
+                it.metadata.each {it.validate(deepValidate: false)}
+            }
+            dm.allDataElements.each {
+                it.validate(deepValidate: false)
+                it.metadata.each {it.validate(deepValidate: false)}
+            }
+            dm.breadcrumbTree.validate(deepValidate: false)
+        }
+        dataModels
     }
 
     List<DataModel> importDataModelsFromParameters(User currentUser, String databaseName, S parameters)

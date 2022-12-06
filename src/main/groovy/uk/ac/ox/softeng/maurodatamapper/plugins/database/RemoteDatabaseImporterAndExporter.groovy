@@ -18,6 +18,7 @@
 package uk.ac.ox.softeng.maurodatamapper.plugins.database
 
 import uk.ac.ox.softeng.maurodatamapper.api.exception.ApiException
+import uk.ac.ox.softeng.maurodatamapper.core.authority.Authority
 import uk.ac.ox.softeng.maurodatamapper.core.container.Folder
 import uk.ac.ox.softeng.maurodatamapper.core.importer.ImporterService
 import uk.ac.ox.softeng.maurodatamapper.core.provider.importer.parameter.FileParameter
@@ -66,18 +67,19 @@ class RemoteDatabaseImporterAndExporter {
         'grails.bootstrap.skip'     : 'true',
         'grails.env'                : 'custom',
         'server.port'               : '9000',
-        'flyway.enabled'            : 'false',
+        'spring.flyway.enabled'     : 'false',
         'dataSource.driverClassName': 'org.h2.Driver',
         'dataSource.dialect'        : 'org.hibernate.dialect.H2Dialect',
         'dataSource.username'       : 'sa',
         'dataSource.password'       : '',
         'dataSource.dbCreate'       : 'create-drop',
-        'dataSource.url'            : 'jdbc:h2:mem:remoteDb;LOCK_TIMEOUT=10000;DB_CLOSE_ON_EXIT=TRUE',
+        'dataSource.url'            : 'jdbc:h2:mem:remoteDb;LOCK_TIMEOUT=10000;DB_CLOSE_ON_EXIT=TRUE;INIT=CREATE SCHEMA IF NOT EXISTS CORE\\;CREATE SCHEMA IF NOT EXISTS ' +
+                                      'SECURITY\\;CREATE SCHEMA IF NOT EXISTS DATAMODEL\\;CREATE SCHEMA IF NOT EXISTS TERMINOLOGY',
     ]
     private static final Map<String, String> ENDPOINTS = [
         LOGIN              : '/authentication/login',
         LOGOUT             : '/authentication/logout',
-        DATAMODEL_IMPORTERS: '/public/plugins/dataModelImporters',
+        DATAMODEL_IMPORTERS: '/dataModels/providers/importers',
     ]
 
     Object post(String url, byte[] bytes) {
@@ -135,7 +137,8 @@ class RemoteDatabaseImporterAndExporter {
         final DatabaseDataModelImporterProviderServiceParameters dbImportParameters = importer.createNewImporterProviderServiceParameters(dbImporter)
         dbImportParameters.populateFromProperties properties
 
-        final Folder randomFolder = new Folder(label: 'random', createdBy: user, id: UUID.randomUUID())
+        final Folder randomFolder = new Folder(label: 'random', createdBy: user.emailAddress)
+        randomFolder.save()
         dbImportParameters.folderId = randomFolder.id
 
         final Errors errors = importer.validateParameters(dbImportParameters, dbImporter.importerProviderServiceParametersClass)
@@ -144,9 +147,13 @@ class RemoteDatabaseImporterAndExporter {
             return []
         }
 
-        final List<DataModel> dataModels = importer.importModels(user, dbImporter, dbImportParameters)
+        Authority importAuthority = new Authority(label: 'Import Authority', url: "http://localhost", createdBy: user.emailAddress)
+        importAuthority.save()
+
+        final List<DataModel> dataModels = importer.importDomains(user, dbImporter, dbImportParameters)
         dataModels.each {DataModel dataModel ->
             dataModel.folder = randomFolder
+            dataModel.authority = importAuthority
             dataModel.validate()
         }
         if (dataModels.any {DataModel dataModel -> dataModel.hasErrors()}) {
@@ -191,10 +198,14 @@ class RemoteDatabaseImporterAndExporter {
         if (response.is2xxSuccessful()) {
             final String body = connection.inputStream.text
             log.trace 'Success Response:\n{}', prettyPrint(body)
-            try {
-                return JSON_SLURPER.parseText(body)
-            } catch (JsonException ignored) {
-                return body
+            if (body) {
+                try {
+                    return JSON_SLURPER.parseText(body)
+                } catch (JsonException ignored) {
+                    return body
+                }
+            } else {
+                return null
             }
         }
 
@@ -218,7 +229,7 @@ class RemoteDatabaseImporterAndExporter {
         final String domainName = parameters.class.simpleName.uncapitalize()
         final WritableScriptTemplate template =
             applicationContext.getBean(JsonViewTemplateEngine).resolveTemplate("/${domainName}/_${domainName}.gson")
-        template.make([domainName: parameters]).writeTo(stringWriter)
+        template.make([dataModelFileImporterProviderServiceParameters: parameters]).writeTo(stringWriter)
         stringWriter.toString()
     }
 
@@ -271,7 +282,7 @@ class RemoteDatabaseImporterAndExporter {
         if (!folderJson) return
 
         log.debug 'Importing/exporting DataModels to JSON'
-        final Map jsonImporter = importers.find {Map importer -> importer.name == 'JsonImporterService'}
+        final Map jsonImporter = importers.find {Map importer -> importer.name == 'DataModelJsonImporterService'}
         final DataModelJsonExporterService jsonExporter = applicationContext.getBean(DataModelJsonExporterService)
 
         dataModels.each {DataModel dataModel ->

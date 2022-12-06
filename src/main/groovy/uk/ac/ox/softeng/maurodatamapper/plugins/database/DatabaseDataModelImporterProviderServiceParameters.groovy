@@ -252,7 +252,7 @@ abstract class DatabaseDataModelImporterProviderServiceParameters<K extends Data
         databaseHost = properties.getProperty 'import.database.host'
         databaseUsername = properties.getProperty 'import.database.username'
         databasePassword = properties.getProperty 'import.database.password'
-        databaseSSL = properties.getProperty('import.database.ssl') as Boolean
+        databaseSSL = properties.getProperty('import.database.ssl').toBoolean()
 
         if (!maxEnumerations) {
             maxEnumerations = 20

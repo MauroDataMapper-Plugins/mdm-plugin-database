@@ -23,6 +23,7 @@ import uk.ac.ox.softeng.maurodatamapper.api.exception.ApiInvalidModelException
 import uk.ac.ox.softeng.maurodatamapper.core.authority.AuthorityService
 import uk.ac.ox.softeng.maurodatamapper.core.container.Folder
 import uk.ac.ox.softeng.maurodatamapper.core.model.CatalogueItem
+import uk.ac.ox.softeng.maurodatamapper.core.traits.domain.MultiFacetItemAware
 import uk.ac.ox.softeng.maurodatamapper.datamodel.DataModel
 import uk.ac.ox.softeng.maurodatamapper.datamodel.DataModelType
 import uk.ac.ox.softeng.maurodatamapper.datamodel.facet.SummaryMetadata
@@ -46,6 +47,7 @@ import uk.ac.ox.softeng.maurodatamapper.plugins.database.calculation.Calculation
 import uk.ac.ox.softeng.maurodatamapper.plugins.database.calculation.SamplingStrategy
 import uk.ac.ox.softeng.maurodatamapper.plugins.database.query.QueryStringProvider
 import uk.ac.ox.softeng.maurodatamapper.security.User
+import uk.ac.ox.softeng.maurodatamapper.traits.domain.MdmDomain
 import uk.ac.ox.softeng.maurodatamapper.util.Utils
 
 import grails.util.Pair
@@ -224,23 +226,40 @@ abstract class AbstractDatabaseDataModelImporterProviderService<S extends Databa
     List<DataModel> validateImportedDataModels(List<DataModel> dataModels) {
         dataModels.each {DataModel dm ->
             dm.validate(deepValidate: false)
+            validateFacets(dm)
             dm.dataTypes.each {
                 it.validate(deepValidate: false)
-                it.metadata.each {it.validate(deepValidate: false)}
+                validateFacets(it)
             }
             dm.enumerationTypes.each {
                 it.enumerationValues.each {
                     it.validate(deepValidate: false)
-                    it.metadata.each {it.validate(deepValidate: false)}
+                    validateFacets(it)
                 }
             }
             dm.dataClasses.each {
                 it.validate(deepValidate: false)
-                it.metadata.each {it.validate(deepValidate: false)}
+                validateFacets(it)
             }
             dm.allDataElements.each {
                 it.validate(deepValidate: false)
-                it.metadata.each {it.validate(deepValidate: false)}
+                validateFacets(it)
+            }
+            dm.classifiers.each {
+                it.validate(deepValidate: false)
+                validateFacets(it)
+            }
+            dm.referenceTypes.each {
+                it.validate(deepValidate: false)
+                validateFacets(it)
+            }
+            dm.importedDataTypes.each {
+                it.validate(deepValidate: false)
+                validateFacets(it)
+            }
+            dm.importedDataClasses.each {
+                it.validate(deepValidate: false)
+                validateFacets(it)
             }
             dm.breadcrumbTree.validate(deepValidate: false)
         }
@@ -334,6 +353,14 @@ abstract class AbstractDatabaseDataModelImporterProviderService<S extends Databa
         }
 
         dataModel
+    }
+
+    void validateFacets(MdmDomain domain, boolean deepValidate = false) {
+        final List<String> facetProperties = ['annotations', 'metadata', 'referenceFiles', 'referenceSummaryMetadata', 'rules', 'semanticLinks', 'summaryMetadata',
+                                              'versionLinks']
+        facetProperties.each {String propName ->
+            if (domain.hasProperty(propName)) domain[propName].each {MultiFacetItemAware it -> it.validate(deepValidate: deepValidate)}
+        }
     }
 
     void updateDataModelWithEnumerationsAndSummaryMetadata(User user, S parameters, DataModel dataModel, Connection connection) {

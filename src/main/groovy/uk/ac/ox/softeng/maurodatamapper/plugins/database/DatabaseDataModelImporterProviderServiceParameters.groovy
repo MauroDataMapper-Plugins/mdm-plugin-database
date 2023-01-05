@@ -234,6 +234,8 @@ abstract class DatabaseDataModelImporterProviderServiceParameters<K extends Data
     )
     String ignoreColumnsForSummaryMetadata
 
+    boolean providerHasSavedModels = true
+
     Integer getDatabasePort() {
         databasePort = databasePort ?: defaultPort
         databasePort

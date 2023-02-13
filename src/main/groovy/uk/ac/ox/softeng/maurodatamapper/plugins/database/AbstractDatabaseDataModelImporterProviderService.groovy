@@ -43,6 +43,8 @@ import uk.ac.ox.softeng.maurodatamapper.datamodel.provider.importer.DataModelImp
 import uk.ac.ox.softeng.maurodatamapper.datamodel.summarymetadata.AbstractIntervalHelper
 import uk.ac.ox.softeng.maurodatamapper.datamodel.summarymetadata.DateIntervalHelper
 import uk.ac.ox.softeng.maurodatamapper.datamodel.summarymetadata.SummaryMetadataHelper
+import uk.ac.ox.softeng.maurodatamapper.path.Path
+import uk.ac.ox.softeng.maurodatamapper.path.PathNode
 import uk.ac.ox.softeng.maurodatamapper.plugins.database.calculation.CalculationStrategy
 import uk.ac.ox.softeng.maurodatamapper.plugins.database.calculation.SamplingStrategy
 import uk.ac.ox.softeng.maurodatamapper.plugins.database.query.QueryStringProvider
@@ -53,7 +55,6 @@ import uk.ac.ox.softeng.maurodatamapper.util.Utils
 import grails.util.Pair
 import grails.validation.ValidationErrors
 import groovy.json.JsonOutput
-import groovy.transform.CompileStatic
 import groovy.util.logging.Slf4j
 import org.apache.commons.text.WordUtils
 import org.grails.datastore.gorm.GormValidateable
@@ -226,44 +227,63 @@ abstract class AbstractDatabaseDataModelImporterProviderService<S extends Databa
     List<DataModel> validateImportedDataModels(List<DataModel> dataModels) {
         dataModels.each {DataModel dm ->
             dm.validate(deepValidate: false)
-            validateFacets(dm)
+            validateFacets(dm, dm)
             dm.dataTypes.each {
                 it.validate(deepValidate: false)
-                validateFacets(it)
+                addErrorsToModel(it, dm)
+                validateFacets(it, dm)
             }
             dm.enumerationTypes.each {
                 it.enumerationValues.each {
                     it.validate(deepValidate: false)
-                    validateFacets(it)
+                    addErrorsToModel(it, dm)
+                    validateFacets(it, dm)
                 }
             }
             dm.dataClasses.each {
                 it.validate(deepValidate: false)
-                validateFacets(it)
+                addErrorsToModel(it, dm)
+                validateFacets(it, dm)
             }
             dm.allDataElements.each {
                 it.validate(deepValidate: false)
-                validateFacets(it)
+                addErrorsToModel(it, dm)
+                validateFacets(it, dm)
             }
             dm.classifiers.each {
                 it.validate(deepValidate: false)
-                validateFacets(it)
+                addErrorsToModel(it, dm)
+                validateFacets(it, dm)
             }
             dm.referenceTypes.each {
                 it.validate(deepValidate: false)
-                validateFacets(it)
+                addErrorsToModel(it, dm)
+                validateFacets(it, dm)
             }
             dm.importedDataTypes.each {
                 it.validate(deepValidate: false)
-                validateFacets(it)
+                addErrorsToModel(it, dm)
+                validateFacets(it, dm)
             }
             dm.importedDataClasses.each {
                 it.validate(deepValidate: false)
-                validateFacets(it)
+                addErrorsToModel(it, dm)
+                validateFacets(it, dm)
             }
             dm.breadcrumbTree.validate(deepValidate: false)
+            addErrorsToModel(dm.breadcrumbTree, dm)
         }
         dataModels
+    }
+
+    void addErrorsToModel(GormValidateable validated, DataModel dataModel) {
+        if (validated.hasErrors()) {
+            validated.errors.allErrors.each {
+                dataModel.errors.reject(it.code, it.arguments, it.defaultMessage)
+            }
+        } else {
+            log.debug 'Validated {}, no errors', validated.class.name
+        }
     }
 
     List<DataModel> importDataModelsFromParameters(User currentUser, String databaseName, S parameters)
@@ -355,11 +375,14 @@ abstract class AbstractDatabaseDataModelImporterProviderService<S extends Databa
         dataModel
     }
 
-    void validateFacets(MdmDomain domain, boolean deepValidate = false) {
+    void validateFacets(MdmDomain domain, DataModel dataModel, boolean deepValidate = false) {
         final List<String> facetProperties = ['annotations', 'metadata', 'referenceFiles', 'referenceSummaryMetadata', 'rules', 'semanticLinks', 'summaryMetadata',
                                               'versionLinks']
         facetProperties.each {String propName ->
-            if (domain.hasProperty(propName)) domain[propName].each {MultiFacetItemAware it -> it.validate(deepValidate: deepValidate)}
+            if (domain.hasProperty(propName)) domain[propName].each {MultiFacetItemAware it ->
+                it.validate(deepValidate: deepValidate)
+                addErrorsToModel(it, dataModel)
+            }
         }
     }
 
@@ -835,7 +858,7 @@ abstract class AbstractDatabaseDataModelImporterProviderService<S extends Databa
             String val = (it.distinct_value as String)?.trim()
             //null is not a value, so skip it
             if (val) {
-                enumerationType.addToEnumerationValues(new EnumerationValue(key: val, value: val))
+                enumerationType.addToEnumerationValues(new EnumerationValue(key: replacePathChars(val), value: val))
             }
         }
 
@@ -955,6 +978,15 @@ abstract class AbstractDatabaseDataModelImporterProviderService<S extends Databa
 
     static boolean getBooleanValue(def value) {
         value.toString().toBoolean()
+    }
+
+    static String replacePathChars(String value) {
+        List<String> pathChars = [
+            Path.PATH_DELIMITER,
+            PathNode.MODEL_PATH_IDENTIFIER_SEPARATOR,
+            PathNode.ATTRIBUTE_PATH_IDENTIFIER_SEPARATOR
+        ]
+        value.replace(pathChars.collectEntries {[it, '?']})
     }
 
 }

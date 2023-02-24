@@ -1,5 +1,5 @@
 /*
- * Copyright 2020-2022 University of Oxford and Health and Social Care Information Centre, also known as NHS Digital
+ * Copyright 2020-2023 University of Oxford and NHS England
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -19,9 +19,11 @@ package uk.ac.ox.softeng.maurodatamapper.plugins.database
 
 import uk.ac.ox.softeng.maurodatamapper.api.exception.ApiBadRequestException
 import uk.ac.ox.softeng.maurodatamapper.api.exception.ApiException
+import uk.ac.ox.softeng.maurodatamapper.api.exception.ApiInvalidModelException
 import uk.ac.ox.softeng.maurodatamapper.core.authority.AuthorityService
 import uk.ac.ox.softeng.maurodatamapper.core.container.Folder
 import uk.ac.ox.softeng.maurodatamapper.core.model.CatalogueItem
+import uk.ac.ox.softeng.maurodatamapper.core.traits.domain.MultiFacetItemAware
 import uk.ac.ox.softeng.maurodatamapper.datamodel.DataModel
 import uk.ac.ox.softeng.maurodatamapper.datamodel.DataModelType
 import uk.ac.ox.softeng.maurodatamapper.datamodel.facet.SummaryMetadata
@@ -41,20 +43,26 @@ import uk.ac.ox.softeng.maurodatamapper.datamodel.provider.importer.DataModelImp
 import uk.ac.ox.softeng.maurodatamapper.datamodel.summarymetadata.AbstractIntervalHelper
 import uk.ac.ox.softeng.maurodatamapper.datamodel.summarymetadata.DateIntervalHelper
 import uk.ac.ox.softeng.maurodatamapper.datamodel.summarymetadata.SummaryMetadataHelper
+import uk.ac.ox.softeng.maurodatamapper.path.Path
+import uk.ac.ox.softeng.maurodatamapper.path.PathNode
 import uk.ac.ox.softeng.maurodatamapper.plugins.database.calculation.CalculationStrategy
 import uk.ac.ox.softeng.maurodatamapper.plugins.database.calculation.SamplingStrategy
 import uk.ac.ox.softeng.maurodatamapper.plugins.database.query.QueryStringProvider
 import uk.ac.ox.softeng.maurodatamapper.security.User
+import uk.ac.ox.softeng.maurodatamapper.traits.domain.MdmDomain
 import uk.ac.ox.softeng.maurodatamapper.util.Utils
 
 import grails.util.Pair
+import grails.validation.ValidationErrors
 import groovy.json.JsonOutput
-import groovy.transform.CompileStatic
 import groovy.util.logging.Slf4j
 import org.apache.commons.text.WordUtils
+import org.grails.datastore.gorm.GormValidateable
 import org.slf4j.Logger
 import org.slf4j.LoggerFactory
 import org.springframework.beans.factory.annotation.Autowired
+import org.springframework.context.MessageSource
+import org.springframework.validation.Errors
 
 import java.sql.Connection
 import java.sql.PreparedStatement
@@ -64,7 +72,7 @@ import java.sql.SQLException
 import java.util.regex.Pattern
 
 @Slf4j
-@CompileStatic
+//@CompileStatic
 abstract class AbstractDatabaseDataModelImporterProviderService<S extends DatabaseDataModelImporterProviderServiceParameters>
     extends DataModelImporterProviderService<S> {
 
@@ -93,6 +101,9 @@ abstract class AbstractDatabaseDataModelImporterProviderService<S extends Databa
 
     @Autowired
     DataTypeService dataTypeService
+
+    @Autowired
+    MessageSource messageSource
 
     String schemaNameColumnName = 'table_schema'
     String dataTypeColumnName = 'data_type'
@@ -133,11 +144,29 @@ abstract class AbstractDatabaseDataModelImporterProviderService<S extends Databa
         final List<String> databaseNames = parameters.databaseNames.split(',').toList()
         log.info 'Importing {} DataModel(s)', databaseNames.size()
 
-        final List<DataModel> dataModels = []
+        List<DataModel> dataModels = []
         databaseNames.each {String databaseName ->
             List<DataModel> importedModels = importDataModelsFromParameters(currentUser, databaseName, parameters as S)
             dataModels.addAll(importedModels)
         }
+
+        dataModels.each {DataModel dm ->
+            updateImportedModelFromParameters(dm, parameters as S, false)
+        }
+
+        validateImportedDataModels(dataModels).each {DataModel dm ->
+            checkImport(currentUser, dm, parameters as S)
+        }
+
+        if (dataModels.any {it.hasErrors()}) {
+            Errors errors = new ValidationErrors(dataModels, dataModels.first().class.getName())
+            dataModels.findAll {it.hasErrors()}.each {errors.addAllErrors((it as GormValidateable).errors)}
+            throw new ApiInvalidModelException('IS03', 'Invalid models', errors, messageSource)
+        }
+        log.debug('No errors in imported models')
+
+        dataModels.each {DataModel dm -> dataModelService.saveModelWithContent(dm)}
+
         dataModels
     }
 
@@ -187,6 +216,74 @@ abstract class AbstractDatabaseDataModelImporterProviderService<S extends Databa
 
     PreparedStatement prepareCoreStatement(Connection connection, S parameters) {
         connection.prepareStatement(getQueryStringProvider().databaseStructureQueryString)
+    }
+
+    /**
+     * Shallow validate DataModels for performance.
+     * All populated associations should have their validate method called.
+     * @param dataModels
+     * @return dataModels
+     */
+    List<DataModel> validateImportedDataModels(List<DataModel> dataModels) {
+        dataModels.each {DataModel dm ->
+            dm.validate(deepValidate: false)
+            validateFacets(dm, dm)
+            dm.dataTypes.each {
+                it.validate(deepValidate: false)
+                addErrorsToModel(it, dm)
+                validateFacets(it, dm)
+            }
+            dm.enumerationTypes.each {
+                it.enumerationValues.each {
+                    it.validate(deepValidate: false)
+                    addErrorsToModel(it, dm)
+                    validateFacets(it, dm)
+                }
+            }
+            dm.dataClasses.each {
+                it.validate(deepValidate: false)
+                addErrorsToModel(it, dm)
+                validateFacets(it, dm)
+            }
+            dm.allDataElements.each {
+                it.validate(deepValidate: false)
+                addErrorsToModel(it, dm)
+                validateFacets(it, dm)
+            }
+            dm.classifiers.each {
+                it.validate(deepValidate: false)
+                addErrorsToModel(it, dm)
+                validateFacets(it, dm)
+            }
+            dm.referenceTypes.each {
+                it.validate(deepValidate: false)
+                addErrorsToModel(it, dm)
+                validateFacets(it, dm)
+            }
+            dm.importedDataTypes.each {
+                it.validate(deepValidate: false)
+                addErrorsToModel(it, dm)
+                validateFacets(it, dm)
+            }
+            dm.importedDataClasses.each {
+                it.validate(deepValidate: false)
+                addErrorsToModel(it, dm)
+                validateFacets(it, dm)
+            }
+            dm.breadcrumbTree.validate(deepValidate: false)
+            addErrorsToModel(dm.breadcrumbTree, dm)
+        }
+        dataModels
+    }
+
+    void addErrorsToModel(GormValidateable validated, DataModel dataModel) {
+        if (validated.hasErrors()) {
+            validated.errors.allErrors.each {
+                dataModel.errors.reject(it.code, it.arguments, it.defaultMessage)
+            }
+        } else {
+            log.debug 'Validated {}, no errors', validated.class.name
+        }
     }
 
     List<DataModel> importDataModelsFromParameters(User currentUser, String databaseName, S parameters)
@@ -276,6 +373,17 @@ abstract class AbstractDatabaseDataModelImporterProviderService<S extends Databa
         }
 
         dataModel
+    }
+
+    void validateFacets(MdmDomain domain, DataModel dataModel, boolean deepValidate = false) {
+        final List<String> facetProperties = ['annotations', 'metadata', 'referenceFiles', 'referenceSummaryMetadata', 'rules', 'semanticLinks', 'summaryMetadata',
+                                              'versionLinks']
+        facetProperties.each {String propName ->
+            if (domain.hasProperty(propName)) domain[propName].each {MultiFacetItemAware it ->
+                it.validate(deepValidate: deepValidate)
+                addErrorsToModel(it, dataModel)
+            }
+        }
     }
 
     void updateDataModelWithEnumerationsAndSummaryMetadata(User user, S parameters, DataModel dataModel, Connection connection) {
@@ -750,7 +858,7 @@ abstract class AbstractDatabaseDataModelImporterProviderService<S extends Databa
             String val = (it.distinct_value as String)?.trim()
             //null is not a value, so skip it
             if (val) {
-                enumerationType.addToEnumerationValues(new EnumerationValue(key: val, value: val))
+                enumerationType.addToEnumerationValues(new EnumerationValue(key: replacePathChars(val), value: val))
             }
         }
 
@@ -870,6 +978,15 @@ abstract class AbstractDatabaseDataModelImporterProviderService<S extends Databa
 
     static boolean getBooleanValue(def value) {
         value.toString().toBoolean()
+    }
+
+    static String replacePathChars(String value) {
+        List<String> pathChars = [
+            Path.PATH_DELIMITER,
+            PathNode.MODEL_PATH_IDENTIFIER_SEPARATOR,
+            PathNode.ATTRIBUTE_PATH_IDENTIFIER_SEPARATOR
+        ]
+        value.replace(pathChars.collectEntries {[it, '?']})
     }
 
 }

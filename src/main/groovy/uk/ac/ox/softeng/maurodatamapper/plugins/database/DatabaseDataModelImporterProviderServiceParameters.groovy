@@ -168,9 +168,21 @@ abstract class DatabaseDataModelImporterProviderServiceParameters<K extends Data
     Integer maxEnumerations = 20
 
     @ImportParameterConfig(
+        displayName = 'Always include columns matching patterns as enumerations',
+        description = 'Include all values in columns which match the following CSV list of regex patterns as enumeration values',
+        order = 3,
+        optional = true,
+        group = @ImportGroupConfig(
+            name = 'Enumeration Values Detection',
+            order = EV_DETECTION_GROUP
+        )
+    )
+    String includeColumnsForEnumerations
+
+    @ImportParameterConfig(
         displayName = 'Ignore columns matching patterns',
         description = 'Ignore any columns which match the following CSV list of regex patterns',
-        order = 3,
+        order = 4,
         optional = true,
         group = @ImportGroupConfig(
             name = 'Enumeration Values Detection',

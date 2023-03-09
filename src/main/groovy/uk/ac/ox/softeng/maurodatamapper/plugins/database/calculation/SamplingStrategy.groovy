@@ -65,7 +65,6 @@ class SamplingStrategy {
                              samplingImporterProviderServiceParameters.enumerationValueUseSampling
         this.smUseDynamicPercentage = samplingImporterProviderServiceParameters.summaryMetadataUseDynamicSamplePercent
         this.smUseDynamicPercentage = samplingImporterProviderServiceParameters.enumerationValueUseDynamicSamplePercent
-
     }
 
     boolean dataExists() {

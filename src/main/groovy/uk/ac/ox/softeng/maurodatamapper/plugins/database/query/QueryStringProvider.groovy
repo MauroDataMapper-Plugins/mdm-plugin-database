@@ -163,7 +163,7 @@ abstract class QueryStringProvider {
      * @return Query string for distinct values in a column
      */
     String distinctColumnValuesQueryString(CalculationStrategy calculationStrategy, SamplingStrategy samplingStrategy, String columnName, String tableName,
-                                           String schemaName = null) {
+                                           String schemaName = null, boolean allValues = false) {
         String schemaIdentifier = schemaName ? "${escapeIdentifier(schemaName)}." : ""
         "SELECT DISTINCT(${escapeIdentifier(columnName)}) AS distinct_value FROM ${schemaIdentifier}${escapeIdentifier(tableName)}" +
         samplingStrategy.samplingClause(SamplingStrategy.Type.ENUMERATION_VALUES) +

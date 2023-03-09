@@ -40,6 +40,7 @@ class CalculationStrategy {
 
     boolean detectEnumerations
     Integer maxEnumerations
+    List<Pattern> includeColumnPatternsForEnumerations
     List<Pattern> ignorePatternsForEnumerations
     boolean computeSummaryMetadata
     List<Pattern> ignorePatternsForSummaryMetadata
@@ -50,6 +51,9 @@ class CalculationStrategy {
     CalculationStrategy(DatabaseDataModelImporterProviderServiceParameters parameters) {
         this.detectEnumerations = parameters.detectEnumerations
         this.maxEnumerations = parameters.maxEnumerations
+        this.includeColumnPatternsForEnumerations =
+            parameters.includeColumnsForEnumerations ? parameters.
+                includeColumnsForEnumerations.split(',').collect {Pattern.compile(it)} : Collections.emptyList() as List<Pattern>
         this.ignorePatternsForEnumerations =
             parameters.ignoreColumnsForEnumerations ? parameters.
                 ignoreColumnsForEnumerations.split(',').collect {Pattern.compile(it)} : Collections.emptyList() as List<Pattern>
@@ -68,7 +72,7 @@ class CalculationStrategy {
         detectEnumerations &&
         isColumnPossibleEnumeration(dataType) &&
         !ignorePatternsForEnumerations.any {columnLabel.matches(it)} &&
-        (rowCount == -1 || rowCount > maxEnumerations) // If the row count is less than maxEnum then all values will be enumerations which is not accurate
+        (rowCount == -1 || rowCount > maxEnumerations || includeColumnPatternsForEnumerations.any {columnLabel.matches(it)}) // If the row count is less than maxEnum then all values will be enumerations which is not accurate
     }
 
     boolean shouldComputeSummaryData(String columnLabel, DataType dataType) {
@@ -77,8 +81,12 @@ class CalculationStrategy {
         !ignorePatternsForSummaryMetadata.any {columnLabel.matches(it)}
     }
 
-    boolean isEnumerationType(int distinctCount) {
-        distinctCount > 0 && distinctCount <= (maxEnumerations ?: DEFAULT_MAX_ENUMERATIONS)
+    boolean isEnumerationType(String columnLabel, int distinctCount) {
+        distinctCount > 0 && (distinctCount <= (maxEnumerations ?: DEFAULT_MAX_ENUMERATIONS) || isColumnAlwaysEnumeration(columnLabel))
+    }
+
+    boolean isColumnAlwaysEnumeration(String columnLabel) {
+        includeColumnPatternsForEnumerations.any {columnLabel.matches(it)}
     }
 
     /**

@@ -343,7 +343,7 @@ abstract class AbstractDatabaseDataModelImporterProviderService<S extends Databa
             dataTypeService.addDefaultListOfDataTypesToDataModel(dataModel, defaultDataTypeProvider.defaultListOfDataTypes)
         }
 
-        results.each {Map<String, Object> row ->
+        results.sort {it.ordinal_position as Integer}.each {Map<String, Object> row ->
             String tableName = row[tableNameColumnName] as String
 
             // If the tablename matches any of the ignore regexes then skip
@@ -364,6 +364,7 @@ abstract class AbstractDatabaseDataModelImporterProviderService<S extends Databa
             final int minMultiplicity = isColumnNullable(row[columnIsNullableColumnName] as String) ? 0 : 1
             final DataElement dataElement = dataElementService.findOrCreateDataElementForDataClass(
                 tableDataClass, row[columnNameColumnName] as String, null, user, dataType, minMultiplicity, 1)
+            dataElement.setIndex(row.ordinal_position as Integer)
             addAliasIfSuitable(dataElement)
             row.findAll {String column, data ->
                 data && !(column in coreColumns)
@@ -438,14 +439,16 @@ abstract class AbstractDatabaseDataModelImporterProviderService<S extends Databa
             DataType dt = dataElement.dataType
 
             //Enumeration detection
+            boolean summaryMetadataComputed
             if (calculationStrategy.shouldDetectEnumerations(dataElement.label, dt, samplingStrategy.approxCount)) {
                 if (samplingStrategy.canDetectEnumerationValues()) {
                     boolean isEnumeration = detectEnumerationsForDataElement(calculationStrategy, samplingStrategy, connection,
                                                                              dataModel, schemaClass, tableClass, dataElement, user)
-
+                    log.trace 'isEnumeration for column {} = {}', dataElement.label, isEnumeration
                     if (isEnumeration && calculationStrategy.computeSummaryMetadata) {
                         if (samplingStrategy.canComputeSummaryMetadata()) {
                             computeSummaryMetadataForEnumerations(calculationStrategy, samplingStrategy, connection, schemaClass, tableClass, dataElement, user)
+                            summaryMetadataComputed = true
                         } else {
                             logNotCalculatingSummaryMetadata(samplingStrategy, dataElement)
                         }
@@ -456,7 +459,7 @@ abstract class AbstractDatabaseDataModelImporterProviderService<S extends Databa
             }
 
             //Summary metadata on dates and numbers
-            else if (calculationStrategy.shouldComputeSummaryData(dataElement.label, dt)) {
+            if (calculationStrategy.shouldComputeSummaryData(dataElement.label, dt) && !summaryMetadataComputed) {
                 if (samplingStrategy.canComputeSummaryMetadata()) {
                     computeSummaryMetadataForDatesAndNumbers(calculationStrategy, samplingStrategy, connection, schemaClass, tableClass, dataElement, user)
                 } else {
@@ -472,8 +475,8 @@ abstract class AbstractDatabaseDataModelImporterProviderService<S extends Databa
 
         // Make 1 call to get the distinct values, then use the size of the that results to tell if its actually an ET
         final List<Map<String, Object>> results = getDistinctColumnValues(connection, calculationStrategy, samplingStrategy, dataElement.label,
-                                                                          tableClass.label, schemaClass?.label)
-        if (calculationStrategy.isEnumerationType(results.size())) {
+                                                                          tableClass.label, schemaClass?.label, calculationStrategy.isColumnAlwaysEnumeration(dataElement.label))
+        if (calculationStrategy.isEnumerationType(dataElement.label, results.size())) {
 
             EnumerationType enumerationType = enumerationTypeService.findOrCreateDataTypeForDataModel(dataModel, dataElement.label, dataElement.label, user)
             replacePrimitiveTypeWithEnumerationType(dataElement, dataElement.dataType, enumerationType, results)
@@ -763,10 +766,10 @@ abstract class AbstractDatabaseDataModelImporterProviderService<S extends Databa
     }
 
     private List<Map<String, Object>> getDistinctColumnValues(Connection connection, CalculationStrategy calculationStrategy, SamplingStrategy samplingStrategy,
-                                                              String columnName, String tableName, String schemaName) {
+                                                              String columnName, String tableName, String schemaName, boolean allValues) {
         log.trace("Starting getDistinctColumnValues query for ${tableName}.${columnName}")
         long startTime = System.currentTimeMillis()
-        String queryString = queryStringProvider.distinctColumnValuesQueryString(calculationStrategy, samplingStrategy, columnName, tableName, schemaName)
+        String queryString = queryStringProvider.distinctColumnValuesQueryString(calculationStrategy, samplingStrategy, columnName, tableName, schemaName, allValues)
         SQL_LOGGER.trace('\n{}', queryString)
         final PreparedStatement preparedStatement = connection.prepareStatement(queryString)
         final List<Map<String, Object>> results = executeStatement(preparedStatement)
@@ -857,7 +860,7 @@ abstract class AbstractDatabaseDataModelImporterProviderService<S extends Databa
         results.each {
             String val = (it.distinct_value as String)?.trim()
             //null is not a value, so skip it
-            if (val) {
+            if (val.toString()) {
                 enumerationType.addToEnumerationValues(new EnumerationValue(key: replacePathChars(val), value: val))
             }
         }

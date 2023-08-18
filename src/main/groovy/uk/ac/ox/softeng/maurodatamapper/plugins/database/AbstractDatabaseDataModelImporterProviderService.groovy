@@ -744,6 +744,17 @@ abstract class AbstractDatabaseDataModelImporterProviderService<S extends Databa
     }
 
     /**
+     * If any rows are returned, return true, else return false.
+     */
+    boolean getIsRowCountGte(Connection connection, String tableName, String schemaName, int rowCount) {
+        final PreparedStatement preparedStatement = connection.prepareStatement(queryStringProvider.greaterThanOrEqualRowCountQueryString(tableName, schemaName))
+        preparedStatement.setInt(1, rowCount)
+        List<Map<String, Object>> results = executeStatement(preparedStatement)
+
+        return results as boolean
+    }
+
+    /**
      * Iterate candidate query strings and return the first not-null approximate count found.
      * If there are no not-null results then return 0. We do this in case queries return null
      * due to a lack of statistics.

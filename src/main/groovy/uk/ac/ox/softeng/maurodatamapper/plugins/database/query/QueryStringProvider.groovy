@@ -245,4 +245,13 @@ FROM ${escapeIdentifier(schemaName)}.${escapeIdentifier(tableName)} ${samplingSt
 GROUP BY ${escapeIdentifier(schemaName)}.${escapeIdentifier(tableName)}.${escapeIdentifier(columnName)}
 ORDER BY ${escapeIdentifier(schemaName)}.${escapeIdentifier(tableName)}.${escapeIdentifier(columnName)}""".stripIndent()
     }
+
+    /**
+     * Check if a table has at least a certain number of rows in it.
+     *
+     * @returns Any number results if the threshold is met, or no results if not.
+     */
+    String greaterThanOrEqualRowCountQueryString(String tableName, String schemaName) {
+        """SELECT 'GTE' FROM ${escapeIdentifier(schemaName)}.${escapeIdentifier(tableName)} HAVING COUNT(*) >= ?"""
+    }
 }

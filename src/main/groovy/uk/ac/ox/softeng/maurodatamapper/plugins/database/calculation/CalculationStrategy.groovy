@@ -47,6 +47,7 @@ class CalculationStrategy {
     boolean computeSummaryMetadata
     List<Pattern> ignorePatternsForSummaryMetadata
     BucketHandling dateBucketHandling
+    Boolean rowCountGteMaxEnumerations
 
     OffsetDateTime calculationDateTime
 
@@ -90,6 +91,14 @@ class CalculationStrategy {
 
     boolean isColumnAlwaysEnumeration(String columnLabel) {
         includeColumnPatternsForEnumerations.any {columnLabel.matches(it)}
+    }
+
+    boolean requiresRowCountGteMaxEnumerations() {
+        this.detectEnumerations ||
+    }
+
+    boolean isEnumerationType(int distinctCount) {
+        distinctCount > 0 && distinctCount <= (maxEnumerations ?: DEFAULT_MAX_ENUMERATIONS)
     }
 
     /**

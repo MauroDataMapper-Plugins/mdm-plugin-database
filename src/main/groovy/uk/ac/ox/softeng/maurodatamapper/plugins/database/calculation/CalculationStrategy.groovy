@@ -37,10 +37,12 @@ import java.util.regex.Pattern
 class CalculationStrategy {
 
     static final Integer DEFAULT_MAX_ENUMERATIONS = 20
+    static final Integer DEFAULT_MIN_SUMMARY_VALUE = 10
 
     boolean detectEnumerations
     Integer maxEnumerations
     List<Pattern> includeColumnPatternsForEnumerations
+    Integer minSummaryValue
     List<Pattern> ignorePatternsForEnumerations
     boolean computeSummaryMetadata
     List<Pattern> ignorePatternsForSummaryMetadata
@@ -50,10 +52,11 @@ class CalculationStrategy {
 
     CalculationStrategy(DatabaseDataModelImporterProviderServiceParameters parameters) {
         this.detectEnumerations = parameters.detectEnumerations
-        this.maxEnumerations = parameters.maxEnumerations
         this.includeColumnPatternsForEnumerations =
             parameters.includeColumnsForEnumerations ? parameters.
                 includeColumnsForEnumerations.split(',').collect {Pattern.compile(it)} : Collections.emptyList() as List<Pattern>
+        this.maxEnumerations = parameters.maxEnumerations ?: DEFAULT_MAX_ENUMERATIONS
+        this.minSummaryValue = parameters.summaryMetadataMinimumValue ?: DEFAULT_MIN_SUMMARY_VALUE
         this.ignorePatternsForEnumerations =
             parameters.ignoreColumnsForEnumerations ? parameters.
                 ignoreColumnsForEnumerations.split(',').collect {Pattern.compile(it)} : Collections.emptyList() as List<Pattern>

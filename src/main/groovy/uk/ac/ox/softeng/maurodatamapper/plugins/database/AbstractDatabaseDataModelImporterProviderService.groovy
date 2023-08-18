@@ -441,6 +441,7 @@ abstract class AbstractDatabaseDataModelImporterProviderService<S extends Databa
             //Enumeration detection
             boolean summaryMetadataComputed
             if (calculationStrategy.shouldDetectEnumerations(dataElement.label, dt, samplingStrategy.approxCount)) {
+                println "DataElement $dataElement.label, DataType $dt.label, approxCount $samplingStrategy.approxCount, canDetectEnumerationValues ${samplingStrategy.canDetectEnumerationValues()}"
                 if (samplingStrategy.canDetectEnumerationValues()) {
                     boolean isEnumeration = detectEnumerationsForDataElement(calculationStrategy, samplingStrategy, connection,
                                                                              dataModel, schemaClass, tableClass, dataElement, user)
@@ -490,7 +491,7 @@ abstract class AbstractDatabaseDataModelImporterProviderService<S extends Databa
         logSummaryMetadataDetection(samplingStrategy, dataElement, 'enumeration')
         //Count enumeration values
         Map<String, Long> enumerationValueDistribution =
-            getEnumerationValueDistribution(connection, samplingStrategy, dataElement.label, tableClass.label, schemaClass?.label)
+            roundSmallEnumerationValues(getEnumerationValueDistribution(connection, samplingStrategy, dataElement.label, tableClass.label, schemaClass?.label), calculationStrategy)
         if (enumerationValueDistribution) {
             String description = 'Enumeration Value Distribution'
             if (samplingStrategy.useSamplingForSummaryMetadata()) {
@@ -545,6 +546,8 @@ abstract class AbstractDatabaseDataModelImporterProviderService<S extends Databa
                     log.debug('Value distribution bucket size reduced to {}', valueDistribution.size())
                 }
 
+                valueDistribution = roundSmallEnumerationValues(valueDistribution, calculationStrategy)
+
                 SummaryMetadata summaryMetadata =
                     SummaryMetadataHelper.createSummaryMetadataFromMap(user, dataElement.label, description, calculationStrategy.calculationDateTime,
                                                                        valueDistribution)
@@ -555,6 +558,12 @@ abstract class AbstractDatabaseDataModelImporterProviderService<S extends Databa
                                                                        valueDistribution)
                 tableClass.addToSummaryMetadata(summaryMetadataOnTable)
             }
+        }
+    }
+
+    Map<String, Long> roundSmallEnumerationValues(Map<String, Long> valueDistribution, CalculationStrategy calculationStrategy) {
+        valueDistribution.each {
+            if (it.value && calculationStrategy.minSummaryValue && it.value < calculationStrategy.minSummaryValue) it.value = calculationStrategy.minSummaryValue
         }
     }
 

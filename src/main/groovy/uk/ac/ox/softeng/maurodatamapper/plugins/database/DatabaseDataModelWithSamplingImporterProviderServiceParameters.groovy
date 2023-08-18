@@ -31,7 +31,7 @@ abstract class DatabaseDataModelWithSamplingImporterProviderServiceParameters<K 
             'Use sampling to determine Summary Metadata if the row count of the table/view is above the threshold.',
             'If this is false then any tables/views with a row count above the threshold will have no summary metadata detection performed.',
         'Default is true.'],
-        order = 5,
+        order = 6,
         optional = true,
         group = @ImportGroupConfig(
             name = 'Summary Metadata Computation',
@@ -46,7 +46,7 @@ abstract class DatabaseDataModelWithSamplingImporterProviderServiceParameters<K 
             'If the approximate number of rows in a table or view exceeds this threshold, then use sampling when computing summary metadata.',
             'A value of 0, which is the default, means that sampling will not be considered and summary metadata computation will occur over the whole table/view.',
             'Sampling is done using vendor specific SQL.'],
-        order = 6,
+        order = 7,
         optional = true,
         group = @ImportGroupConfig(
             name = 'Summary Metadata Computation',
@@ -61,7 +61,7 @@ abstract class DatabaseDataModelWithSamplingImporterProviderServiceParameters<K 
             'If sampling is used, the percentage of rows to use as a sample.',
             'If the sampling threshold is > 0 but no value is supplied for Sample Percentage, a default value of 1% will be used.'
         ],
-        order = 7,
+        order = 8,
         optional = true,
         group = @ImportGroupConfig(
             name = 'Summary Metadata Computation',
@@ -77,7 +77,7 @@ abstract class DatabaseDataModelWithSamplingImporterProviderServiceParameters<K 
             'then dynamically adjust the sample percentage down by a factor of 10 until the sample size is less than 10x the threshold.',
             'Defaults to false'
         ],
-        order = 8,
+        order = 9,
         optional = true,
         group = @ImportGroupConfig(
             name = 'Summary Metadata Computation',

@@ -18,6 +18,7 @@
 package uk.ac.ox.softeng.maurodatamapper.plugins.database.calculation
 
 import uk.ac.ox.softeng.maurodatamapper.datamodel.item.datatype.DataType
+import uk.ac.ox.softeng.maurodatamapper.datamodel.item.datatype.EnumerationType
 import uk.ac.ox.softeng.maurodatamapper.datamodel.summarymetadata.AbstractIntervalHelper
 import uk.ac.ox.softeng.maurodatamapper.datamodel.summarymetadata.DateIntervalHelper
 import uk.ac.ox.softeng.maurodatamapper.datamodel.summarymetadata.DecimalIntervalHelper
@@ -48,6 +49,7 @@ class CalculationStrategy {
     List<Pattern> ignorePatternsForSummaryMetadata
     BucketHandling dateBucketHandling
     Boolean rowCountGteMaxEnumerations
+    Boolean rowCountGteMinSummaryValue
 
     OffsetDateTime calculationDateTime
 
@@ -76,10 +78,10 @@ class CalculationStrategy {
         detectEnumerations &&
         isColumnPossibleEnumeration(dataType) &&
         !ignorePatternsForEnumerations.any {columnLabel.matches(it)} &&
-        (rowCount == -1 || rowCount > maxEnumerations || includeColumnPatternsForEnumerations.any {columnLabel.matches(it)}) // If the row count is less than maxEnum then all values will be enumerations which is not accurate
+        (rowCountGteMaxEnumerations || (rowCountGteMaxEnumerations == null && rowCount > maxEnumerations) || includeColumnPatternsForEnumerations.any {columnLabel.matches(it)})  // If the row count is less than maxEnum then all values will be enumerations which is not accurate
     }
 
-    boolean shouldComputeSummaryData(String columnLabel, DataType dataType) {
+    boolean shouldComputeSummaryData(String columnLabel, DataType dataType, Long rowCount) {
         computeSummaryMetadata &&
         isColumnForDateOrNumericSummary(dataType) &&
         !ignorePatternsForSummaryMetadata.any {columnLabel.matches(it)}
@@ -95,6 +97,9 @@ class CalculationStrategy {
 
     boolean requiresRowCountGteMaxEnumerations() {
         this.detectEnumerations ||
+        (isColumnForDateOrNumericSummary(dataType) || dataType instanceof EnumerationType) &&
+        !ignorePatternsForSummaryMetadata.any {columnLabel.matches(it)} &&
+        (rowCountGteMinSummaryValue || (rowCountGteMinSummaryValue == null && rowCount > minSummaryValue))
     }
 
     boolean isEnumerationType(int distinctCount) {

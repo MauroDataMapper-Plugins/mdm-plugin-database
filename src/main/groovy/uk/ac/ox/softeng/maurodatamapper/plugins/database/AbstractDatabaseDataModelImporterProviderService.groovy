@@ -390,10 +390,10 @@ abstract class AbstractDatabaseDataModelImporterProviderService<S extends Databa
     void updateDataModelWithEnumerationsAndSummaryMetadata(User user, S parameters, DataModel dataModel, Connection connection) {
         log.debug('Starting enumeration and summary metadata detection')
         long startTime = System.currentTimeMillis()
-        CalculationStrategy calculationStrategy = createCalculationStrategy(parameters)
         dataModel.childDataClasses.sort().each {DataClass schemaClass ->
             schemaClass.dataClasses.sort().each {DataClass tableClass ->
                 log.trace('Checking {}.{} for possible enumerations and summary metadata', schemaClass.label, tableClass.label)
+                CalculationStrategy calculationStrategy = createCalculationStrategy(parameters)
                 SamplingStrategy samplingStrategy = createSamplingStrategy(schemaClass.label, tableClass.label, parameters)
                 if (samplingStrategy.requiresTableType()) {
                     samplingStrategy.tableType = getTableType(connection, tableClass.label, schemaClass.label, dataModel.label)
@@ -401,7 +401,19 @@ abstract class AbstractDatabaseDataModelImporterProviderService<S extends Databa
                 try {
                     // If SS needs the approx count then make the query, this can take a long time hence the reason to check if we need it
                     samplingStrategy.approxCount = samplingStrategy.requiresApproxCount() ? getApproxCount(connection, tableClass.label, schemaClass.label) : -1
-                    if (samplingStrategy.dataExists()) {
+                    if (samplingStrategy.approxCount == -1 && calculationStrategy.detectEnumerations) {
+                        calculationStrategy.rowCountGteMaxEnumerations = getIsRowCountGte(connection, tableClass.label, schemaClass.label, calculationStrategy.maxEnumerations)
+                        if (calculationStrategy.minSummaryValue < calculationStrategy.maxEnumerations && calculationStrategy.rowCountGteMaxEnumerations) {
+                            println "minSummaryValue $calculationStrategy.minSummaryValue maxEnumerations $calculationStrategy.maxEnumerations rowCountGteMaxEnumerations $calculationStrategy.rowCountGteMaxEnumerations"
+                            calculationStrategy.rowCountGteMinSummaryValue = true
+                        } else if (calculationStrategy.minSummaryValue > calculationStrategy.maxEnumerations && !calculationStrategy.rowCountGteMaxEnumerations) {
+                            calculationStrategy.rowCountGteMinSummaryValue = false
+                        }
+                    }
+                    if (samplingStrategy.approxCount == -1 && calculationStrategy.computeSummaryMetadata && calculationStrategy.rowCountGteMinSummaryValue == null) {
+                        calculationStrategy.rowCountGteMinSummaryValue = getIsRowCountGte(connection, tableClass.label, schemaClass.label, calculationStrategy.minSummaryValue)
+                    }
+                    if (samplingStrategy.dataExists() || calculationStrategy.rowCountGteMinSummaryValue || calculationStrategy.rowCountGteMaxEnumerations) {
                         calculateEnumerationsAndSummaryMetadata(dataModel, schemaClass, tableClass, calculationStrategy, samplingStrategy, connection, user)
                     } else {
                         log.warn('Not calculating enumerations and summary metadata in {}.{} as the table contains no data', schemaClass.label, tableClass.label)
@@ -438,15 +450,15 @@ abstract class AbstractDatabaseDataModelImporterProviderService<S extends Databa
         tableClass.dataElements.sort().each {DataElement dataElement ->
             DataType dt = dataElement.dataType
 
+            println "DataElement $dataElement.label, DataType $dt.label, approxCount $samplingStrategy.approxCount, gteMaxEnumerations $calculationStrategy.rowCountGteMaxEnumerations, gteMinSummary $calculationStrategy.rowCountGteMinSummaryValue}"
+
             //Enumeration detection
             boolean summaryMetadataComputed
             if (calculationStrategy.shouldDetectEnumerations(dataElement.label, dt, samplingStrategy.approxCount)) {
-                println "DataElement $dataElement.label, DataType $dt.label, approxCount $samplingStrategy.approxCount, canDetectEnumerationValues ${samplingStrategy.canDetectEnumerationValues()}"
                 if (samplingStrategy.canDetectEnumerationValues()) {
                     boolean isEnumeration = detectEnumerationsForDataElement(calculationStrategy, samplingStrategy, connection,
                                                                              dataModel, schemaClass, tableClass, dataElement, user)
-                    log.trace 'isEnumeration for column {} = {}', dataElement.label, isEnumeration
-                    if (isEnumeration && calculationStrategy.computeSummaryMetadata) {
+                    if (isEnumeration && calculationStrategy.computeSummaryMetadata && calculationStrategy.shouldComputeSummaryData(dataElement.label, dataElement.dataType, samplingStrategy.approxCount)) {
                         if (samplingStrategy.canComputeSummaryMetadata()) {
                             computeSummaryMetadataForEnumerations(calculationStrategy, samplingStrategy, connection, schemaClass, tableClass, dataElement, user)
                             summaryMetadataComputed = true
@@ -460,7 +472,8 @@ abstract class AbstractDatabaseDataModelImporterProviderService<S extends Databa
             }
 
             //Summary metadata on dates and numbers
-            if (calculationStrategy.shouldComputeSummaryData(dataElement.label, dt) && !summaryMetadataComputed) {
+
+            if (calculationStrategy.shouldComputeSummaryData(dataElement.label, dt, samplingStrategy.approxCount) && !summaryMetadataComputed) {
                 if (samplingStrategy.canComputeSummaryMetadata()) {
                     computeSummaryMetadataForDatesAndNumbers(calculationStrategy, samplingStrategy, connection, schemaClass, tableClass, dataElement, user)
                 } else {
@@ -491,7 +504,8 @@ abstract class AbstractDatabaseDataModelImporterProviderService<S extends Databa
         logSummaryMetadataDetection(samplingStrategy, dataElement, 'enumeration')
         //Count enumeration values
         Map<String, Long> enumerationValueDistribution =
-            roundSmallEnumerationValues(getEnumerationValueDistribution(connection, samplingStrategy, dataElement.label, tableClass.label, schemaClass?.label), calculationStrategy)
+            roundSmallEnumerationValues(getEnumerationValueDistribution(connection, samplingStrategy, dataElement.label, tableClass.label, schemaClass?.label),
+                                        calculationStrategy)
         if (enumerationValueDistribution) {
             String description = 'Enumeration Value Distribution'
             if (samplingStrategy.useSamplingForSummaryMetadata()) {
@@ -750,6 +764,9 @@ abstract class AbstractDatabaseDataModelImporterProviderService<S extends Databa
         final PreparedStatement preparedStatement = connection.prepareStatement(queryStringProvider.greaterThanOrEqualRowCountQueryString(tableName, schemaName))
         preparedStatement.setInt(1, rowCount)
         List<Map<String, Object>> results = executeStatement(preparedStatement)
+
+        println "getIsRowCountGte :: $schemaName . $tableName , rowCount >= $rowCount ? ${results as boolean}"
+        println results
 
         return results as boolean
     }

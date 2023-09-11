@@ -165,7 +165,14 @@ class CalculationStrategy {
         if (isColumnForLongSummary(dataType)) {
             return new LongIntervalHelper((Long) minMax.aValue, (Long) minMax.bValue)
         } else if (isColumnForIntegerSummary(dataType)) {
-            return new LongIntervalHelper((Long) minMax.aValue, (Long) minMax.bValue)
+            LongIntervalHelper lih = new LongIntervalHelper((Long) minMax.aValue, (Long) minMax.bValue)
+            Map<String, Pair<Long, Long>> newIntervals = [:]
+            lih.intervals.each {
+                String[] startEnd = it.key.split(' - ')
+                newIntervals[startEnd.first() + ' - ' + startEnd.last().toInteger()-1] = it.value
+            }
+            lih.intervals = newIntervals
+            return lih
         } else if (isColumnForDateSummary(dataType)) {
             return new DateIntervalHelper(getLocalDateTime(minMax.aValue), getLocalDateTime(minMax.bValue))
         } else if (isColumnForDecimalSummary(dataType)) {

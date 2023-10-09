@@ -452,13 +452,13 @@ abstract class AbstractDatabaseDataModelImporterProviderService<S extends Databa
 
             println "DataElement $dataElement.label, DataType $dt.label, approxCount $samplingStrategy.approxCount, gteMaxEnumerations $calculationStrategy.rowCountGteMaxEnumerations, gteMinSummary $calculationStrategy.rowCountGteMinSummaryValue}"
 
-            //Enumeration detection
+            // Enumeration detection and summary metadata on enumeration values
             boolean summaryMetadataComputed
             if (calculationStrategy.shouldDetectEnumerations(dataElement.label, dt, samplingStrategy.approxCount)) {
                 if (samplingStrategy.canDetectEnumerationValues()) {
                     boolean isEnumeration = detectEnumerationsForDataElement(calculationStrategy, samplingStrategy, connection,
                                                                              dataModel, schemaClass, tableClass, dataElement, user)
-                    if (isEnumeration && calculationStrategy.computeSummaryMetadata && calculationStrategy.shouldComputeSummaryData(dataElement.label, dataElement.dataType, samplingStrategy.approxCount)) {
+                    if (isEnumeration && calculationStrategy.shouldComputeSummaryData(dataElement.label, dataElement.dataType, samplingStrategy.approxCount)) {
                         if (samplingStrategy.canComputeSummaryMetadata()) {
                             computeSummaryMetadataForEnumerations(calculationStrategy, samplingStrategy, connection, schemaClass, tableClass, dataElement, user)
                             summaryMetadataComputed = true
@@ -471,9 +471,8 @@ abstract class AbstractDatabaseDataModelImporterProviderService<S extends Databa
                 }
             }
 
-            //Summary metadata on dates and numbers
-
-            if (calculationStrategy.shouldComputeSummaryData(dataElement.label, dt, samplingStrategy.approxCount) && !summaryMetadataComputed) {
+            // Summary metadata on dates and numbers
+            if (calculationStrategy.isColumnForDateOrNumericSummary(dt) && calculationStrategy.shouldComputeSummaryData(dataElement.label, dt, samplingStrategy.approxCount) && !summaryMetadataComputed) {
                 if (samplingStrategy.canComputeSummaryMetadata()) {
                     computeSummaryMetadataForDatesAndNumbers(calculationStrategy, samplingStrategy, connection, schemaClass, tableClass, dataElement, user)
                 } else {

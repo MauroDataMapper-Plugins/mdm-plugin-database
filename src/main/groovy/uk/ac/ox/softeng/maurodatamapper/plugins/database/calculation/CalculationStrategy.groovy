@@ -83,8 +83,9 @@ class CalculationStrategy {
 
     boolean shouldComputeSummaryData(String columnLabel, DataType dataType, Long rowCount) {
         computeSummaryMetadata &&
-        isColumnForDateOrNumericSummary(dataType) &&
-        !ignorePatternsForSummaryMetadata.any {columnLabel.matches(it)}
+        (isColumnForDateOrNumericSummary(dataType) || dataType instanceof EnumerationType) &&
+        !ignorePatternsForSummaryMetadata.any {columnLabel.matches(it)} &&
+        (rowCountGteMinSummaryValue || (rowCountGteMinSummaryValue == null && rowCount > minSummaryValue))
     }
 
     boolean isEnumerationType(String columnLabel, int distinctCount) {
@@ -93,17 +94,6 @@ class CalculationStrategy {
 
     boolean isColumnAlwaysEnumeration(String columnLabel) {
         includeColumnPatternsForEnumerations.any {columnLabel.matches(it)}
-    }
-
-    boolean requiresRowCountGteMaxEnumerations() {
-        this.detectEnumerations ||
-        (isColumnForDateOrNumericSummary(dataType) || dataType instanceof EnumerationType) &&
-        !ignorePatternsForSummaryMetadata.any {columnLabel.matches(it)} &&
-        (rowCountGteMinSummaryValue || (rowCountGteMinSummaryValue == null && rowCount > minSummaryValue))
-    }
-
-    boolean isEnumerationType(int distinctCount) {
-        distinctCount > 0 && distinctCount <= (maxEnumerations ?: DEFAULT_MAX_ENUMERATIONS)
     }
 
     /**
@@ -165,14 +155,7 @@ class CalculationStrategy {
         if (isColumnForLongSummary(dataType)) {
             return new LongIntervalHelper((Long) minMax.aValue, (Long) minMax.bValue)
         } else if (isColumnForIntegerSummary(dataType)) {
-            LongIntervalHelper lih = new LongIntervalHelper((Long) minMax.aValue, (Long) minMax.bValue)
-            Map<String, Pair<Long, Long>> newIntervals = [:]
-            lih.intervals.each {
-                String[] startEnd = it.key.split(' - ')
-                newIntervals[startEnd.first() + ' - ' + startEnd.last().toInteger()-1] = it.value
-            }
-            lih.intervals = newIntervals
-            return lih
+            return new LongIntervalHelper((Long) minMax.aValue, (Long) minMax.bValue)
         } else if (isColumnForDateSummary(dataType)) {
             return new DateIntervalHelper(getLocalDateTime(minMax.aValue), getLocalDateTime(minMax.bValue))
         } else if (isColumnForDecimalSummary(dataType)) {

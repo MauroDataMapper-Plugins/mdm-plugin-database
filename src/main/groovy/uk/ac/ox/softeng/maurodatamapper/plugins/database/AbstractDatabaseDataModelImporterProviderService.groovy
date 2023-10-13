@@ -463,7 +463,7 @@ abstract class AbstractDatabaseDataModelImporterProviderService<S extends Databa
                             logCannotCalculateSummaryMetadata(samplingStrategy, dataElement)
                         }
                     } else if (isEnumeration) {
-                        logExcludedFromSummaryMetadata(calculationStrategy, samplingStrategy.approxCount, dataElement)
+//                        logExcludedFromSummaryMetadata(calculationStrategy, samplingStrategy.approxCount, dataElement)
                     }
                 } else {
                     logNotDetectingEnumerationValues(samplingStrategy, dataElement)
@@ -479,7 +479,7 @@ abstract class AbstractDatabaseDataModelImporterProviderService<S extends Databa
                         logCannotCalculateSummaryMetadata(samplingStrategy, dataElement)
                     }
                 } else {
-                    logExcludedFromSummaryMetadata(calculationStrategy, samplingStrategy.approxCount, dataElement)
+//                    logExcludedFromSummaryMetadata(calculationStrategy, samplingStrategy.approxCount, dataElement)
                 }
             }
         }

@@ -404,7 +404,6 @@ abstract class AbstractDatabaseDataModelImporterProviderService<S extends Databa
                     if (samplingStrategy.approxCount == -1 && calculationStrategy.detectEnumerations) {
                         calculationStrategy.rowCountGteMaxEnumerations = getIsRowCountGte(connection, tableClass.label, schemaClass.label, calculationStrategy.maxEnumerations)
                         if (calculationStrategy.minSummaryValue < calculationStrategy.maxEnumerations && calculationStrategy.rowCountGteMaxEnumerations) {
-                            println "minSummaryValue $calculationStrategy.minSummaryValue maxEnumerations $calculationStrategy.maxEnumerations rowCountGteMaxEnumerations $calculationStrategy.rowCountGteMaxEnumerations"
                             calculationStrategy.rowCountGteMinSummaryValue = true
                         } else if (calculationStrategy.minSummaryValue > calculationStrategy.maxEnumerations && !calculationStrategy.rowCountGteMaxEnumerations) {
                             calculationStrategy.rowCountGteMinSummaryValue = false
@@ -450,8 +449,6 @@ abstract class AbstractDatabaseDataModelImporterProviderService<S extends Databa
         tableClass.dataElements.sort().each {DataElement dataElement ->
             DataType dt = dataElement.dataType
 
-            println "DataElement $dataElement.label, DataType $dt.label, approxCount $samplingStrategy.approxCount, gteMaxEnumerations $calculationStrategy.rowCountGteMaxEnumerations, gteMinSummary $calculationStrategy.rowCountGteMinSummaryValue}"
-
             // Enumeration detection and summary metadata on enumeration values
             boolean summaryMetadataComputed
             if (calculationStrategy.shouldDetectEnumerations(dataElement.label, dt, samplingStrategy.approxCount)) {
@@ -463,8 +460,10 @@ abstract class AbstractDatabaseDataModelImporterProviderService<S extends Databa
                             computeSummaryMetadataForEnumerations(calculationStrategy, samplingStrategy, connection, schemaClass, tableClass, dataElement, user)
                             summaryMetadataComputed = true
                         } else {
-                            logNotCalculatingSummaryMetadata(samplingStrategy, dataElement)
+                            logCannotCalculateSummaryMetadata(samplingStrategy, dataElement)
                         }
+                    } else if (isEnumeration) {
+                        logExcludedFromSummaryMetadata(calculationStrategy, samplingStrategy.approxCount, dataElement)
                     }
                 } else {
                     logNotDetectingEnumerationValues(samplingStrategy, dataElement)
@@ -472,11 +471,15 @@ abstract class AbstractDatabaseDataModelImporterProviderService<S extends Databa
             }
 
             // Summary metadata on dates and numbers
-            if (calculationStrategy.isColumnForDateOrNumericSummary(dt) && calculationStrategy.shouldComputeSummaryData(dataElement.label, dt, samplingStrategy.approxCount) && !summaryMetadataComputed) {
-                if (samplingStrategy.canComputeSummaryMetadata()) {
-                    computeSummaryMetadataForDatesAndNumbers(calculationStrategy, samplingStrategy, connection, schemaClass, tableClass, dataElement, user)
+            if (calculationStrategy.isColumnForDateOrNumericSummary(dt) && !summaryMetadataComputed) {
+                if (calculationStrategy.shouldComputeSummaryData(dataElement.label, dt, samplingStrategy.approxCount)) {
+                    if (samplingStrategy.canComputeSummaryMetadata()) {
+                        computeSummaryMetadataForDatesAndNumbers(calculationStrategy, samplingStrategy, connection, schemaClass, tableClass, dataElement, user)
+                    } else {
+                        logCannotCalculateSummaryMetadata(samplingStrategy, dataElement)
+                    }
                 } else {
-                    logNotCalculatingSummaryMetadata(samplingStrategy, dataElement)
+                    logExcludedFromSummaryMetadata(calculationStrategy, samplingStrategy.approxCount, dataElement)
                 }
             }
         }
@@ -764,9 +767,6 @@ abstract class AbstractDatabaseDataModelImporterProviderService<S extends Databa
         preparedStatement.setInt(1, rowCount)
         List<Map<String, Object>> results = executeStatement(preparedStatement)
 
-        println "getIsRowCountGte :: $schemaName . $tableName , rowCount >= $rowCount ? ${results as boolean}"
-        println results
-
         return results as boolean
     }
 
@@ -878,7 +878,14 @@ abstract class AbstractDatabaseDataModelImporterProviderService<S extends Databa
         }
     }
 
-    private void logNotCalculatingSummaryMetadata(SamplingStrategy samplingStrategy, DataElement de) {
+    private void logExcludedFromSummaryMetadata(CalculationStrategy calculationStrategy, Long rowCount, DataElement de) {
+        log.warn(
+            'Not calculating summary metadata for {} as it is disabled, not a date, numeric or enumeration type, or rowcount {} does not exceed minimum threshold {}',
+            de.label, rowCount, calculationStrategy.minSummaryValue
+        )
+    }
+
+    private void logCannotCalculateSummaryMetadata(SamplingStrategy samplingStrategy, DataElement de) {
         log.warn(
             'Not calculating summary metadata for {} as rowcount {} is above threshold {} and we cannot use sampling',
             de.label, samplingStrategy.approxCount, samplingStrategy.smThreshold)

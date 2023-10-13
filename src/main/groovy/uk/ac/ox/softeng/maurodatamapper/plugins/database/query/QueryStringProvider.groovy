@@ -163,7 +163,7 @@ abstract class QueryStringProvider {
      * @return Query string for distinct values in a column
      */
     String distinctColumnValuesQueryString(CalculationStrategy calculationStrategy, SamplingStrategy samplingStrategy, String columnName, String tableName,
-                                           String schemaName = null) {
+                                           String schemaName = null, boolean allValues = false) {
         String schemaIdentifier = schemaName ? "${escapeIdentifier(schemaName)}." : ""
         "SELECT DISTINCT(${escapeIdentifier(columnName)}) AS distinct_value FROM ${schemaIdentifier}${escapeIdentifier(tableName)}" +
         samplingStrategy.samplingClause(SamplingStrategy.Type.ENUMERATION_VALUES) +
@@ -244,5 +244,14 @@ WHERE ${escapeIdentifier(columnName)} IS NOT NULL""".stripIndent()
 FROM ${escapeIdentifier(schemaName)}.${escapeIdentifier(tableName)} ${samplingStrategy.samplingClause(SamplingStrategy.Type.SUMMARY_METADATA)}
 GROUP BY ${escapeIdentifier(schemaName)}.${escapeIdentifier(tableName)}.${escapeIdentifier(columnName)}
 ORDER BY ${escapeIdentifier(schemaName)}.${escapeIdentifier(tableName)}.${escapeIdentifier(columnName)}""".stripIndent()
+    }
+
+    /**
+     * Check if a table has at least a certain number of rows in it.
+     *
+     * @returns Any number results if the threshold is met, or no results if not.
+     */
+    String greaterThanOrEqualRowCountQueryString(String tableName, String schemaName) {
+        """SELECT 'GTE' FROM ${escapeIdentifier(schemaName)}.${escapeIdentifier(tableName)} HAVING COUNT(*) >= ?"""
     }
 }

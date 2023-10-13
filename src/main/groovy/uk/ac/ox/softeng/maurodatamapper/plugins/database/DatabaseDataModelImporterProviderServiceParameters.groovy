@@ -168,9 +168,21 @@ abstract class DatabaseDataModelImporterProviderServiceParameters<K extends Data
     Integer maxEnumerations = 20
 
     @ImportParameterConfig(
+        displayName = 'Always include columns matching patterns as enumerations',
+        description = 'Include all values in columns which match the following CSV list of regex patterns as enumeration values',
+        order = 3,
+        optional = true,
+        group = @ImportGroupConfig(
+            name = 'Enumeration Values Detection',
+            order = EV_DETECTION_GROUP
+        )
+    )
+    String includeColumnsForEnumerations
+
+    @ImportParameterConfig(
         displayName = 'Ignore columns matching patterns',
         description = 'Ignore any columns which match the following CSV list of regex patterns',
-        order = 3,
+        order = 4,
         optional = true,
         group = @ImportGroupConfig(
             name = 'Enumeration Values Detection',
@@ -192,12 +204,24 @@ abstract class DatabaseDataModelImporterProviderServiceParameters<K extends Data
     Boolean calculateSummaryMetadata = false
 
     @ImportParameterConfig(
+        displayName = 'Minimum Threshold',
+        description = 'Non-zero values less than this threshold will be rounded up to the threshold. The default value is 10.',
+        order = 2,
+        optional = true,
+        group = @ImportGroupConfig(
+            name = 'Summary Metadata Computation',
+            order = SM_COMPUTE_GROUP
+        )
+    )
+    Integer summaryMetadataMinimumValue = 10
+
+    @ImportParameterConfig(
         displayName = 'Merge (default) or Remove empty Date buckets',
         description = ['Value of "merge" or "remove".',
             'For date ranges over 100 years there will be more than 10 "buckets" of data with a range of 10 years,',
             'the default action is to merge empty buckets to reduce the complexity of the report.',
             'You can choose instead just to remove the empty buckets and only show the decades with data.'],
-        order = 2,
+        order = 3,
         optional = true,
         group = @ImportGroupConfig(
             name = 'Summary Metadata Computation',

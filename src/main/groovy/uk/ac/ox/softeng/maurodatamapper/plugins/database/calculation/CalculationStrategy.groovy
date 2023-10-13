@@ -18,6 +18,7 @@
 package uk.ac.ox.softeng.maurodatamapper.plugins.database.calculation
 
 import uk.ac.ox.softeng.maurodatamapper.datamodel.item.datatype.DataType
+import uk.ac.ox.softeng.maurodatamapper.datamodel.item.datatype.EnumerationType
 import uk.ac.ox.softeng.maurodatamapper.datamodel.summarymetadata.AbstractIntervalHelper
 import uk.ac.ox.softeng.maurodatamapper.datamodel.summarymetadata.DateIntervalHelper
 import uk.ac.ox.softeng.maurodatamapper.datamodel.summarymetadata.DecimalIntervalHelper
@@ -37,19 +38,28 @@ import java.util.regex.Pattern
 class CalculationStrategy {
 
     static final Integer DEFAULT_MAX_ENUMERATIONS = 20
+    static final Integer DEFAULT_MIN_SUMMARY_VALUE = 10
 
     boolean detectEnumerations
     Integer maxEnumerations
+    List<Pattern> includeColumnPatternsForEnumerations
+    Integer minSummaryValue
     List<Pattern> ignorePatternsForEnumerations
     boolean computeSummaryMetadata
     List<Pattern> ignorePatternsForSummaryMetadata
     BucketHandling dateBucketHandling
+    Boolean rowCountGteMaxEnumerations
+    Boolean rowCountGteMinSummaryValue
 
     OffsetDateTime calculationDateTime
 
     CalculationStrategy(DatabaseDataModelImporterProviderServiceParameters parameters) {
         this.detectEnumerations = parameters.detectEnumerations
-        this.maxEnumerations = parameters.maxEnumerations
+        this.includeColumnPatternsForEnumerations =
+            parameters.includeColumnsForEnumerations ? parameters.
+                includeColumnsForEnumerations.split(',').collect {Pattern.compile(it)} : Collections.emptyList() as List<Pattern>
+        this.maxEnumerations = parameters.maxEnumerations ?: DEFAULT_MAX_ENUMERATIONS
+        this.minSummaryValue = parameters.summaryMetadataMinimumValue ?: DEFAULT_MIN_SUMMARY_VALUE
         this.ignorePatternsForEnumerations =
             parameters.ignoreColumnsForEnumerations ? parameters.
                 ignoreColumnsForEnumerations.split(',').collect {Pattern.compile(it)} : Collections.emptyList() as List<Pattern>
@@ -68,17 +78,22 @@ class CalculationStrategy {
         detectEnumerations &&
         isColumnPossibleEnumeration(dataType) &&
         !ignorePatternsForEnumerations.any {columnLabel.matches(it)} &&
-        (rowCount == -1 || rowCount > maxEnumerations) // If the row count is less than maxEnum then all values will be enumerations which is not accurate
+        (rowCountGteMaxEnumerations || (rowCountGteMaxEnumerations == null && rowCount > maxEnumerations) || includeColumnPatternsForEnumerations.any {columnLabel.matches(it)})  // If the row count is less than maxEnum then all values will be enumerations which is not accurate
     }
 
-    boolean shouldComputeSummaryData(String columnLabel, DataType dataType) {
+    boolean shouldComputeSummaryData(String columnLabel, DataType dataType, Long rowCount) {
         computeSummaryMetadata &&
-        isColumnForDateOrNumericSummary(dataType) &&
-        !ignorePatternsForSummaryMetadata.any {columnLabel.matches(it)}
+        (isColumnForDateOrNumericSummary(dataType) || dataType instanceof EnumerationType) &&
+        !ignorePatternsForSummaryMetadata.any {columnLabel.matches(it)} &&
+        (rowCountGteMinSummaryValue || (rowCountGteMinSummaryValue == null && rowCount > minSummaryValue))
     }
 
-    boolean isEnumerationType(int distinctCount) {
-        distinctCount > 0 && distinctCount <= (maxEnumerations ?: DEFAULT_MAX_ENUMERATIONS)
+    boolean isEnumerationType(String columnLabel, int distinctCount) {
+        distinctCount > 0 && (distinctCount <= (maxEnumerations ?: DEFAULT_MAX_ENUMERATIONS) || isColumnAlwaysEnumeration(columnLabel))
+    }
+
+    boolean isColumnAlwaysEnumeration(String columnLabel) {
+        includeColumnPatternsForEnumerations.any {columnLabel.matches(it)}
     }
 
     /**

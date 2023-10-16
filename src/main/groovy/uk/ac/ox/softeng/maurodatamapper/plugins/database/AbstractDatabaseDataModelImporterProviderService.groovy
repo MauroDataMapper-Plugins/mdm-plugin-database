@@ -463,7 +463,7 @@ abstract class AbstractDatabaseDataModelImporterProviderService<S extends Databa
                             logCannotCalculateSummaryMetadata(samplingStrategy, dataElement)
                         }
                     } else if (isEnumeration) {
-//                        logExcludedFromSummaryMetadata(calculationStrategy, samplingStrategy.approxCount, dataElement)
+                        logExcludedFromSummaryMetadata(calculationStrategy, samplingStrategy.approxCount, dataElement)
                     }
                 } else {
                     logNotDetectingEnumerationValues(samplingStrategy, dataElement)
@@ -479,7 +479,7 @@ abstract class AbstractDatabaseDataModelImporterProviderService<S extends Databa
                         logCannotCalculateSummaryMetadata(samplingStrategy, dataElement)
                     }
                 } else {
-//                    logExcludedFromSummaryMetadata(calculationStrategy, samplingStrategy.approxCount, dataElement)
+                    logExcludedFromSummaryMetadata(calculationStrategy, samplingStrategy.approxCount, dataElement)
                 }
             }
         }
@@ -861,7 +861,7 @@ abstract class AbstractDatabaseDataModelImporterProviderService<S extends Databa
         }
     }
 
-    private void logSummaryMetadataDetection(SamplingStrategy samplingStrategy, DataElement de, String type) {
+    void logSummaryMetadataDetection(SamplingStrategy samplingStrategy, DataElement de, String type) {
         if (samplingStrategy.useSamplingForSummaryMetadata()) {
             log.debug('Performing {} summary metadata detection for column {} (calculated by sampling {}% of rows)', type, de.label,
                       samplingStrategy.getSummaryMetadataSamplePercentage())
@@ -870,7 +870,7 @@ abstract class AbstractDatabaseDataModelImporterProviderService<S extends Databa
         }
     }
 
-    private void logEnumerationDetection(SamplingStrategy samplingStrategy, DataElement de) {
+    void logEnumerationDetection(SamplingStrategy samplingStrategy, DataElement de) {
         if (samplingStrategy.useSamplingForEnumerationValues()) {
             log.debug('Performing enumeration detection for column {} (calculated by sampling {}% of rows)', de.label, samplingStrategy.getEnumerationValueSamplePercentage())
         } else {
@@ -878,20 +878,20 @@ abstract class AbstractDatabaseDataModelImporterProviderService<S extends Databa
         }
     }
 
-    private void logExcludedFromSummaryMetadata(CalculationStrategy calculationStrategy, Long rowCount, DataElement de) {
+    void logExcludedFromSummaryMetadata(CalculationStrategy calculationStrategy, Long rowCount, DataElement de) {
         log.warn(
             'Not calculating summary metadata for {} as it is disabled, not a date, numeric or enumeration type, or rowcount {} does not exceed minimum threshold {}',
             de.label, rowCount, calculationStrategy.minSummaryValue
         )
     }
 
-    private void logCannotCalculateSummaryMetadata(SamplingStrategy samplingStrategy, DataElement de) {
+    void logCannotCalculateSummaryMetadata(SamplingStrategy samplingStrategy, DataElement de) {
         log.warn(
             'Not calculating summary metadata for {} as rowcount {} is above threshold {} and we cannot use sampling',
             de.label, samplingStrategy.approxCount, samplingStrategy.smThreshold)
     }
 
-    private void logNotDetectingEnumerationValues(SamplingStrategy samplingStrategy, DataElement de) {
+    void logNotDetectingEnumerationValues(SamplingStrategy samplingStrategy, DataElement de) {
         log.warn(
             'Not detecting enumerations for {} as rowcount {} is above threshold {} and we cannot use sampling',
             de.label, samplingStrategy.approxCount, samplingStrategy.evThreshold)

@@ -44,8 +44,10 @@ abstract class QueryStringProvider {
      * Must return a String which will be queryable by schema name,
      * and return a row with the following elements:
      *  * constraint_name
+     *  * schema_name
      *  * table_name
      *  * column_name
+     *  * reference_schema_name
      *  * reference_table_name
      *  * reference_column_name
      * @return Query string for foreign key information

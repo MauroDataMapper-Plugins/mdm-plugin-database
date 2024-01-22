@@ -22,6 +22,9 @@ import uk.ac.ox.softeng.maurodatamapper.api.exception.ApiException
 import uk.ac.ox.softeng.maurodatamapper.api.exception.ApiInvalidModelException
 import uk.ac.ox.softeng.maurodatamapper.core.authority.AuthorityService
 import uk.ac.ox.softeng.maurodatamapper.core.container.Folder
+import uk.ac.ox.softeng.maurodatamapper.core.facet.SemanticLink
+import uk.ac.ox.softeng.maurodatamapper.core.facet.SemanticLinkService
+import uk.ac.ox.softeng.maurodatamapper.core.facet.SemanticLinkType
 import uk.ac.ox.softeng.maurodatamapper.core.model.CatalogueItem
 import uk.ac.ox.softeng.maurodatamapper.core.traits.domain.MultiFacetItemAware
 import uk.ac.ox.softeng.maurodatamapper.datamodel.DataModel
@@ -57,6 +60,7 @@ import grails.validation.ValidationErrors
 import groovy.json.JsonOutput
 import groovy.util.logging.Slf4j
 import org.apache.commons.text.WordUtils
+import org.grails.datastore.gorm.GormEntity
 import org.grails.datastore.gorm.GormValidateable
 import org.slf4j.Logger
 import org.slf4j.LoggerFactory
@@ -101,6 +105,9 @@ abstract class AbstractDatabaseDataModelImporterProviderService<S extends Databa
 
     @Autowired
     DataTypeService dataTypeService
+
+    @Autowired
+    SemanticLinkService semanticLinkService
 
     @Autowired
     MessageSource messageSource
@@ -165,7 +172,44 @@ abstract class AbstractDatabaseDataModelImporterProviderService<S extends Databa
         }
         log.debug('No errors in imported models')
 
+        // Save semantic links after dataModels
+        List<SemanticLink> allSemanticLinks = []
+        dataModels.each {
+            it.dataTypes.each {
+                it.semanticLinks?.each {
+                    allSemanticLinks << it
+                }
+            }
+        }
+        dataModels.each {
+            it.allDataElements.each {
+                it.semanticLinks?.each {
+                    allSemanticLinks << it
+                }
+            }
+        }
+
+        dataModels.each {
+            it.dataTypes.each {
+                it.semanticLinks = null
+            }
+            it.allDataElements.each {
+                it.semanticLinks = null
+            }
+        }
+        dataModels.each {
+            it.allDataElements.each {
+                it.semanticLinks = null
+            }
+        }
+
         dataModels.each {DataModel dm -> dataModelService.saveModelWithContent(dm)}
+
+        allSemanticLinks.each {
+            it.multiFacetAwareItem = ((GormEntity) it.multiFacetAwareItem).refresh()
+            it.targetMultiFacetAwareItem = ((GormEntity) it.targetMultiFacetAwareItem).refresh()
+            semanticLinkService.save(it)
+        }
 
         dataModels
     }
@@ -364,6 +408,7 @@ abstract class AbstractDatabaseDataModelImporterProviderService<S extends Databa
             final int minMultiplicity = isColumnNullable(row[columnIsNullableColumnName] as String) ? 0 : 1
             final DataElement dataElement = dataElementService.findOrCreateDataElementForDataClass(
                 tableDataClass, row[columnNameColumnName] as String, null, user, dataType, minMultiplicity, 1)
+            dataElement.addToMetadata(namespace: namespaceColumn(), key: 'original_data_type', value: row[dataTypeColumnName] as String, createdBy: user.emailAddress)
             dataElement.setIndex(row.ordinal_position as Integer)
             addAliasIfSuitable(dataElement)
             row.findAll {String column, data ->
@@ -377,7 +422,7 @@ abstract class AbstractDatabaseDataModelImporterProviderService<S extends Databa
     }
 
     void validateFacets(MdmDomain domain, DataModel dataModel, boolean deepValidate = false) {
-        final List<String> facetProperties = ['annotations', 'metadata', 'referenceFiles', 'referenceSummaryMetadata', 'rules', 'semanticLinks', 'summaryMetadata',
+        final List<String> facetProperties = ['annotations', 'metadata', 'referenceFiles', 'referenceSummaryMetadata', 'rules', /*'semanticLinks',*/ 'summaryMetadata',
                                               'versionLinks']
         facetProperties.each {String propName ->
             if (domain.hasProperty(propName)) domain[propName].each {MultiFacetItemAware it ->
@@ -494,10 +539,12 @@ abstract class AbstractDatabaseDataModelImporterProviderService<S extends Databa
 
         // Make 1 call to get the distinct values, then use the size of the that results to tell if its actually an ET
         final List<Map<String, Object>> results = getDistinctColumnValues(connection, calculationStrategy, samplingStrategy, dataElement.label,
-                                                                          tableClass.label, schemaClass?.label, calculationStrategy.isColumnAlwaysEnumeration(dataElement.label))
+                                                                          tableClass.label, schemaClass?.label,
+                                                                          calculationStrategy.isColumnAlwaysEnumeration(dataElement.label))
         if (calculationStrategy.isEnumerationType(dataElement.label, results.size())) {
 
             EnumerationType enumerationType = enumerationTypeService.findOrCreateDataTypeForDataModel(dataModel, enumerationTypeLabel, enumerationTypeLabel, user)
+            enumerationType.addToSemanticLinks(linkType: SemanticLinkType.REFINES, targetMultiFacetAwareItem: dataElement.dataType, createdBy: user.emailAddress)
             replacePrimitiveTypeWithEnumerationType(dataElement, dataElement.dataType, enumerationType, results)
             return true
         }
@@ -675,7 +722,10 @@ abstract class AbstractDatabaseDataModelImporterProviderService<S extends Databa
     void addForeignKeyInformation(DataModel dataModel, DataClass schemaClass, Connection connection) throws ApiException, SQLException {
         final List<Map<String, Object>> results = executePreparedStatement(dataModel, schemaClass, connection, queryStringProvider.foreignKeyInformationQueryString)
         results.each {Map<String, Object> row ->
-            final DataClass foreignTableClass = dataModel.dataClasses.find {DataClass dataClass -> dataClass.label == row.reference_table_name}
+            final DataClass foreignTableClass = dataModel.dataClasses.find {DataClass dataClass ->
+                dataClass.label == row.reference_table_name && dataClass.parentDataClass?.label == row.reference_schema_name
+            }
+            DataElement foreignDataElement
             DataType dataType
 
             if (foreignTableClass) {
@@ -683,6 +733,7 @@ abstract class AbstractDatabaseDataModelImporterProviderService<S extends Databa
                     dataModel, "${foreignTableClass.label}Type", "Linked to DataElement [${row.reference_column_name}]",
                     dataModel.createdBy, foreignTableClass)
                 dataModel.addToDataTypes dataType
+                foreignDataElement = foreignTableClass.dataElements.find {it.label == row.reference_column_name}
             } else {
                 dataType = primitiveTypeService.findOrCreateDataTypeForDataModel(
                     dataModel, "${row.reference_table_name}Type",
@@ -693,8 +744,17 @@ abstract class AbstractDatabaseDataModelImporterProviderService<S extends Databa
             final DataClass tableClass = schemaClass ? schemaClass.findDataClass(row.table_name as String) : dataModel.dataClasses.find {it.label == row.table_name as String}
             final DataElement columnElement = tableClass.findDataElement(row.column_name as String)
             columnElement.dataType = dataType
+
             columnElement.addToMetadata(namespaceColumn(), "foreign_key_name", row.constraint_name as String, dataModel.createdBy)
+            columnElement.addToMetadata(namespaceColumn(), "foreign_key_schema", row.reference_schema_name as String, dataModel.createdBy)
+            columnElement.addToMetadata(namespaceColumn(), "foreign_key_table", row.reference_table_name as String, dataModel.createdBy)
             columnElement.addToMetadata(namespaceColumn(), "foreign_key_columns", row.reference_column_name as String, dataModel.createdBy)
+
+            if (foreignDataElement) {
+                // add bidirectional semantic link as foreign key should be equal
+                columnElement.addToSemanticLinks(linkType: SemanticLinkType.REFINES, targetMultiFacetAwareItem: foreignDataElement, createdBy: dataModel.createdBy)
+                foreignDataElement.addToSemanticLinks(linkType: SemanticLinkType.REFINES, targetMultiFacetAwareItem: columnElement, createdBy: dataModel.createdBy)
+            }
         }
 
     }

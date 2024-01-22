@@ -489,12 +489,15 @@ abstract class AbstractDatabaseDataModelImporterProviderService<S extends Databa
                                              DataModel dataModel, DataClass schemaClass, DataClass tableClass, DataElement dataElement, User user) {
         logEnumerationDetection(samplingStrategy, dataElement)
 
+        String enumerationTypeLabel = "${tableClass.label}.${dataElement.label}"
+        if (schemaClass?.label) enumerationTypeLabel = "${schemaClass.label}.${enumerationTypeLabel}"
+
         // Make 1 call to get the distinct values, then use the size of the that results to tell if its actually an ET
         final List<Map<String, Object>> results = getDistinctColumnValues(connection, calculationStrategy, samplingStrategy, dataElement.label,
                                                                           tableClass.label, schemaClass?.label, calculationStrategy.isColumnAlwaysEnumeration(dataElement.label))
         if (calculationStrategy.isEnumerationType(dataElement.label, results.size())) {
 
-            EnumerationType enumerationType = enumerationTypeService.findOrCreateDataTypeForDataModel(dataModel, dataElement.label, dataElement.label, user)
+            EnumerationType enumerationType = enumerationTypeService.findOrCreateDataTypeForDataModel(dataModel, enumerationTypeLabel, enumerationTypeLabel, user)
             replacePrimitiveTypeWithEnumerationType(dataElement, dataElement.dataType, enumerationType, results)
             return true
         }

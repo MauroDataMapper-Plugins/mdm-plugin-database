@@ -203,7 +203,7 @@ abstract class AbstractDatabaseDataModelImporterProviderService<S extends Databa
             }
         }
 
-        dataModels.each {DataModel dm -> dataModelService.saveModelWithContent(dm)}
+        List<DataModel> savedDataModels = dataModels.collect {DataModel dm -> dataModelService.saveModelWithContent(dm)}
 
         allSemanticLinks.each {
             it.multiFacetAwareItem = ((GormEntity) it.multiFacetAwareItem).refresh()
@@ -211,7 +211,7 @@ abstract class AbstractDatabaseDataModelImporterProviderService<S extends Databa
             semanticLinkService.save(it)
         }
 
-        dataModels
+        savedDataModels
     }
 
     /**
@@ -399,15 +399,19 @@ abstract class AbstractDatabaseDataModelImporterProviderService<S extends Databa
             if (importSchemaAsDataClass) {
                 DataClass schemaDataClass = dataClassService.findOrCreateDataClass(dataModel, row[schemaNameColumnName] as String, null, user)
                 addAliasIfSuitable(schemaDataClass)
+                schemaDataClass.addToMetadata(namespace: namespaceSchema(), key: 'schema_name', value: row[schemaNameColumnName] as String, createdBy: user.emailAddress)
                 tableDataClass = dataClassService.findOrCreateDataClass(schemaDataClass, tableName, null, user)
             } else {
                 tableDataClass = dataClassService.findOrCreateDataClass(dataModel, tableName, null, user)
             }
+            tableDataClass.addToMetadata(namespace: namespaceTable(), key: 'table_name', value: tableName, createdBy: user.emailAddress)
+            tableDataClass.addToMetadata(namespace: namespaceTable(), key: 'table_type', value: row.table_type as String, createdBy: user.emailAddress)
 
             addAliasIfSuitable(tableDataClass)
             final int minMultiplicity = isColumnNullable(row[columnIsNullableColumnName] as String) ? 0 : 1
             final DataElement dataElement = dataElementService.findOrCreateDataElementForDataClass(
                 tableDataClass, row[columnNameColumnName] as String, null, user, dataType, minMultiplicity, 1)
+            dataElement.addToMetadata(namespace: namespaceColumn(), key: 'column_name', value: row[columnNameColumnName] as String, createdBy: user.emailAddress)
             dataElement.addToMetadata(namespace: namespaceColumn(), key: 'original_data_type', value: row[dataTypeColumnName] as String, createdBy: user.emailAddress)
             dataElement.setIndex(row.ordinal_position as Integer)
             addAliasIfSuitable(dataElement)
@@ -441,7 +445,7 @@ abstract class AbstractDatabaseDataModelImporterProviderService<S extends Databa
                 CalculationStrategy calculationStrategy = createCalculationStrategy(parameters)
                 SamplingStrategy samplingStrategy = createSamplingStrategy(schemaClass.label, tableClass.label, parameters)
                 if (samplingStrategy.requiresTableType()) {
-                    samplingStrategy.tableType = getTableType(connection, tableClass.label, schemaClass.label, dataModel.label)
+                    samplingStrategy.tableType = tableClass.metadata.find {it.key == 'table_type'}.value
                 }
                 try {
                     // If SS needs the approx count then make the query, this can take a long time hence the reason to check if we need it
@@ -751,9 +755,8 @@ abstract class AbstractDatabaseDataModelImporterProviderService<S extends Databa
             columnElement.addToMetadata(namespaceColumn(), "foreign_key_columns", row.reference_column_name as String, dataModel.createdBy)
 
             if (foreignDataElement) {
-                // add bidirectional semantic link as foreign key should be equal
+                // add semantic link: foreign key refines the referenced element
                 columnElement.addToSemanticLinks(linkType: SemanticLinkType.REFINES, targetMultiFacetAwareItem: foreignDataElement, createdBy: dataModel.createdBy)
-                foreignDataElement.addToSemanticLinks(linkType: SemanticLinkType.REFINES, targetMultiFacetAwareItem: columnElement, createdBy: dataModel.createdBy)
             }
         }
 
@@ -806,11 +809,11 @@ abstract class AbstractDatabaseDataModelImporterProviderService<S extends Databa
      * @param schemaName
      * @return
      */
-    String getTableType(Connection connection, String tableName, String schemaName, String modelName) {
+    String getTableType(Connection connection, String tableName, String schemaName, String databaseName) {
 
         String tableType = ""
         final PreparedStatement preparedStatement = connection.prepareStatement(queryStringProvider.tableTypeQueryString())
-        preparedStatement.setString(1, modelName)
+        preparedStatement.setString(1, databaseName)
         preparedStatement.setString(2, schemaName)
         preparedStatement.setString(3, tableName)
         List<Map<String, Object>> results = executeStatement(preparedStatement)

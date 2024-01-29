@@ -1,5 +1,5 @@
 /*
- * Copyright 2020-2023 University of Oxford and NHS England
+ * Copyright 2020-2024 University of Oxford and NHS England
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -44,8 +44,10 @@ abstract class QueryStringProvider {
      * Must return a String which will be queryable by schema name,
      * and return a row with the following elements:
      *  * constraint_name
+     *  * schema_name
      *  * table_name
      *  * column_name
+     *  * reference_schema_name
      *  * reference_table_name
      *  * reference_column_name
      * @return Query string for foreign key information

@@ -161,9 +161,10 @@ abstract class AbstractDatabaseDataModelImporterProviderService<S extends Databa
             updateImportedModelFromParameters(dm, parameters as S, false)
         }
 
-        validateImportedDataModels(dataModels).each {DataModel dm ->
+        dataModels.each {DataModel dm ->
             checkImport(currentUser, dm, parameters as S)
         }
+        validateImportedDataModels(dataModels)
 
         if (dataModels.any {it.hasErrors()}) {
             Errors errors = new ValidationErrors(dataModels, dataModels.first().class.getName())
@@ -180,9 +181,12 @@ abstract class AbstractDatabaseDataModelImporterProviderService<S extends Databa
                     allSemanticLinks << it
                 }
             }
-        }
-        dataModels.each {
             it.allDataElements.each {
+                it.semanticLinks?.each {
+                    allSemanticLinks << it
+                }
+            }
+            it.dataClasses.each {
                 it.semanticLinks?.each {
                     allSemanticLinks << it
                 }
@@ -196,9 +200,7 @@ abstract class AbstractDatabaseDataModelImporterProviderService<S extends Databa
             it.allDataElements.each {
                 it.semanticLinks = null
             }
-        }
-        dataModels.each {
-            it.allDataElements.each {
+            it.dataClasses.each {
                 it.semanticLinks = null
             }
         }
@@ -206,9 +208,12 @@ abstract class AbstractDatabaseDataModelImporterProviderService<S extends Databa
         List<DataModel> savedDataModels = dataModels.collect {DataModel dm -> dataModelService.saveModelWithContent(dm)}
 
         allSemanticLinks.each {
-            it.multiFacetAwareItem = ((GormEntity) it.multiFacetAwareItem).refresh()
-            it.targetMultiFacetAwareItem = ((GormEntity) it.targetMultiFacetAwareItem).refresh()
-            semanticLinkService.save(it)
+            if (!it.multiFacetAwareItemId) it.multiFacetAwareItemId = it.multiFacetAwareItem.id
+            if (!it.targetMultiFacetAwareItemId) it.targetMultiFacetAwareItemId = it.targetMultiFacetAwareItem.id
+            if (!it.multiFacetAwareItemDomainType) it.multiFacetAwareItemDomainType = it.multiFacetAwareItem.domainType
+            if (!it.targetMultiFacetAwareItemDomainType) it.targetMultiFacetAwareItemDomainType = it.targetMultiFacetAwareItem.domainType
+
+            it.save(validate: false)
         }
 
         savedDataModels

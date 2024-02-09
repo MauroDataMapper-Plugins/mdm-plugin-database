@@ -43,6 +43,18 @@ abstract class QueryStringProvider {
     /**
      * Must return a String which will be queryable by schema name,
      * and return a row with the following elements:
+     *  * table_name
+     *  * column_name
+     *  * is_identity (boolean)
+     *  * seed_value (integer)
+     *  * increment_value (integer)
+     * @return Query string for identity/serial column information
+     */
+    abstract String getIdentityColumnInformationQueryString()
+
+    /**
+     * Must return a String which will be queryable by schema name,
+     * and return a row with the following elements:
      *  * constraint_name
      *  * schema_name
      *  * table_name

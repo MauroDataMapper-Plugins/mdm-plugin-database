@@ -490,6 +490,7 @@ abstract class AbstractDatabaseDataModelImporterProviderService<S extends Databa
     void updateDataModelWithDatabaseSpecificInformation(DataModel dataModel, Connection connection) throws ApiException, SQLException {
         addStandardConstraintInformation dataModel, connection
         addPrimaryKeyAndUniqueConstraintInformation dataModel, connection
+        addIdentityColumnInformation dataModel, connection
         addIndexInformation dataModel, connection
         addForeignKeyInformation dataModel, connection
         addMetadata dataModel, connection
@@ -718,6 +719,33 @@ abstract class AbstractDatabaseDataModelImporterProviderService<S extends Databa
             } as List<Map>
 
             tableClass.addToMetadata(namespaceTable(), 'indexes', JsonOutput.prettyPrint(JsonOutput.toJson(indexes)), dataModel.createdBy)
+        }
+    }
+
+    void addIdentityColumnInformation(DataModel dataModel, Connection connection) {
+        if (!queryStringProvider.indexInformationQueryString) return
+        dataModel.childDataClasses.each {DataClass schemaClass ->
+            addIdentityColumnInformation(dataModel, schemaClass, connection)
+        }
+    }
+
+    void addIdentityColumnInformation(DataModel dataModel, DataClass schemaClass, Connection connection) {
+        final List<Map<String, Object>> results = executePreparedStatement(dataModel, schemaClass, connection, queryStringProvider.identityColumnInformationQueryString)
+
+        results.groupBy {it.table_name}.each {tableName, rows ->
+            final DataClass tableClass = schemaClass ? schemaClass.findDataClass(tableName as String) : dataModel.dataClasses.find {(it.label == tableName as String)}
+            if (!tableClass) {
+                log.warn 'Could not add identity column information as DataClass for table {} does not exist', tableName
+                return
+            }
+
+            tableClass.dataElements.each {DataElement dataElement ->
+                rows.find {it.column_name == dataElement.label}?.with {row ->
+                    dataElement.addToMetadata(namespaceColumn(), 'identity', getBooleanValue(row.is_identity) as String)
+                    dataElement.addToMetadata(namespaceColumn(), 'identity_seed_value', row.seed_value as String)
+                    dataElement.addToMetadata(namespaceColumn(), 'identity_increment_value', row.increment_value as String)
+                }
+            }
         }
     }
 
